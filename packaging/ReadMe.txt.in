@@ -1,9 +1,9 @@
 Boxer for AROS @VERSION@ (@ABI_NAME@, x86_64)
 =============================================
 
-This is a TEST BUILD of the AROS port of Boxer, the DOS game emulator
-front end by Alun Bestor, with Boxer's DOSBox 0.74 core. It is not a
-release. Expect missing features and bugs.
+This is an experimental preview of the AROS port of Boxer, the DOS game
+emulator front end by Alun Bestor, with Boxer's DOSBox 0.74 core. It is
+not yet the complete Boxer experience. Expect missing features and bugs.
 
 This build only runs on @ABI_NAME@. Binaries for ABIv11 (AROS One) and for
 mainline AROS (ABI v1) are different files and do not run on each other.
@@ -64,28 +64,13 @@ can take the whole AROS system down when it is closed (see Known issues).
 
 Known issues
 ------------
-Tested on ABIv11 (AROS One) only, under QEMU. Mainline AROS (ABI v1) has
-not been tested with this package.
+Tested on x86_64 ABIv11 (AROS One) only, under QEMU. Other ABIv11
+distributions, real hardware and mainline AROS (ABI v1) have not been
+tested with this package. Game compatibility is not yet broadly tested.
 
-Not tested in this package's acceptance runs: paths that contain spaces,
-importing from LhA archives, and keeping icons that a game folder already
-has. They may work; nobody has checked them for this build.
-
-- Loading a Tyrian save from the game's title screen froze the game with
-  noise on the screen, twice, on ABIv11. Loading the same save through the
-  in-game Options menu worked. That is the path that was checked, not a
-  workaround known to avoid every freeze. The same game copy and save
-  loaded fine in a Mac build of Boxer on DOSBox Staging; that is a
-  comparison, not a confirmed cause.
-- After such a freeze, quitting the session caused a DOSBox assertion
-  (CPU_IRET, cpu.cpp:901) and, separately, a crash in the SDL audio
-  thread. These are two separate events and neither is explained yet.
-  Closing a hung session can crash the whole AROS system.
-- The session froze twice at the end of a game installer (when the
-  installer exited) on a machine with live audio output. Eight later
-  attempts did not freeze. How often it happens is not known.
-- Tyrian's first title menu may ignore keys and clicks until its demo has
-  run once (observed; cause not known).
+- A game session can freeze, including when a game installer exits.
+- Closing a hung session can crash the whole AROS system.
+These problems are still under investigation.
 
 When something goes wrong
 -------------------------
@@ -114,7 +99,9 @@ If Boxer is still on screen but seems hung:
      Copy RAM:boxerui.log Work:boxerui-1.log
 3. Type Status to list running programs; note whether BoxerUI is there.
 
-Please send: the log file, what you did just before (which screen, which
+Report problems through the issue tracker at
+  https://github.com/tomaszstaniak/aros-boxerapp/issues
+Please send: which game you tried, the log file, what you did just before (which screen, which
 button or key), the AROS version and distribution (Kickstart/Workbench
 version from the Wanderer "About" window), the ABI (ABIv11 or mainline),
 the amount of RAM, whether it runs on real hardware (which) or in an

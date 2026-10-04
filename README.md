@@ -3,42 +3,43 @@
 An AROS port of [Boxer](https://github.com/alinebee/Boxer), the DOS game
 emulator front end by Alun Bestor, with Boxer's own DOSBox 0.74 core.
 
-**This is a first experimental preview, not a full Boxer port.** It
-follows the original's look and gamebox format, but many of Boxer's
-features are not there yet, and there are known bugs (below). Use it on a
-test installation of AROS, not on the system you depend on.
+It brings Boxer's gamebox workflow and interface to AROS using Zune.
+**This is a first experimental preview.** It provides
+the foundation for the port; it is not yet the complete Boxer experience.
 
-## Targets
+## What this preview can do
 
-- **Confirmed:** AROS x86_64 ABIv11 (AROS One and other ABIv11
-  distributions). Tested under QEMU.
-- **Builds, not tested:** mainline AROS x86_64 (ABI v1).
+Import a game folder, run its installer or copy a ready-to-play game,
+choose its startup program, and launch it from its icon. You can play, save
+using the game's own save system, close the session, and reopen the game to
+continue. Game saves and other changes made during play are stored
+separately in **Boxer Data**, so the imported gamebox stays unchanged.
+
+Music, sound effects, volume control and the basic import-to-play workflow
+have been tested. No games are included; bring your own DOS games.
+
+## Supported system
+
+- **Tested:** AROS x86_64 ABIv11 (AROS One), under QEMU. Other ABIv11
+  distributions and real hardware have not been tested.
+- **Builds, not tested:** mainline AROS x86_64 (ABI v1), an intended target.
 
 ABIv11 and mainline binaries are different files and do not run on each
-other. No DOS games or game data are included.
+other.
 
-## What works in this preview
+## Download
 
-On ABIv11, this sequence was checked end to end: import a DOS game (run its
-installer, or copy it in) into a gamebox, launch it, save in the game, quit,
-reopen the gamebox and load the save.
+Get the archive from the
+[releases page](https://github.com/tomaszstaniak/aros-boxerapp/releases)
+(currently [0.1.0 preview 1](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview1),
+x86_64 ABIv11). Checksums are listed with each release.
 
-## Known issues
+## Before testing
 
-- Loading a save from Tyrian's title screen froze the game twice. Loading
-  it through the in-game Options menu worked; that is the path that was
-  checked, not a workaround known to avoid every freeze.
-- After such a freeze, quitting caused a DOSBox assertion (`CPU_IRET`,
-  `cpu.cpp:901`) and, separately, a crash in the SDL audio thread; neither
-  is explained yet. **Closing a hung session can crash the whole AROS
-  system.**
-- A session froze twice when a game installer exited, on a machine with
-  live audio output; eight later attempts did not freeze.
-- Tyrian's first title menu may ignore keys and clicks until its demo has
-  run once.
-- Not tested in this preview's acceptance runs: paths that contain spaces,
-  importing from LhA archives, and keeping icons that a game folder already
-  has.
+**Use a separate test installation or a copy of your AROS system.** This is
+an early preview: sessions can freeze, including when leaving a game
+installer, and closing a hung session can crash AROS. These problems are
+still under investigation. Game compatibility is not yet broadly tested.
 
 ## Install
 
@@ -64,12 +65,18 @@ delete them only if you no longer want them.
 
 ## Reporting a problem
 
+Report problems through the
+[issue tracker](https://github.com/tomaszstaniak/aros-boxerapp/issues).
+Hardware testing and feedback are welcome.
+
 BoxerUI logs to `RAM:boxerui.log` by default, which is lost when AROS
 restarts or crashes. To keep it, start BoxerUI with a log in a writable
 drawer, for example the ToolType `LOG=Work:boxerui.log` or, from a Shell,
 `BoxerUI LOG Work:boxerui.log` (the Boxer drawer itself may be read-only).
 
-Please open an issue with:
+Please include:
+
+- which game you tried, what worked, and the steps that led to the problem;
 
 - the log file;
 - what you did just before the problem (screen, button or key);
