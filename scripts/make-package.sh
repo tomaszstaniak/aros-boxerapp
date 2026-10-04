@@ -43,12 +43,31 @@ got=$(shasum -a 256 "$bin" | cut -d' ' -f1)
 awk '/^sources:/{f=1;next} /^core library/{f=0} f{print $1"  "$2}' "$info" > "$BUILD_DIR/.pkg-src.sha256"
 # BOXER_PKG_ALLOW_STALE=1 packages anyway for a dry run of the recipe; the
 # result is marked NOT CORRESPONDING and must never be distributed.
-stale=0
-if ! (cd "$P" && shasum -a 256 -c --quiet "$BUILD_DIR/.pkg-src.sha256"); then
-  [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ] \
-    || die "sources changed since the build; rebuild (build-core.sh, build-ui.sh) before packaging"
-  stale=1; ver="$ver-STALE"
-  echo "make-package: WARNING sources changed since the build; dry run, not distributable" >&2
+#
+# BOXER_PKG_ACCEPTED_BINARY=<sha256> + BOXER_PKG_SOURCE_NOTE=<text>: package
+# an already-accepted binary whose sources were changed afterwards in ways
+# that do not change the program (e.g. comments only). The sha256 must equal
+# the binary's; the changed files and the note are written to BUILDINFO.txt.
+# The script cannot prove the change is behaviour-neutral: whoever sets the
+# note must have checked it (for example by a rebuild that differs only in
+# the embedded build time).
+stale=0; srcnote=""
+# shasum exits 1 on a mismatch and grep 1 on none; only the text counts.
+changed=$( (cd "$P" && shasum -a 256 -c "$BUILD_DIR/.pkg-src.sha256" 2>/dev/null) | grep -v ': OK$' || true)
+if [ -n "$changed" ]; then
+  if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
+    [ "$BOXER_PKG_ACCEPTED_BINARY" = "$got" ] \
+      || die "BOXER_PKG_ACCEPTED_BINARY ($BOXER_PKG_ACCEPTED_BINARY) is not this BoxerUI ($got)"
+    [ -n "${BOXER_PKG_SOURCE_NOTE:-}" ] || die "BOXER_PKG_ACCEPTED_BINARY needs BOXER_PKG_SOURCE_NOTE"
+    srcnote="$changed"
+    echo "make-package: packaging accepted binary $got; sources changed since the build:" >&2
+    echo "$changed" | sed 's/^/  /' >&2
+  elif [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ]; then
+    stale=1; ver="$ver-STALE"
+    echo "make-package: WARNING sources changed since the build; dry run, not distributable" >&2
+  else
+    die "sources changed since the build; rebuild (build-core.sh, build-ui.sh) before packaging"
+  fi
 fi
 rm -f "$BUILD_DIR/.pkg-src.sha256"
 lib="$BUILD_DIR/core$HOST_SUFFIX/libboxer-dosbox.a"
@@ -99,7 +118,7 @@ python3 "$P/tools/mkicon.py" "$pkg/Install-Assign.info" project --default-tool C
 # work/, build/ or local.env (private or machine-specific).
 srcname="boxer-$ver-source"; sx="$out/.src/$srcname"
 mkdir -p "$sx/aros-boxerapp" "$sx/boxer-upstream/Resources/Base.lproj"
-srcpaths=(COPYING README.md upstreams.json local.env.example LICENSES documentation src scripts
+srcpaths=(.gitignore COPYING README.md upstreams.json upstreams.example.json local.env.example LICENSES documentation src scripts
   tools patches packaging assets tests third_party)
 # In a Git checkout only tracked files go in, so local material in those
 # directories (ignored or untracked) is never published by accident.
@@ -116,7 +135,14 @@ pin=$(git -C "$UPSTREAM_DIR" rev-parse HEAD)
 cp "$strings" "$sx/boxer-upstream/Resources/Base.lproj/"
 printf 'repository: https://github.com/alinebee/Boxer.git\ncommit: %s\n' "$pin" > "$sx/UPSTREAM-PIN.txt"
 cp "$P/packaging/SOURCE-README.txt" "$sx/"
-cp "$info" "$sx/BUILDINFO-$BOXER_ABI.txt"
+# Published copies of BUILDINFO name the configured directories by their
+# variable (see local.env.example), not by this machine's paths.
+pubinfo() {
+  sed -e "s|$AROS_TOOLCHAIN|\$AROS_TOOLCHAIN|g" -e "s|$AROS_SDK|\$AROS_SDK|g" \
+      -e "s|${AROS_ISO_FONTS:-/nonexistent}|\$AROS_ISO_FONTS|g" -e "s|$P/|<project>/|g" \
+      -e "s|$HOME|~|g" "$1"
+}
+pubinfo "$info" > "$sx/BUILDINFO-$BOXER_ABI.txt"
 srcarc="$srcname.tar.gz"
 (cd "$out/.src" && COPYFILE_DISABLE=1 tar --uid 0 --gid 0 --uname root --gname wheel -czf "$pkg/$srcarc" "$srcname")
 chmod -R u+w "$out/.src"; rm -rf "$out/.src"
@@ -127,10 +153,15 @@ chmod -R u+w "$out/.src"; rm -rf "$out/.src"
 sdkrev=$(git -C "${sdkrepo:-/nonexistent}" rev-parse --short=10 HEAD 2>/dev/null || echo "unknown (${sdkrepo:-AROS source not set})")
 sdkbr=$(git -C "${sdkrepo:-/nonexistent}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 {
-  cat "$info"
+  pubinfo "$info"
   echo
   echo "package: boxer $ver $target"
   [ $stale = 1 ] && echo "WARNING: NOT CORRESPONDING SOURCE - src/ changed after this binary was built; dry run only, do not distribute"
+  if [ -n "$srcnote" ]; then
+    echo "source changed after the build (accepted binary $got):"
+    echo "$srcnote" | sed 's/^/  /'
+    echo "  note: $BOXER_PKG_SOURCE_NOTE"
+  fi
   echo "package date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "AROS link libraries from source: $sdkrepo at $sdkrev (branch $sdkbr)"
   echo "Boxer upstream: https://github.com/alinebee/Boxer.git $pin + patches/boxer/series"

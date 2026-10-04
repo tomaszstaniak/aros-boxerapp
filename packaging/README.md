@@ -46,6 +46,12 @@ WAV, TTF, EXE, `.boxer` or Dune file ends up in the drawer.
    binary and the script stops. `BOXER_PKG_ALLOW_STALE=1` builds a dry-run
    package anyway, versioned `-STALE` and marked NOT CORRESPONDING in
    `BUILDINFO.txt`; never distribute one.
+   `BOXER_PKG_ACCEPTED_BINARY=<sha256>` with `BOXER_PKG_SOURCE_NOTE=<text>`
+   packages an already-accepted binary after source changes that do not
+   change the program (for example comments only): the sha256 must match
+   `BoxerUI`, and the changed files and the note are recorded in
+   `BUILDINFO.txt`. The script cannot verify the note; check it first, for
+   example with a rebuild that differs only in the embedded build time.
 3. `work/boxer` conf files equal the upstream pin; `upstream/boxer` is at the
    commit in `upstreams.json`.
 4. `scripts/check-package-notices.sh` on the drawer must pass.
