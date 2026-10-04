@@ -1,0 +1,18 @@
+Replacement icons in assets/source/replacements/ and assets/runtime/replacements/
+
+These stand in for the Apple system images NSRevealFreestandingTemplate,
+NSLockLockedTemplate and NSLockUnlockedTemplate (category b), plus the
+full-screen toolbar glyph. Per-file sources, hashes, commands and UI use:
+assets/replacement-assets.json.
+
+History: until 2026-10-02 Tango Desktop Project 0.8.90 (public domain)
+stood in for gamefolder.icns, import.png, prompt.icns and Game.png. Boxer's
+originals are used again (assets/NOTICE-boxer.txt). The Tango sources remain
+in the source tree only, unused (LICENSES/Tango-Public-Domain.txt).
+
+Feather icons 4.29.2 - MIT, Copyright (c) 2013-2023 Cole Bemis.
+  https://registry.npmjs.org/feather-icons/-/feather-icons-4.29.2.tgz
+  Used: search, maximize-2, lock, unlock (stroke widened, rasterised).
+  The MIT notice must accompany copies: LICENSES/MIT-Feather.txt
+
+The licence is compatible with distribution of BoxerUI under GPL-2.0.

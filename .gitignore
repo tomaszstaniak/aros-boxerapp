@@ -1,0 +1,30 @@
+# Build outputs and fetched dependencies
+/build/
+/dist/
+/deps/
+
+# Pinned upstream checkout and the patched working copy (scripts/bootstrap.sh)
+/upstream/
+/work/
+
+# Machine-specific configuration (copy local.env.example)
+/local.env
+/local.json
+/.env
+/.env.local
+
+# Local game data, gameboxes and saves; never part of the repository
+/var/
+*.boxer
+*.boxerstate
+
+# Recordings and captures
+*.ppm
+*.mov
+*.mp4
+
+# Host metadata
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc

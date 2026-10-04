@@ -1,0 +1,40 @@
+Title: MOUNT: AROS volume paths are not PhysFS archives
+Repository: boxer (https://github.com/alinebee/Boxer.git)
+Date: 2026-10-01
+Author: tomaszstaniak <68373859+tomaszstaniak@users.noreply.github.com>
+Base-Commit: 0062fc18e154cde6cef3bf3329be4b0658597e31
+Preceding-Patches:
+  0001-aros-host-sdl-seam.patch
+  0002-aros-config.patch
+Problem: MOUNT::Run treats any ':' after a drive-letter prefix as a PhysFS archive path. AROS host paths always contain the volume separator (RAM:boxer-run/c), so every mount was routed to PhysFS, which this build lacks; no drive was created. 'newdrive' was also left uninitialised on that path, so the following NULL check passed and garbage was dereferenced: Software Failure, privilege violation in MOUNT::Run+0x9A6 on ABIv11 (2026-10-01, AROS ABIv11 2026.09 under QEMU).
+Solution: Initialise newdrive to NULL (the IMGMOUNT branch already does), and when the build has no PhysFS (C_HAVE_PHYSFS false) never classify a path as a PhysFS archive. A later PhysFS build on AROS will need a different archive syntax, since ':' cannot mark one there.
+Platform-Scope: All builds without PhysFS; the colon rule matters on AROS, the NULL default everywhere.
+Upstream-Status: local-only
+Verification: 2026-10-01, ABIv11 2026.09 under QEMU, GCC 10.5.0, boxer-core-smoke: 'mount c RAM:boxer-run/c' mounted C:, BOXTEST SAVE ran twice from it, run ended with result 0. Mainline v1 not run yet.
+Removal-Condition: If PhysFS support with an AROS-compatible archive syntax is added.
+
+diff --git a/DOSBox/src/dos/dos_programs.cpp b/DOSBox/src/dos/dos_programs.cpp
+index b659e7d916bd005bea792e2938aed304584eaa38..5e6b1108724dc8b3d1bf33f4278afbe5e29d3a32 100644
+--- a/DOSBox/src/dos/dos_programs.cpp
++++ b/DOSBox/src/dos/dos_programs.cpp
+@@ -54,7 +54,7 @@ class MOUNT : public Program {
+ public:
+ 	void Run(void)
+ 	{
+-		DOS_Drive * newdrive;char drive;
++		DOS_Drive * newdrive = NULL;char drive;
+ 		std::string label;
+ 		std::string umount;
+ 
+@@ -175,6 +175,11 @@ public:
+ 			if (!cmd->FindCommand(2,temp_line)) goto showusage;
+ 			if (!temp_line.size()) goto showusage;
+ 			bool is_physfs = temp_line.find(':',((temp_line[0]|0x20) >= 'a' && (temp_line[0]|0x20) <= 'z')?2:0) != std::string::npos;
++#if !C_HAVE_PHYSFS
++			// Without PhysFS a colon cannot select an archive; on AROS it is
++			// the volume separator of an ordinary host path (SYS:Games/...).
++			is_physfs = false;
++#endif
+ 			struct stat test;
+ 			//Win32 : strip tailing backslashes
+ 			//os2: some special drive check

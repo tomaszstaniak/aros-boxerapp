@@ -1,0 +1,11 @@
+--- a/src/time/unix/SDL_systime.c
++++ b/src/time/unix/SDL_systime.c
+@@ -23,7 +23,9 @@
+ #include "../SDL_time_c.h"
+ #include <errno.h>
++#ifdef HAVE_NL_LANGINFO
+ #include <langinfo.h>
++#endif
+ #include <sys/time.h>
+ #include <time.h>
+ #include <unistd.h>

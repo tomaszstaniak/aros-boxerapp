@@ -1,0 +1,21 @@
+Required on the target system: ABIv11 (AROS One 1.3 / ABIv11 2026.09), x86_64
+Derived from the link trace of BoxerUI (2026-10-02)
+and the library names found in this BoxerUI binary. Presence on any given
+AROS image has NOT been checked by this package.
+
+Opened at program start (autoinit; BoxerUI does not start without them):
+  exec.library graphics.library intuition.library utility.library
+  diskfont.library cybergraphics.library muimaster.library (Zune)
+  gadtools.library iffparse.library keymap.library commodities.library
+  workbench.library
+  crt.library stdlib.library m.library   (ABIv11 C runtime)
+  gl.library                             (only a link stub is in BoxerUI;
+                                          the library is not shipped)
+Opened later by BoxerUI or the SDL code linked into it:
+  dos.library icon.library lowlevel.library
+  timer.device input.device clipboard.device ahi.device (sound)
+Not needed: sdl2.library (SDL 2.32.10 is linked statically on this ABI).
+Fonts: Fonts:TrueType/VeraSans.ttf and VeraSansBold.ttf (the system's
+  Bitstream Vera Sans; Boxer's Fonts/*.otag refer to them). Without them
+  BoxerUI falls back to topaz.font.
+Stack: 65536 bytes (set in BoxerUI.info; type "Stack 65536" in a Shell).

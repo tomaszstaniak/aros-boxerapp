@@ -1,0 +1,39 @@
+Title: AROS configuration switches for the core
+Repository: boxer (https://github.com/alinebee/Boxer.git)
+Date: 2026-10-01
+Author: tomaszstaniak <68373859+tomaszstaniak@users.noreply.github.com>
+Base-Commit: 0062fc18e154cde6cef3bf3329be4b0658597e31
+Preceding-Patches: 0001-aros-host-sdl-seam.patch
+Problem: DOSBox/config.h is Boxer's hand-maintained configuration for macOS. On AROS x86_64 it enables features without host support (serial/IPX/modem via SDL_net, OpenGL, SDL_sound, process priority, mprotect) and forces C_FPU_X86, whose inline assembly is i386-only and fails to assemble for x86_64.
+Solution: Add an __AROS__ block that undefines those switches: MACOSX, C_FPU_X86 (stock DOSBox configure enables it for i386 only), C_HAVE_MPROTECT (AROS memory is executable, the dynrec cache needs no mprotect), C_DIRECTSERIAL, C_IPX, C_MODEM, C_OPENGL, C_SDL_SOUND, C_SET_PRIORITY, HAVE_NETINET_IN_H, HAVE_SYS_SOCKET_H. Disabled features are recorded as port limitations, not dropped from scope: CD audio from compressed tracks (SDL_sound), IPX/serial networking.
+Platform-Scope: AROS (all architectures; C_DYNREC stays selected for x86_64 by the existing logic).
+Upstream-Status: local-only
+Verification: 2026-10-01: with 0001, all 119 TUs compile for ABIv11 and mainline v1 (GCC 10.5.0); boxer-core-smoke links on both. Runtime not tested yet.
+Removal-Condition: Revisit each switch when its host support is ported (SDL_sound/SDL_net equivalents, serial).
+
+diff --git a/DOSBox/config.h b/DOSBox/config.h
+index 73f8c598f20e45108cb9012f376382028043822d..2e9b8fd3d45aa0e763080e6da7a78533e1d5f0db 100644
+--- a/DOSBox/config.h
++++ b/DOSBox/config.h
+@@ -375,3 +375,21 @@ typedef		int64_t		Bit64s;
+ 
+ */
+ //--End of modifications
++
++/* AROS: features whose host support is absent or not yet ported. Boxer forced
++ * C_FPU_X86 on for x86_64 too, but its inline assembly is i386-only (stock
++ * DOSBox configure enables it for i386 alone); the dynrec cache needs no
++ * mprotect because AROS memory is executable. */
++#ifdef __AROS__
++#undef MACOSX
++#undef C_FPU_X86
++#undef C_HAVE_MPROTECT
++#undef C_DIRECTSERIAL
++#undef C_IPX
++#undef C_MODEM
++#undef C_OPENGL
++#undef C_SDL_SOUND
++#undef C_SET_PRIORITY
++#undef HAVE_NETINET_IN_H
++#undef HAVE_SYS_SOCKET_H
++#endif

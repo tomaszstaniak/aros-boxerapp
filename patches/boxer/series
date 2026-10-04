@@ -1,0 +1,7 @@
+
+0001-aros-host-sdl-seam.patch
+0002-aros-config.patch
+0003-mount-colon-paths.patch
+0004-host-sdl3-core-audio-timer-on-sdl3-under-boxer-hos.patch
+0005-mixer-channel-lock.patch
+0006-mixer-audio-path-errors.patch

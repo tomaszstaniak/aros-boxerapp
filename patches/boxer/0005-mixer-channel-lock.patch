@@ -1,0 +1,79 @@
+Title: Mixer: channel list changes under the host audio lock; SDL2 device closed at mixer stop
+Repository: boxer (https://github.com/alinebee/Boxer.git)
+Date: 2026-10-02
+Author: tomaszstaniak <68373859+tomaszstaniak@users.noreply.github.com>
+Base-Commit: 0062fc18e154cde6cef3bf3329be4b0658597e31
+Preceding-Patches:
+  0001-aros-host-sdl-seam.patch
+  0002-aros-config.patch
+  0003-mount-colon-paths.patch
+  0004-host-sdl3-core-audio-timer-on-sdl3-under-boxer-hos.patch
+Problem: The host device callback (SDL2 audio thread, SDL3 device thread running the stream callback) walks mixer.channels and writes chan->done. MIXER_AddChannel and MIXER_DelChannel changed that list without the host lock, and MIXER_DelChannel freed the channel at once. Config::~Config deletes sections in reverse order, so every device (sblaster/OPL, gus, speaker, ...) removes its channel while the device callback still runs; the mixer section, registered earlier, stops last. A callback positioned on the removed channel then reads its next pointer and writes its done field after free. SDL2 also never closed the device in MIXER_Stop, so its callback kept running through the rest of the teardown until SDL_Quit (SDL3 already destroyed the stream there). Parameter changes (SetVolume/UpdateVolume/boxer_updateVolumes, SetFreq) only touch fields the callback does not read, and on AROS they run on the emulator task, so they were left unlocked; Enable and FillUp already locked.
+Solution: MIXER_AddChannel links the fully initialised channel under MIXER_LockHost; MIXER_DelChannel unlinks and deletes under it. MIXER_Stop calls SDL_CloseAudio on the SDL2 host (joins the device thread); afterwards SDL_LockAudio/SDL_PauseAudio are no-ops, so later lock calls are safe. Both locks are recursive (SDL2 device mutex, SDL3 stream mutex) and are taken from inside MIXER_Mix handlers already, so a device that removes a channel from a handler does not deadlock; nothing waits for the callback while holding the lock (SDL_CloseAudio/SDL_DestroyAudioStream are called unlocked).
+Platform-Scope: All non-Apple builds of the core, both hosts (BOXER_HOST=sdl2 and sdl3), AROS ABIv11 and mainline v1. The lock code compiles on any host.
+Upstream-Status: local-only
+Verification: 2026-10-02: a host race harness (not published; real mixer.cpp, pthread SDL stand-in, callback in a tight loop on its own thread, freed channels quarantined with next -> trap): before 2096/2065 freed-channel walks per 3 s (sdl2/sdl3) and 2.2 M SDL2 callbacks after MIXER_Stop; after 0 and 0, three runs each. Builds: build-core/build-ui sdl2 and sdl3 on ABIv11 and mainline v1. Guest runs on ABIv11.
+Removal-Condition: When the core is replaced or its mixer is rewritten with its own list synchronisation.
+
+diff --git a/DOSBox/src/hardware/mixer.cpp b/DOSBox/src/hardware/mixer.cpp
+index f2ec9af7db04e512fed724b29bc019796912c7e7..17732bf9ee2ebac5efe2068091863152b96055d3 100644
+--- a/DOSBox/src/hardware/mixer.cpp
++++ b/DOSBox/src/hardware/mixer.cpp
+@@ -102,10 +102,15 @@ MixerChannel * MIXER_AddChannel(MIXER_Handler handler,Bitu freq,const char * nam
+ 	chan->handler=handler;
+ 	chan->name=name;
+ 	chan->SetFreq(freq);
+-	chan->next=mixer.channels;
+ 	chan->SetVolume(1,1);
+ 	chan->enabled=false;
++	//--Modified 2026 for the AROS port: the device callback walks this list
++	//on its own thread; link the fully built channel under the host lock.
++	MIXER_LockHost();
++	chan->next=mixer.channels;
+ 	mixer.channels=chan;
++	MIXER_UnlockHost();
++	//--End of modifications
+ 	return chan;
+ }
+ 
+@@ -119,17 +124,26 @@ MixerChannel * MIXER_FindChannel(const char * name) {
+ }
+ 
+ void MIXER_DelChannel(MixerChannel* delchan) {
++	//--Modified 2026 for the AROS port: devices are destroyed before the
++	//mixer (Config::~Config runs sections in reverse), so channels are
++	//removed while the device callback may be walking the list and writing
++	//chan->done. Unlink and free under the host lock; the callback then
++	//either finished with the channel or never sees it. The lock is
++	//recursive on both hosts and the callback never waits on this thread.
++	MIXER_LockHost();
+ 	MixerChannel * chan=mixer.channels;
+ 	MixerChannel * * where=&mixer.channels;
+ 	while (chan) {
+ 		if (chan==delchan) {
+ 			*where=chan->next;
+ 			delete delchan;
+-			return;
++			break;
+ 		}
+ 		where=&chan->next;
+ 		chan=chan->next;
+ 	}
++	MIXER_UnlockHost();
++	//--End of modifications
+ }
+ 
+ void MixerChannel::UpdateVolume(void) {
+@@ -580,6 +594,12 @@ static void MIXER_Stop(Section* sec) {
+ 		mixer_stream=NULL;
+ 		SDL_DestroyAudioStream(stream);
+ 	}
++#else
++	//--Modified 2026: SDL2's device stayed open until SDL_Quit, so its
++	//callback kept running while the rest of the core was torn down.
++	//SDL_CloseAudio joins the device thread; afterwards SDL_LockAudio and
++	//SDL_PauseAudio are no-ops, so later MIXER_LockHost calls are safe.
++	if (!mixer.nosound) SDL_CloseAudio();
+ #endif
+ }
+ 

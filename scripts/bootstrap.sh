@@ -1,0 +1,5 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Tomasz Staniak
+# Wrapper: see scripts/patchtool.py and documentation/patching.md.
+exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patchtool.py" bootstrap "$@"

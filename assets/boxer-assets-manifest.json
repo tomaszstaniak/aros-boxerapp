@@ -1,0 +1,2543 @@
+{
+ "upstream": "alunbestor/Boxer",
+ "commit": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+ "generated_by": "scripts/boxer-assets.py",
+ "tools": {
+  "host": "macOS 27.2 arm64",
+  "sips": "sips-316",
+  "afconvert": "afconvert from the same macOS (no version flag)",
+  "python": "3.14.7",
+  "iconutil": "iconutil from the same macOS (no version flag)"
+ },
+ "counts": {
+  "a": 101,
+  "c": 15,
+  "d": 80
+ },
+ "apple_system_images_by_name": [
+  "NSActionTemplate",
+  "NSAddTemplate",
+  "NSApplicationIcon",
+  "NSFolder",
+  "NSFollowLinkFreestandingTemplate",
+  "NSLockLockedTemplate",
+  "NSLockUnlockedTemplate",
+  "NSPreferencesGeneral",
+  "NSRefreshTemplate",
+  "NSRemoveTemplate",
+  "NSRevealFreestandingTemplate",
+  "NSRightFacingTriangleTemplate",
+  "NSStopProgressFreestandingTemplate"
+ ],
+ "assets": [
+  {
+   "path": "Bundler/Resources/app.icns",
+   "sha256": "67b97a77c003bc0165c8a7ee40528a375884867412141efdf8a7fc318628be89",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Bundler/Resources/app.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/app-32.png",
+     "sha256": "10229480f80805e79e244bc913f55ea2818e824e26d46908d8459e31a05bf9fb",
+     "command": "sips -s format png -Z 32 upstream/boxer/Bundler/Resources/app.icns --out assets/runtime/boxer/app-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/app-128.png",
+     "sha256": "6d8242991b507dd458eb86ffb76bf32cc84c66f101294639709bbd4eae24fbad",
+     "command": "sips -s format png -Z 128 upstream/boxer/Bundler/Resources/app.icns --out assets/runtime/boxer/app-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/app-512.png",
+     "sha256": "3db263da81e9db837d5b7fc1c7629837ea2d8a0b463ccff9a640d0fbef6da7c0",
+     "command": "sips -s format png -Z 512 upstream/boxer/Bundler/Resources/app.icns --out assets/runtime/boxer/app-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Frameworks/BGHUDAppKit.framework/Versions/A/Resources/BGHUDAppKitPlugin.ibplugin/Contents/Resources/outlineview.png",
+   "sha256": "75133549e1b5320ae29feb252e53a806fc8f0c551e07cad62811916142c44639",
+   "category": "c",
+   "reason": "BGHUDAppKit (BSD-3, Tim Davis); IB plugin images, not used at runtime"
+  },
+  {
+   "path": "Frameworks/BGHUDAppKit.framework/Versions/A/Resources/BGHUDAppKitPlugin.ibplugin/Contents/Resources/scrollview.png",
+   "sha256": "8e281c1c7fbc1257e907442d7ec25b43fd81249b5101ba9b6c9925934ab6a214",
+   "category": "c",
+   "reason": "BGHUDAppKit (BSD-3, Tim Davis); IB plugin images, not used at runtime"
+  },
+  {
+   "path": "Frameworks/BGHUDAppKit.framework/Versions/A/Resources/BGHUDAppKitPlugin.ibplugin/Contents/Resources/tableview.png",
+   "sha256": "cacdad998a513a49ab1aa2367501056326ce36d5f11b09524ed1de97304b0963",
+   "category": "c",
+   "reason": "BGHUDAppKit (BSD-3, Tim Davis); IB plugin images, not used at runtime"
+  },
+  {
+   "path": "Frameworks/BGHUDAppKit.framework/Versions/A/Resources/BGHUDAppKitPlugin.ibplugin/Contents/Resources/tabview.png",
+   "sha256": "a52a063198f38b0e2fa37017d01c1cf3147fe790b12982a1cb2c242a175cc95b",
+   "category": "c",
+   "reason": "BGHUDAppKit (BSD-3, Tim Davis); IB plugin images, not used at runtime"
+  },
+  {
+   "path": "Frameworks/BGHUDAppKit.framework/Versions/A/Resources/BGHUDAppKitPlugin.ibplugin/Contents/Resources/textview.png",
+   "sha256": "4008f5c5c7e7c5405fca5aa8209b3aa4c44a37d9fc16b2a1a0d494626b1b4f99",
+   "category": "c",
+   "reason": "BGHUDAppKit (BSD-3, Tim Davis); IB plugin images, not used at runtime"
+  },
+  {
+   "path": "Frameworks/Sparkle.framework/Versions/A/Resources/Autoupdate.app/Contents/Resources/AppIcon.icns",
+   "sha256": "f96998658e63a5d83d91ed9b0b3f0558bc235991c172985aef347fc2535fdaab",
+   "category": "c",
+   "reason": "Sparkle (MIT, Andy Matuschak); updater not ported (D3)"
+  },
+  {
+   "path": "Frameworks/Sparkle.framework/Versions/A/Resources/Autoupdate.app/Contents/Resources/Sparkle.icns",
+   "sha256": "d3bdf012983d7f5f40414815c3afbb35c740d6151d628e17d7ba51491b319dbe",
+   "category": "c",
+   "reason": "Sparkle (MIT, Andy Matuschak); updater not ported (D3)"
+  },
+  {
+   "path": "Resources/35Diskette.icns",
+   "sha256": "03fb98649390318165fb24837ee8fbf721b2b22966238619f6df416d69985a43",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/35Diskette.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/35Diskette-32.png",
+     "sha256": "476201b07a92860da77f8ea5bc3b969977ebd2333589d4ee57e5936cee7717ec",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/35Diskette.icns --out assets/runtime/boxer/35Diskette-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/35Diskette-128.png",
+     "sha256": "597e3ab4e1c2904a9cb49bf34041418c49e54cc53de9af23df4eac06d236ad7b",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/35Diskette.icns --out assets/runtime/boxer/35Diskette-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/35Diskette-512.png",
+     "sha256": "f69b256fefa9870620114dfa51315e27e248ad00385d864f9454fd78b613455e",
+     "command": "sips -s format png -Z 512 upstream/boxer/Resources/35Diskette.icns --out assets/runtime/boxer/35Diskette-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/35DisketteShine.icns",
+   "sha256": "97044bfca3dd585c63532770cd542f135e05a0f4fe38948343288d904db18ca1",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/35DisketteShine.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/35DisketteShine-32.png",
+     "sha256": "4cbd677e15dd74f8e948cd0ee69ff4d4237002286f083d0e92a8966da81fd1c6",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/35DisketteShine.icns --out assets/runtime/boxer/35DisketteShine-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/35DisketteShine-128.png",
+     "sha256": "338b1c2215133480b4778c7da2035f5c814785941a8dcca4965f57f11ddce080",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/35DisketteShine.icns --out assets/runtime/boxer/35DisketteShine-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/35DisketteShine-512.png",
+     "sha256": "7992d8597712cf8cdb01fb28eaa89cc00bc0d1c32518cbc04a38da99e20f8c6c",
+     "command": "sips -s format png -Z 512 upstream/boxer/Resources/35DisketteShine.icns --out assets/runtime/boxer/35DisketteShine-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/4ButtonJoystick.png",
+   "sha256": "704ac20167a0504ed073a941ed53900e560f4f51949a489be0a3fbc566e56f4d",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/4ButtonJoystick.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/4ButtonJoystick.png",
+     "sha256": "704ac20167a0504ed073a941ed53900e560f4f51949a489be0a3fbc566e56f4d",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/4ButtonJoystick@2x.png",
+   "sha256": "9e97162b3bb9f1104843c6674d5a0e5abb1d3eeb4d7363669f9413d6164aee5d",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/4ButtonJoystick@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/4ButtonJoystick@2x.png",
+     "sha256": "9e97162b3bb9f1104843c6674d5a0e5abb1d3eeb4d7363669f9413d6164aee5d",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/525Diskette.icns",
+   "sha256": "a6917dd7a1b62904559ede9e584956ca60398be6b7f7515cce26bd2d396e8fe3",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/525Diskette.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/525Diskette-32.png",
+     "sha256": "fad461bd4fb5b960f6a7a459c49f19795edcded3c45b6f1fdfb65f416140e81c",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/525Diskette.icns --out assets/runtime/boxer/525Diskette-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/525Diskette-128.png",
+     "sha256": "9810b64fab2383b813b4d78fb1bf3d9e2425142da2ebe45719c82a89dedff41b",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/525Diskette.icns --out assets/runtime/boxer/525Diskette-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/525Diskette-512.png",
+     "sha256": "e631a344e85db232e831ed12a9fcaf51204eb8493f59000ad80d3b35580bc981",
+     "command": "sips -s format png -Z 512 upstream/boxer/Resources/525Diskette.icns --out assets/runtime/boxer/525Diskette-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/AboutBackground.png",
+   "sha256": "ffa10371e90a718b91f882fd8d57b375e805b440fcdef78603306dc2a4b43ad0",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/AboutBackground.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/AboutBackground.png",
+     "sha256": "ffa10371e90a718b91f882fd8d57b375e805b440fcdef78603306dc2a4b43ad0",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/AboutBackground@2x.png",
+   "sha256": "bad01f261fad75564d0b8c7f551e2298979233e378a1ec9a43c034854a4a34c2",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/AboutBackground@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/AboutBackground@2x.png",
+     "sha256": "bad01f261fad75564d0b8c7f551e2298979233e378a1ec9a43c034854a4a34c2",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Audio.png",
+   "sha256": "dd8c23b4d60d8208611fe54566a30c6aaa981b2160c17d006756b1399e0839cd",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Audio.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Audio.png",
+     "sha256": "dd8c23b4d60d8208611fe54566a30c6aaa981b2160c17d006756b1399e0839cd",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Audio@2x.png",
+   "sha256": "02d0f9379445e5035092b8dac6a945ccbe3045fd520baacc97fee60638fd420b",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Audio@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Audio@2x.png",
+     "sha256": "02d0f9379445e5035092b8dac6a945ccbe3045fd520baacc97fee60638fd420b",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Base.lproj/ImportCoverArtTip.png",
+   "sha256": "94f2c62231100464b6244a9e19436f2d8034ece396be2dd6618e903e797bcfe2",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Base.lproj/ImportCoverArtTip.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ImportCoverArtTip.png",
+     "sha256": "94f2c62231100464b6244a9e19436f2d8034ece396be2dd6618e903e797bcfe2",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Base.lproj/ImportCoverArtTip@2x.png",
+   "sha256": "2ae91619d44447880ce67c06997e7f1d17cc7018fd7b528e6b6847a007db2a69",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Base.lproj/ImportCoverArtTip@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ImportCoverArtTip@2x.png",
+     "sha256": "2ae91619d44447880ce67c06997e7f1d17cc7018fd7b528e6b6847a007db2a69",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Base.lproj/ImportRenameTip.png",
+   "sha256": "631a2868282a44b089d89e07a676eb1f15b81b762eb2f3ae28d1606f158eed9a",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Base.lproj/ImportRenameTip.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ImportRenameTip.png",
+     "sha256": "631a2868282a44b089d89e07a676eb1f15b81b762eb2f3ae28d1606f158eed9a",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Base.lproj/ImportRenameTip@2x.png",
+   "sha256": "77553f1a3eaf51a3356542767b9839575588d719683e3ba5cd22551049ed69dc",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Base.lproj/ImportRenameTip@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ImportRenameTip@2x.png",
+     "sha256": "77553f1a3eaf51a3356542767b9839575588d719683e3ba5cd22551049ed69dc",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Blueprint.jpg",
+   "sha256": "4d5a811b5f3178cd40a4d04e613508c4ee0f3c96e21bf3cd3bfd0a4dc943e00b",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Blueprint.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Blueprint.png",
+     "sha256": "554a1e744df08d2e27bf7089780907c029403e4abc6098d9f56fdd9ab1c1bd3c",
+     "command": "sips -s format png upstream/boxer/Resources/Blueprint.jpg --out assets/runtime/boxer/Blueprint.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Blueprint@2x.jpg",
+   "sha256": "d93e9942ac4617bd85e6a2d69b7b8b67b7a58036468a19336c789911f03081a9",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Blueprint@2x.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Blueprint@2x.png",
+     "sha256": "df5c6439789be2cf16229de69bd3c738a70d52329a00ea238aa5895d21037229",
+     "command": "sips -s format png upstream/boxer/Resources/Blueprint@2x.jpg --out assets/runtime/boxer/Blueprint@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/BoxArtShine.png",
+   "sha256": "2bf132a5e49d3bfc57ead67f19d49f692ff613590b00752c5970d389feeb6f0f",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/BoxArtShine.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/BoxArtShine.png",
+     "sha256": "2bf132a5e49d3bfc57ead67f19d49f692ff613590b00752c5970d389feeb6f0f",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/gamebox-contextmenu.png",
+   "sha256": "987c90d63941f81dbd5f878406467f01fd58866e382b55fe0eb2f758ba60fbc9",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/gamebox-internals.png",
+   "sha256": "38bb46f16f16361696965409b1239f6e963d16de6f92e4e9f296f9b3d8e4264e",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/help-menu-documentation.png",
+   "sha256": "41857c4dc50f9ed8d08161a63e820f140f8d4171b7f3da7d67ab0891050dffe5",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/import-choose-installer.png",
+   "sha256": "44111c71033bd9bd6eb42338d72c168319da260331cb78a48da59459b63de023",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/import-done.png",
+   "sha256": "6848a2c277e60f1067e85d264c9930ff044de8681739f5b00916ec3ddaf30173",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/import-drop-coverart.png",
+   "sha256": "914d67c1d7cca69a2eadebadff6d5bc687bcb002a666ee7b73cfb2d20485e3ab",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/import-dropzone.png",
+   "sha256": "caa8ae9362cd7acfd1758d0aeca748fa0255d1d5dadd79e1403af5bcd749fe34",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/import-finishing.png",
+   "sha256": "664a00f0eb4802bccd9530f96847dbbe1dcec3e45cdf25f0db00e5ba50d21d6d",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/import-run-installer.png",
+   "sha256": "83e300b289d6e252a4be137b326d0e26ba62f872d5401480f524db4b128faec0",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/inspector-cpu.png",
+   "sha256": "86fabf19ccbd8a26fb03516c40650f00a4e86cc664a770be779b77cdfaf1585f",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/inspector-drives.png",
+   "sha256": "0261407c3d6358c59cb78c91aadd5f598a023b1aeb2dd5a6584928db0567cd1d",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/inspector-drop-coverart.png",
+   "sha256": "00fa281a0d3428acb081eae7a83adb009a4cae70fc8a8671cacfbe61a8469c3a",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/inspector-mouse.png",
+   "sha256": "741f0cae3f8c5390e0597fff5a849781858ba9e937c6908de31beac786d0b00c",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/numeric-keypad.png",
+   "sha256": "f599ec340c3c0a024194f1af41030383dc3a3bd616d70f51705ef19c671afe83",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/English.lproj/images/program-chooser.png",
+   "sha256": "9715624d4f5949bcf7a1744c7e31e39b358e2ff8cbc87b83b33e6c80ec4f7728",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/360-controller.png",
+   "sha256": "684eb6589991ea8b3efa3208be9e3926068e80385d9faa562a64d81719d77571",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/add-drive-button.png",
+   "sha256": "878b930871e78d31b283981cc5143164e2ce83eede4e4f709bb80ce2c0e6a756",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/application-popout.png",
+   "sha256": "6f880017f6dece77ab9479573466c0e8704fdd7bd5b5942cf7ced5c4431af7ac",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/boxer-128.png",
+   "sha256": "5b871378d4be3ebcd3619feeb85d919766e214581654d099d464d8f3f871c2b9",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/boxer-16.png",
+   "sha256": "1da4639b3d9efe872281f367efdaa20c2753ab3aec2cd801325dcbe2d1a5cf0b",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/bundle-drive-button.png",
+   "sha256": "ddff1ac1ca12fe8c3ff641a468e4ccd91f64278900c5f5fabc360f64a49052e1",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/coverart-128.png",
+   "sha256": "d53ab03a3e285d7404ec86739a55f56ac20b9b108cbf04d1521f5223bfd7afc3",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/crt.png",
+   "sha256": "01579ca1cfec5fdd1db3bfe3489979add7f40246e4b54489a89ff7cc1679aa97",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/display-32.png",
+   "sha256": "6d3f30a32908f2ef8fe5466a086e9b73838c64b9cc50082c4fc802d32511b515",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/eject-drive-button.png",
+   "sha256": "44c8785945d3ee82b46f281db18bb4775ef3a8b7f2d94c88db3efc0a14955bde",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/email-popout.png",
+   "sha256": "00021536d165bf9989cfbdc99bb20a5d2d632106d55b0f2351c878c69a691c6c",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/fast-forward-key.png",
+   "sha256": "40865304b64cdc41bac0825a4b5988c198214d110360e4990894ba1f93d99efb",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/flightstick-pro-128.png",
+   "sha256": "ac950029850851be84a2651ff714d47e92682cbdc7e36e2ee28c3f03a4f54698",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/gallery-hqx.png",
+   "sha256": "9a8caabfa8f286ff0eea81f69ffd42f237ab4f081d3b868561bd7b9fc4c9f9a7",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/game-shelf.jpg",
+   "sha256": "ee1df752ed82912d5195a0dba662eae86978e60d50d1712851b264e6bcf6f486",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/gamebox-128.png",
+   "sha256": "adfe42d820270403d4381ecf191d9c2ab27561aec5fbeee8e9459b8ce7742882",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/games-folder-128-trimmed.png",
+   "sha256": "59e09c8d7b2e621e875cb328f4060fbb8f9986311f5a37f2f464c5871d1e04b1",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/icon.png",
+   "sha256": "1da4639b3d9efe872281f367efdaa20c2753ab3aec2cd801325dcbe2d1a5cf0b",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/importer-128.png",
+   "sha256": "8acd5a5ee225012402054d97def4aca4b577df188e152ad2660e53f116b45712",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/importer-32.png",
+   "sha256": "3d01e9980794098355c5ad3ded9c4db64848fe185b2d1bb99d0b6741515fdbe5",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/info.png",
+   "sha256": "2ccbef49ac76653687bb5e021c8172ac8542feb5ad97ca10299871ec64782d39",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/insert-drive-button.png",
+   "sha256": "fe74bacd77098f0bf3ab9c8d9090f39ea7f985f7acbd80905aa4783a4b0d0651",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/joypad-logo.png",
+   "sha256": "a701834f09f7e244f91ef59c88151fc614ae528e61a1ee3818814a5b261be225",
+   "category": "c",
+   "reason": "Joypad app logo (third-party product brand); Joypad SDK not ported (D3)"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/joystick-disabled-128.png",
+   "sha256": "0ba900666b6d00a8fa3d0166b46ab49ad742d90aee9f3bb1399a287e745e0029",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/mt32.png",
+   "sha256": "da3b5b538b863de02425a0de70f3c68a94db3cae86cbfcbb1e2f9c8141040c33",
+   "category": "d",
+   "reason": "depicts Roland hardware with Roland name/logo (trademark)"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/play-pause-key.png",
+   "sha256": "d57cec43ad5506b268326393f5be347ab9dcdba6e873092a79430e171b50ee0e",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/racing-wheel-128.png",
+   "sha256": "bdf9a5025adbcb3881a5c43516a476ff57628c74500676ccf0742d08224dbecb",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/reveal.png",
+   "sha256": "581b3c08d3761a4eadaf84672b0e780a79f744fdfe9d00bc166ebb089c609697",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/site-popout.png",
+   "sha256": "349c1a6d1f810dba668eb31271fd40eebfbba0c4ee896a182fff8512095f2f2c",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/standard-joystick-128.png",
+   "sha256": "056ffc56082e5cb2bcd8b65f957bf008c3760c0d7ab5a01094462af7100274c5",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/thrustmaster-128.png",
+   "sha256": "84aedbbd77f0097828f9625ad35e8a249b0580f7c5ca5068d4ef659e91c0e4c8",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/Boxer.help/Contents/Resources/shared/images/topic-arrow.png",
+   "sha256": "9a557c860a2d3bcfe15c9db21ae35cd71b832bd508ab199fba7b565d7534c850",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Resources/Brand.png",
+   "sha256": "1bb1860da152ba437044c5f0623e8d3ce094d9170fbf1a7ee1cf68f487957c12",
+   "category": "c",
+   "reason": "DOSBox cross logo by Robert Hagenström, 'used with permission' (acknowledgements.html); permission was given to Boxer, not to this port"
+  },
+  {
+   "path": "Resources/BrandWatermark.png",
+   "sha256": "71eed2bc061a828da89342886c260f89ecda7b9330f5d90aed49bd35980a2dee",
+   "category": "c",
+   "reason": "DOSBox cross logo by Robert Hagenström, 'used with permission' (acknowledgements.html); permission was given to Boxer, not to this port"
+  },
+  {
+   "path": "Resources/BundleFreestandingTemplate.pdf",
+   "sha256": "fdfbb0e122199a252db0be18847c529157b91c6511753090ba569266ae986fcb",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/BundleFreestandingTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/BundleFreestandingTemplate.png",
+     "sha256": "1816dbf8fc907bd44cec96d4b115f20bc0a0882327346ba83c661b3f0eb4e2b6",
+     "command": "sips -s format png -Z 14 upstream/boxer/Resources/BundleFreestandingTemplate.pdf --out assets/runtime/boxer/BundleFreestandingTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/BundleFreestandingTemplate@2x.png",
+     "sha256": "0ca992624169729ef28cd43b29d293f4d841c98b8095442b00106f4bb5896d38",
+     "command": "sips -s format png -Z 28 upstream/boxer/Resources/BundleFreestandingTemplate.pdf --out assets/runtime/boxer/BundleFreestandingTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/BunnyTemplate.pdf",
+   "sha256": "d247024d9199f7378efee5bc729ba506779113d3acb742ef2e952c5f365412d1",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/BunnyTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/BunnyTemplate.png",
+     "sha256": "7f7c26e8544de16a111c556650babab61d1b8d7ba8cd9120e51f08bde274863b",
+     "command": "sips -s format png -Z 14 upstream/boxer/Resources/BunnyTemplate.pdf --out assets/runtime/boxer/BunnyTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/BunnyTemplate@2x.png",
+     "sha256": "2cd477d9b922d1468c0faa32901d8e9cfbd4d7762739aa8600da297c7fff307f",
+     "command": "sips -s format png -Z 28 upstream/boxer/Resources/BunnyTemplate.pdf --out assets/runtime/boxer/BunnyTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/CDCase.icns",
+   "sha256": "1a01e6cb3d7eeddaee7e78496891ebd95fb4a7381ff4e5f813188eeb79672d85",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/CDCase.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/CDCase-32.png",
+     "sha256": "edb09a36baf41db794dcc8ae843e21a09603ab9c397eeb0cb6de76e835020052",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/CDCase.icns --out assets/runtime/boxer/CDCase-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/CDCase-128.png",
+     "sha256": "4deb49c306259e7dde7666afd17d3e961b4624ecfce14faf7657644af62ff5c7",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/CDCase.icns --out assets/runtime/boxer/CDCase-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/CDCase-512.png",
+     "sha256": "47fa9ca224d823afc34c56944e46fbf11f1fae4dfa3d97bb5fe0aec93d9b4c3b",
+     "command": "sips -s format png -Z 512 upstream/boxer/Resources/CDCase.icns --out assets/runtime/boxer/CDCase-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/CDCover.icns",
+   "sha256": "a371bb209b77c86984a42d2bf2ee8118c8da417ddca4f93cf0b102484b06f4ea",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/CDCover.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/CDCover-32.png",
+     "sha256": "dae2d5ddc76edf5eb952bc9880ec12c609f0c929e85d521474d84ea237951fdc",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/CDCover.icns --out assets/runtime/boxer/CDCover-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/CDCover-128.png",
+     "sha256": "d271390ce3951592d6f4e11a4824a74aa0dd934a1d323dec758ce742c1a4fb67",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/CDCover.icns --out assets/runtime/boxer/CDCover-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/CDCover-512.png",
+     "sha256": "2a967ae86e61a1d107ceab0a27b966fd8b2e705df87f2eb623d322144a61e49f",
+     "command": "sips -s format png -Z 512 upstream/boxer/Resources/CDCover.icns --out assets/runtime/boxer/CDCover-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/CDROMTemplate.pdf",
+   "sha256": "08f2d3032f107d412ef9783ab03738c00c74388ba09a44f13eabf1ea308a0705",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/CDROMTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/CDROMTemplate.png",
+     "sha256": "fe308ce4b0725e488175f23c4fb9a341d1c79a095b1414d6cadcd58b4dd59417",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/CDROMTemplate.pdf --out assets/runtime/boxer/CDROMTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/CDROMTemplate@2x.png",
+     "sha256": "1a8ed3ba40ee023d6ead3a312cbadc7805bef96c8ab42062d0357d5a6499adcd",
+     "command": "sips -s format png -Z 64 upstream/boxer/Resources/CDROMTemplate.pdf --out assets/runtime/boxer/CDROMTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/CHFlightstickPro.png",
+   "sha256": "60190e439dd8609bb8278732d5ca09fbdf1279134e87be6150f9fc94df7b396a",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/CHFlightstickPro@2x.png",
+   "sha256": "113bd51cafe8382927bef3e407d1ee1032471751aba9aa16389c11499f4c1782",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/CM32L.png",
+   "sha256": "cd0fe2033500b470dd5a0383b3fc15c6f82659335e80f6708bb9aa150781bc5e",
+   "category": "d",
+   "reason": "depicts Roland hardware with Roland name/logo (trademark)"
+  },
+  {
+   "path": "Resources/CM32L@2x.png",
+   "sha256": "48ae62cb4429e5053f654d07405320203b29081487015d6deee9c1d86f768725",
+   "category": "d",
+   "reason": "depicts Roland hardware with Roland name/logo (trademark)"
+  },
+  {
+   "path": "Resources/CPU.png",
+   "sha256": "d6e2f6fedcfe9a563ec2e9aff9ed79ab022218d06c9ca23d557fac1aa389c74d",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/CPU.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/CPU.png",
+     "sha256": "d6e2f6fedcfe9a563ec2e9aff9ed79ab022218d06c9ca23d557fac1aa389c74d",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/CPU@2x.png",
+   "sha256": "5a23bda36cf72d7426d09084916c8156323b3d56589c074a74c7a168e37c20d4",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/CPU@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/CPU@2x.png",
+     "sha256": "5a23bda36cf72d7426d09084916c8156323b3d56589c074a74c7a168e37c20d4",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DOSWindowBackground.png",
+   "sha256": "a40a599240c353f3a9a77ccac43e19b844df58942f51c4dacede639f26416191",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DOSWindowBackground.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DOSWindowBackground.png",
+     "sha256": "a40a599240c353f3a9a77ccac43e19b844df58942f51c4dacede639f26416191",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DOSWindowBackground@2x.png",
+   "sha256": "a40a599240c353f3a9a77ccac43e19b844df58942f51c4dacede639f26416191",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DOSWindowBackground@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DOSWindowBackground@2x.png",
+     "sha256": "a40a599240c353f3a9a77ccac43e19b844df58942f51c4dacede639f26416191",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DOSWindowGrille.png",
+   "sha256": "7e6b5193db12a844269dade77ce1c36661ef6bd017e7c00ba3706d71ab505b72",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DOSWindowGrille.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DOSWindowGrille.png",
+     "sha256": "7e6b5193db12a844269dade77ce1c36661ef6bd017e7c00ba3706d71ab505b72",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DOSWindowGrille@2x.png",
+   "sha256": "ea2bb629272f05c2cb709131c2d88664b4166b1f18140f57b593061d87834355",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DOSWindowGrille@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DOSWindowGrille@2x.png",
+     "sha256": "ea2bb629272f05c2cb709131c2d88664b4166b1f18140f57b593061d87834355",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DiscSwapTemplate.pdf",
+   "sha256": "8a1ef4c674907776265c1814cd4f2ac4e435f6501874c67de79df54ab29d043e",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DiscSwapTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DiscSwapTemplate.png",
+     "sha256": "4be3d3ec31d8a32598f0cef6ae90d1066c07a7a95e04102c6e7bc14800c4d8b2",
+     "command": "sips -s format png -Z 24 upstream/boxer/Resources/DiscSwapTemplate.pdf --out assets/runtime/boxer/DiscSwapTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/DiscSwapTemplate@2x.png",
+     "sha256": "ae655f4818e6aca836dd9b1d0203babf694a444d3b1e623c32fda54250bc7280",
+     "command": "sips -s format png -Z 48 upstream/boxer/Resources/DiscSwapTemplate.pdf --out assets/runtime/boxer/DiscSwapTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DisketteTemplate.pdf",
+   "sha256": "e162cbbc29dfb89f4244cc3ed3f594897aef71bc8f2d7321f50cbede32808b89",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DisketteTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DisketteTemplate.png",
+     "sha256": "4e6a11be1ca027606f6e6565c72ebd900a8c39b1f1d0f17a845680267f4bc19e",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/DisketteTemplate.pdf --out assets/runtime/boxer/DisketteTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/DisketteTemplate@2x.png",
+     "sha256": "1aefd5e1b62a723a0e3b888bccf3ca8e3b18645a538f4fe8c4fbb88dae555d82",
+     "command": "sips -s format png -Z 64 upstream/boxer/Resources/DisketteTemplate.pdf --out assets/runtime/boxer/DisketteTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Display.png",
+   "sha256": "b7f1a6cb6709999c6d768d880366903ee4f4c0e54972315aa801d633d6c8b82c",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Display.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Display.png",
+     "sha256": "b7f1a6cb6709999c6d768d880366903ee4f4c0e54972315aa801d633d6c8b82c",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Display@2x.png",
+   "sha256": "504c1f428c20a4affe200871508242c07e84bff31d8ca3d42c93f665699ab740",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Display@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Display@2x.png",
+     "sha256": "504c1f428c20a4affe200871508242c07e84bff31d8ca3d42c93f665699ab740",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DocumentationTemplate.pdf",
+   "sha256": "8d875183f90a2e833bc0fb557e5deeb02258dec4a98b3d751da9586b2a84d468",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DocumentationTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DocumentationTemplate.png",
+     "sha256": "f7c85e4422473418e4b4e83e841b189ae5b2b7d935fb925a48e899a564b1641c",
+     "command": "sips -s format png -Z 16 upstream/boxer/Resources/DocumentationTemplate.pdf --out assets/runtime/boxer/DocumentationTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/DocumentationTemplate@2x.png",
+     "sha256": "7ae951fd9abbceff2a0b8c6d665da4eb8ae001b69d7fec6bcb6e0e7238969d18",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/DocumentationTemplate.pdf --out assets/runtime/boxer/DocumentationTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Drives.png",
+   "sha256": "78146b61f6bee18c8edd0758c16fd3b2aea4713142ade46d4a806ffcef34cddb",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Drives.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Drives.png",
+     "sha256": "78146b61f6bee18c8edd0758c16fd3b2aea4713142ade46d4a806ffcef34cddb",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Drives@2x.png",
+   "sha256": "09bce9023a2f28eb865395713a71bb1e2ef603873b7b03de0f36d68fc3ebd7ca",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Drives@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Drives@2x.png",
+     "sha256": "09bce9023a2f28eb865395713a71bb1e2ef603873b7b03de0f36d68fc3ebd7ca",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/DropzoneTemplate.pdf",
+   "sha256": "e6c2dd8abb6a4bdb8eb684edc375a6106ef7ae2fd08964003694495751d1e937",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/DropzoneTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/DropzoneTemplate.png",
+     "sha256": "59023e7c1a3f0fec4420feeabf82d27e7de579dea667edaa632954dd89869c5c",
+     "command": "sips -s format png -Z 96 upstream/boxer/Resources/DropzoneTemplate.pdf --out assets/runtime/boxer/DropzoneTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/DropzoneTemplate@2x.png",
+     "sha256": "870bcf14918668138bd7906a98a1e96b4b92e27e34e8162d45e6d5ae7969c613",
+     "command": "sips -s format png -Z 192 upstream/boxer/Resources/DropzoneTemplate.pdf --out assets/runtime/boxer/DropzoneTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/EjectFreestandingTemplate.pdf",
+   "sha256": "f6b12ba140064c3fde69a1dde36a2fae97be2453603a6f599bd502e1d1a1965d",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/EjectFreestandingTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/EjectFreestandingTemplate.png",
+     "sha256": "af613512913a2b118950194d1602e9467a0b9f1c84a82892c16f21d034bab90d",
+     "command": "sips -s format png -Z 14 upstream/boxer/Resources/EjectFreestandingTemplate.pdf --out assets/runtime/boxer/EjectFreestandingTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/EjectFreestandingTemplate@2x.png",
+     "sha256": "bb05e8dbffe29107c3e8df112a8ee5930f4917384a53b66c41acc12aaa15fbc2",
+     "command": "sips -s format png -Z 28 upstream/boxer/Resources/EjectFreestandingTemplate.pdf --out assets/runtime/boxer/EjectFreestandingTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/EjectTemplate.pdf",
+   "sha256": "c212f6d2c4ed653cfc2ec7fcb7bb62664144a27d723ccb3ca815854e914bf368",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/EjectTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/EjectTemplate.png",
+     "sha256": "65676529f0f5959d67868c5e4635970bf04237add24f326c137147903d0982fd",
+     "command": "sips -s format png -Z 15 upstream/boxer/Resources/EjectTemplate.pdf --out assets/runtime/boxer/EjectTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/EjectTemplate@2x.png",
+     "sha256": "14c33e7d999e9c4f282b4d7e5e8904b5c442dc3e94ae9083af5c15d5550db2c9",
+     "command": "sips -s format png -Z 30 upstream/boxer/Resources/EjectTemplate.pdf --out assets/runtime/boxer/EjectTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/FastForwardTemplate.pdf",
+   "sha256": "4c8c65c27f6d28ea14b6ab996502b4d553915dfd501bfbef3e0469fdc2a411be",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/FastForwardTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/FastForwardTemplate.png",
+     "sha256": "d4c8e7d1fe44f4af6307c24658367e2be11e21f022ddc6107564ba3d5ff5a9ce",
+     "command": "sips -s format png -Z 19 upstream/boxer/Resources/FastForwardTemplate.pdf --out assets/runtime/boxer/FastForwardTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/FastForwardTemplate@2x.png",
+     "sha256": "f1afe60e72dd2c3d55954cc98aef4f027411c4502ded79650e37fe7b1a38c62e",
+     "command": "sips -s format png -Z 38 upstream/boxer/Resources/FastForwardTemplate.pdf --out assets/runtime/boxer/FastForwardTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/FavoriteFilledTemplate.pdf",
+   "sha256": "c0d07f5cb155edfce48c7ec982f20dfd5eb1986f9fc08e29ca2398a7d462f668",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/FavoriteFilledTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/FavoriteFilledTemplate.png",
+     "sha256": "963180d07284acf9b0c502048a39e58d4f7de6668a670704140e9a00d4b9fb18",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/FavoriteFilledTemplate.pdf --out assets/runtime/boxer/FavoriteFilledTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/FavoriteFilledTemplate@2x.png",
+     "sha256": "b717dbd06dafe522ef203a179c83b33affa95847993066974e201295444228d9",
+     "command": "sips -s format png -Z 64 upstream/boxer/Resources/FavoriteFilledTemplate.pdf --out assets/runtime/boxer/FavoriteFilledTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/FavoriteOutlineTemplate.pdf",
+   "sha256": "149fa11eacb23912249505c1a0fd993415bb4caa53155a78b047ee21dd4addfa",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/FavoriteOutlineTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/FavoriteOutlineTemplate.png",
+     "sha256": "8c2f3e8be859e8879683f568873a21e2bba43af373ee7dd46f8208b37a38b283",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/FavoriteOutlineTemplate.pdf --out assets/runtime/boxer/FavoriteOutlineTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/FavoriteOutlineTemplate@2x.png",
+     "sha256": "8300e873254315b940ea625e152b99a2efca17d3ccfebac3e980b9dd8328d671",
+     "command": "sips -s format png -Z 64 upstream/boxer/Resources/FavoriteOutlineTemplate.pdf --out assets/runtime/boxer/FavoriteOutlineTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/GalleryBkg.jpg",
+   "sha256": "f532d81a023ed4821870cfaa46eaed122c2aac808e2ea86be065d375a7074919",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/GalleryBkg.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/GalleryBkg.png",
+     "sha256": "d6e2b2ef22694d07e223764ab717c8f63f4b9cc63ad2bf912ef8606383df8dd6",
+     "command": "sips -s format png upstream/boxer/Resources/GalleryBkg.jpg --out assets/runtime/boxer/GalleryBkg.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/GalleryHQx.png",
+   "sha256": "4ce3aef002c247a0674e76d89f0550ca41ecf4099ab548f251ef5d1e423bee41",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/GalleryMAME.png",
+   "sha256": "ace6a8c9ec4abead5856b2738b977999eee28bcb5ac8e985d1ada32729b22eeb",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/GalleryOriginal.png",
+   "sha256": "56c6569d07e3272ad73cf8f25bfebc3ad957706912eda6641eef278565f2cb84",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/GallerySpotlight.png",
+   "sha256": "c905da96362e83cf525d792a9ac50f1b53a5286e94b522a8d689f6956770c78b",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/GallerySpotlight.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/GallerySpotlight.png",
+     "sha256": "c905da96362e83cf525d792a9ac50f1b53a5286e94b522a8d689f6956770c78b",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/GalleryTVScanlines.png",
+   "sha256": "7c5a354c6fe004925d0f3e27692fc9b3e6d35bdacf4a18dae732f1eae3a67a1c",
+   "category": "d",
+   "reason": "contains DOS game pixel art of unidentified origin"
+  },
+  {
+   "path": "Resources/Game.png",
+   "sha256": "4d9ce9eac9d8f41fea7b804de856be235d1e8605428545de388895ea8bd9ce35",
+   "category": "d",
+   "reason": "rainbow disc element resembles the Mac OS X optical-disc icon; box/C:\\ is Boxer's",
+   "restored": "2026-10-02",
+   "upstream_revision": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Game.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Game.png",
+     "sha256": "4d9ce9eac9d8f41fea7b804de856be235d1e8605428545de388895ea8bd9ce35",
+     "command": "copy (already PNG at the exact 32 px drawn size, no resampling)"
+    }
+   ],
+   "used_in": "Inspector 'Gamebox' tab icon (Inspector.xib toolbarItem image=\"Game\"; src/ui/gfx.cpp tabIcon, TabIcon::Game)",
+   "open_question": "category (d) note kept as history: visual resemblance only, not a confirmed prohibition; the rainbow disc resembles Apple's optical-disc icon"
+  },
+  {
+   "path": "Resources/Game@2x.png",
+   "sha256": "7992deb4e284e075099eab86e164c3ee4d72bf5a943827241eef6d12d165ab6d",
+   "category": "d",
+   "reason": "rainbow disc element resembles the Mac OS X optical-disc icon; box/C:\\ is Boxer's",
+   "restored": "2026-10-02",
+   "upstream_revision": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Game@2x.png",
+   "runtime": [],
+   "used_in": "source only: 64 px Retina variant; the UI draws 32 px, so Game.png (exact size) is used",
+   "open_question": "category (d) note kept as history: visual resemblance only, not a confirmed prohibition; the rainbow disc resembles Apple's optical-disc icon"
+  },
+  {
+   "path": "Resources/GamepadTemplate.pdf",
+   "sha256": "f1e284cdb20600142e79878cf64718606d271da1f2527f2cfd6479304fd6c742",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/GamepadTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/GamepadTemplate.png",
+     "sha256": "b8c0651b0eb0771672c48da862f6fb679db8a9e048b7bf3f55f502d52c9bf130",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/GamepadTemplate.pdf --out assets/runtime/boxer/GamepadTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/GamepadTemplate@2x.png",
+     "sha256": "00edaab8d5d7c9086066b0af331c5721fa4e8fcea784f36be1672711e677449f",
+     "command": "sips -s format png -Z 256 upstream/boxer/Resources/GamepadTemplate.pdf --out assets/runtime/boxer/GamepadTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Grille.png",
+   "sha256": "a1c8939c729d6df5a4c0845c8a6c9e0c636ff771fcefe7a2586c782d124ea740",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Grille.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Grille.png",
+     "sha256": "a1c8939c729d6df5a4c0845c8a6c9e0c636ff771fcefe7a2586c782d124ea740",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Grille@2x.png",
+   "sha256": "f0ab398814cd955076d33d503594748fc45161b6723f787b05c81ed6e4922419",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Grille@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Grille@2x.png",
+     "sha256": "f0ab398814cd955076d33d503594748fc45161b6723f787b05c81ed6e4922419",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/HardDiskTemplate.pdf",
+   "sha256": "d781d482516290496b976c5100155807a2d042e65465f1961f17ca34d3f497dd",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/HardDiskTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/HardDiskTemplate.png",
+     "sha256": "e7bc25151ee83054b9386ab3c8b655b39639f8344e7f39ddb3fc9b832d8397c1",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/HardDiskTemplate.pdf --out assets/runtime/boxer/HardDiskTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/HardDiskTemplate@2x.png",
+     "sha256": "7fac1fcda90974fcde9bdd38d1a5116b49e63e5ba01ec3b1439203d4ab6a33eb",
+     "command": "sips -s format png -Z 64 upstream/boxer/Resources/HardDiskTemplate.pdf --out assets/runtime/boxer/HardDiskTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/InsertFreestandingTemplate.pdf",
+   "sha256": "6afc620ba052e793da49e291287c6f303e7c7eb30af49bc67ec7c17640c5fe80",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/InsertFreestandingTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/InsertFreestandingTemplate.png",
+     "sha256": "b1ad427eb42d567eaae6b994425ba0310473315278386a0976ecd07baa8e85b9",
+     "command": "sips -s format png -Z 14 upstream/boxer/Resources/InsertFreestandingTemplate.pdf --out assets/runtime/boxer/InsertFreestandingTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/InsertFreestandingTemplate@2x.png",
+     "sha256": "e350c2eef74f6cfaa9eb0fc623b4846d802cd9f873f20c71f4297242ff1f6792",
+     "command": "sips -s format png -Z 28 upstream/boxer/Resources/InsertFreestandingTemplate.pdf --out assets/runtime/boxer/InsertFreestandingTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/InsertTemplate.pdf",
+   "sha256": "39d1d7320bddab574ceab09401124de04201281c90a22f052d35126e81dccc93",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/InsertTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/InsertTemplate.png",
+     "sha256": "e7ac9d842eda7c1995d9c761f9ec75eff1bfcab99d69711304569b5b5f446267",
+     "command": "sips -s format png -Z 15 upstream/boxer/Resources/InsertTemplate.pdf --out assets/runtime/boxer/InsertTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/InsertTemplate@2x.png",
+     "sha256": "0ef5f14d8dd68f36662a6453dc041ea7139cb2d2590a6a22631c9c2758f2fd61",
+     "command": "sips -s format png -Z 30 upstream/boxer/Resources/InsertTemplate.pdf --out assets/runtime/boxer/InsertTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Joystick.png",
+   "sha256": "d525ed6048c47e2f67432ef4bf67e2b8bb03286f395755ac601b4a410b640321",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Joystick.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Joystick.png",
+     "sha256": "d525ed6048c47e2f67432ef4bf67e2b8bb03286f395755ac601b4a410b640321",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Joystick@2x.png",
+   "sha256": "143aa54d187315a29638cd709dd5d18537e64fb02daacba3c1070ecbb4deeff9",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Joystick@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Joystick@2x.png",
+     "sha256": "143aa54d187315a29638cd709dd5d18537e64fb02daacba3c1070ecbb4deeff9",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Keyboard.png",
+   "sha256": "b81a440cf9b56726829f48096474041b1f238829bdb5eb73a8d6787d924b1fce",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Keyboard.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Keyboard.png",
+     "sha256": "b81a440cf9b56726829f48096474041b1f238829bdb5eb73a8d6787d924b1fce",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Keyboard@2x.png",
+   "sha256": "9e6280167865fc4c51a26b4d40aee3c543826050ea9bacf381554e09d4d95229",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Keyboard@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Keyboard@2x.png",
+     "sha256": "9e6280167865fc4c51a26b4d40aee3c543826050ea9bacf381554e09d4d95229",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/LaunchPanelDivider.png",
+   "sha256": "765843ea268f9ec5e2d0fecc4183e8ba95599f9ec6de3936da52c08fdfa50968",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/LaunchPanelDivider.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/LaunchPanelDivider.png",
+     "sha256": "765843ea268f9ec5e2d0fecc4183e8ba95599f9ec6de3936da52c08fdfa50968",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/LauncherListTemplate.pdf",
+   "sha256": "20627505cfa18e5dc397a9e1cc5eecc5762a8d26bd9ca2c90ee65cfc02c68ee2",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/LauncherListTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/LauncherListTemplate.png",
+     "sha256": "eb3cdd750e0e85710fd01f481aeb8e91e500081c9598110f35087a48403bfb16",
+     "command": "sips -s format png -Z 16 upstream/boxer/Resources/LauncherListTemplate.pdf --out assets/runtime/boxer/LauncherListTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/LauncherListTemplate@2x.png",
+     "sha256": "6796c5a9479258621d431e58abe4f2ff0839a13081c175866d77768780a22846",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/LauncherListTemplate.pdf --out assets/runtime/boxer/LauncherListTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/LockClosing.aiff",
+   "sha256": "b7000a925f06f74727e08fea6e82691231fc0800b4b97f619b4e598ebd1cf4d4",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/LockClosing.aiff",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/LockClosing.wav",
+     "sha256": "1259c1f018509b7862704cef67157dfaa5b4609fb5797f9f8efff18372999eaa",
+     "command": "afconvert -f WAVE -d LEI16 upstream/boxer/Resources/LockClosing.aiff assets/runtime/boxer/LockClosing.wav"
+    }
+   ]
+  },
+  {
+   "path": "Resources/LockOpening.aiff",
+   "sha256": "c5019004decff1795e547d53188a9048072a1fca802fbea73b5a778ceae13720",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/LockOpening.aiff",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/LockOpening.wav",
+     "sha256": "aa2638469983efd446b18e5b42e4384fcc60c290c5992108d20637d34d1d7560",
+     "command": "afconvert -f WAVE -d LEI16 upstream/boxer/Resources/LockOpening.aiff assets/runtime/boxer/LockOpening.wav"
+    }
+   ]
+  },
+  {
+   "path": "Resources/MT32.png",
+   "sha256": "35a2abaffb5c1e6bf0b5bf22ec2be2f3ca7771b9ee518b0cd28c5dd4726ffc19",
+   "category": "d",
+   "reason": "depicts Roland hardware with Roland name/logo (trademark)"
+  },
+  {
+   "path": "Resources/MT32@2x.png",
+   "sha256": "84b8b3bf19e9b576d44e84c04b1d66238fe90c7991cce522140ac2d1dd8245f8",
+   "category": "d",
+   "reason": "depicts Roland hardware with Roland name/logo (trademark)"
+  },
+  {
+   "path": "Resources/MT32LCDFontTemplate.png",
+   "sha256": "03155b4d0eb1c4dddad2983a75e3cf3c57b999b883140447269781432388854a",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/MT32LCDFontTemplate.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/MT32LCDFontTemplate.png",
+     "sha256": "03155b4d0eb1c4dddad2983a75e3cf3c57b999b883140447269781432388854a",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/MT32LCDGridTemplate.png",
+   "sha256": "578250a4fd0c72759aa31e23ed625bbaa3d1a1c047407b93db89c505619670de",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/MT32LCDGridTemplate.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/MT32LCDGridTemplate.png",
+     "sha256": "578250a4fd0c72759aa31e23ed625bbaa3d1a1c047407b93db89c505619670de",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/MT32Shelf.jpg",
+   "sha256": "fce0e5c7449a78adea3f0654ff72427171dad46cff5474ecba23852ebe17108d",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/MT32Shelf.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/MT32Shelf.png",
+     "sha256": "81f2dbc32ddeac53a74150f4fe29f5abe85531b828c4491012fffb1a5720bcdb",
+     "command": "sips -s format png upstream/boxer/Resources/MT32Shelf.jpg --out assets/runtime/boxer/MT32Shelf.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/MT32Shelf@2x.jpg",
+   "sha256": "aa19f92ce0c65d1d3083f7340806ed0c99136c626107c7e127e191b1f62d065c",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/MT32Shelf@2x.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/MT32Shelf@2x.png",
+     "sha256": "1557485d9aee1fd1961e822f67119c3f162c561fc61e5b1ce1660fcdfcd87f81",
+     "command": "sips -s format png upstream/boxer/Resources/MT32Shelf@2x.jpg --out assets/runtime/boxer/MT32Shelf@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/MT32ShelfHighlight.png",
+   "sha256": "16f0c396d558a1f3a4fa6ce65283f68dccb943365e95476ec1737b3cf53c8f77",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/MT32ShelfHighlight.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/MT32ShelfHighlight.png",
+     "sha256": "16f0c396d558a1f3a4fa6ce65283f68dccb943365e95476ec1737b3cf53c8f77",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/MT32ShelfHighlight@2x.png",
+   "sha256": "73ec46db8440b6da221131a0437b7526a7c5388dee8e3a28a62269afb670ae98",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/MT32ShelfHighlight@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/MT32ShelfHighlight@2x.png",
+     "sha256": "73ec46db8440b6da221131a0437b7526a7c5388dee8e3a28a62269afb670ae98",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Mouse.png",
+   "sha256": "95a621ead28423e83f7018918b0628767c75fd202d328f6b80c85630c79af196",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Mouse.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Mouse.png",
+     "sha256": "95a621ead28423e83f7018918b0628767c75fd202d328f6b80c85630c79af196",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Mouse@2x.png",
+   "sha256": "cadf8b1b47fcb3c8218b0774ddc173974c7960fadbb7d732e733bdebd5afcad1",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Mouse@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Mouse@2x.png",
+     "sha256": "cadf8b1b47fcb3c8218b0774ddc173974c7960fadbb7d732e733bdebd5afcad1",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/NoJoystickTemplate.pdf",
+   "sha256": "010efd23d896ac9e7dbbd6c516c157b34442ca246d7be4b6e87ad5728c114038",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/NoJoystickTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/NoJoystickTemplate.png",
+     "sha256": "d8f9bb5e500d301a9436ed3abb5a6ee799476d89249345ba598d679217b95b2b",
+     "command": "sips -s format png -Z 48 upstream/boxer/Resources/NoJoystickTemplate.pdf --out assets/runtime/boxer/NoJoystickTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/NoJoystickTemplate@2x.png",
+     "sha256": "c1df689e826711d71c336db5bae04e60259b056a6195836f6ee71bccf916743e",
+     "command": "sips -s format png -Z 96 upstream/boxer/Resources/NoJoystickTemplate.pdf --out assets/runtime/boxer/NoJoystickTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/NumlockActiveTemplate.pdf",
+   "sha256": "2a23bb25548694477d5519b393d8ee347778f5b758c9475fde4095d7462c0113",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/NumlockActiveTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/NumlockActiveTemplate.png",
+     "sha256": "7c6975b4477a3f0a27928d45608f45a3028b53d2f2b6227d3d0600e8075d1dd9",
+     "command": "sips -s format png -Z 96 upstream/boxer/Resources/NumlockActiveTemplate.pdf --out assets/runtime/boxer/NumlockActiveTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/NumlockActiveTemplate@2x.png",
+     "sha256": "18ee015deaff04f6d57585a5e21dff5efdbb47738dac7216e936ffa5c72cf076",
+     "command": "sips -s format png -Z 192 upstream/boxer/Resources/NumlockActiveTemplate.pdf --out assets/runtime/boxer/NumlockActiveTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/NumlockInactiveTemplate.pdf",
+   "sha256": "1523a41411bb75589c5d091d760fbad76cde628845f23dcf96cb873b0000e9ce",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/NumlockInactiveTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/NumlockInactiveTemplate.png",
+     "sha256": "2da499979c802e351cca8889108cb48e805cc9a02a84bc841f04eab1629e3cd8",
+     "command": "sips -s format png -Z 96 upstream/boxer/Resources/NumlockInactiveTemplate.pdf --out assets/runtime/boxer/NumlockInactiveTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/NumlockInactiveTemplate@2x.png",
+     "sha256": "b649a84460001aa94d4bdcdeed05515f365177b93d449c8746a04595e133dbf2",
+     "command": "sips -s format png -Z 192 upstream/boxer/Resources/NumlockInactiveTemplate.pdf --out assets/runtime/boxer/NumlockInactiveTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/NumpadActiveTemplate.pdf",
+   "sha256": "8bc404bbea4a9bb9a13562a3a1aca71f5f9c96a9e333f31a9f4f6fe766df09e1",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/NumpadActiveTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/NumpadActiveTemplate.png",
+     "sha256": "b519e327fe730cf4d55b6ad2f116ef623ed027dce4e177cdaf47d3b4ec59e0d3",
+     "command": "sips -s format png -Z 112 upstream/boxer/Resources/NumpadActiveTemplate.pdf --out assets/runtime/boxer/NumpadActiveTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/NumpadActiveTemplate@2x.png",
+     "sha256": "ac5c52cad937e2fe7304fffc75f2211c08de0f3e7da07af58894258370daaf77",
+     "command": "sips -s format png -Z 224 upstream/boxer/Resources/NumpadActiveTemplate.pdf --out assets/runtime/boxer/NumpadActiveTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/NumpadInactiveTemplate.pdf",
+   "sha256": "f83a8d5e1ad48a960105f6fb66ba78cf23a189eb5748ddc3ed76316c5ccc1ed8",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/NumpadInactiveTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/NumpadInactiveTemplate.png",
+     "sha256": "37940723ad8da8b5e6519d0904a062f370234031275ed7531980a3dc30684d20",
+     "command": "sips -s format png -Z 112 upstream/boxer/Resources/NumpadInactiveTemplate.pdf --out assets/runtime/boxer/NumpadInactiveTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/NumpadInactiveTemplate@2x.png",
+     "sha256": "1663d5feda283294b2271ae5ddea5ccdd5896183babc43b8e0ca92c657322e70",
+     "command": "sips -s format png -Z 224 upstream/boxer/Resources/NumpadInactiveTemplate.pdf --out assets/runtime/boxer/NumpadInactiveTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PanelCollapseTemplate.pdf",
+   "sha256": "8cc78b74c8aaecc9193c96f3f474a616e9bd90dbf5ae82c3f74db2fdf8bf1c92",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PanelCollapseTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PanelCollapseTemplate.png",
+     "sha256": "d0dec4ca2c2391618f5b3ba13baba50051bd5ab0c071648bd983239b18f39582",
+     "command": "sips -s format png -Z 13 upstream/boxer/Resources/PanelCollapseTemplate.pdf --out assets/runtime/boxer/PanelCollapseTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/PanelCollapseTemplate@2x.png",
+     "sha256": "ae7903a234548a5b5f74360425f9b964efc69f49ede03c520c0d43fc1a97c732",
+     "command": "sips -s format png -Z 26 upstream/boxer/Resources/PanelCollapseTemplate.pdf --out assets/runtime/boxer/PanelCollapseTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PanelExpandTemplate.pdf",
+   "sha256": "e615262be40c58e6308cf58402b83195ba987b61ab9eff67be1a99d2958316d6",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PanelExpandTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PanelExpandTemplate.png",
+     "sha256": "ef6c30b8692e51b2478c7cda7ec8da8114366b2c19875d41a2194421fb368d0a",
+     "command": "sips -s format png -Z 13 upstream/boxer/Resources/PanelExpandTemplate.pdf --out assets/runtime/boxer/PanelExpandTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/PanelExpandTemplate@2x.png",
+     "sha256": "63ef639e7039b643dcbc95fc145442e23f5192aaefb8c72d4d12062ed0fb9bd9",
+     "command": "sips -s format png -Z 26 upstream/boxer/Resources/PanelExpandTemplate.pdf --out assets/runtime/boxer/PanelExpandTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PauseTemplate.pdf",
+   "sha256": "70994e1280a2a900607a9305f2889b91bd1f3c1047ee0c36576707425535dd79",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PauseTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PauseTemplate.png",
+     "sha256": "361db8b9b351a645f8c8f73db33886d8d21f236b7bf7b96d6babf49183d5360b",
+     "command": "sips -s format png -Z 13 upstream/boxer/Resources/PauseTemplate.pdf --out assets/runtime/boxer/PauseTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/PauseTemplate@2x.png",
+     "sha256": "810cf454050d638fc7dfdcc498d89b419562a4deb6e8b3d9c8b457e2d79b5f7f",
+     "command": "sips -s format png -Z 26 upstream/boxer/Resources/PauseTemplate.pdf --out assets/runtime/boxer/PauseTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PlayTemplate.pdf",
+   "sha256": "e5157e70983127dbe1e0ce023d6e82eadc632342872920eb25c38ccc26eaf266",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PlayTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PlayTemplate.png",
+     "sha256": "1e918a39444ddf46c8be7c9a5015538d7e6f5376e5959e1338f84a443fd65635",
+     "command": "sips -s format png -Z 13 upstream/boxer/Resources/PlayTemplate.pdf --out assets/runtime/boxer/PlayTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/PlayTemplate@2x.png",
+     "sha256": "b184d08a64005edc65a32ff6c9674d3cabffe37b62a25cc2f029fde22cdc93e2",
+     "command": "sips -s format png -Z 26 upstream/boxer/Resources/PlayTemplate.pdf --out assets/runtime/boxer/PlayTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PrinterBackground.jpg",
+   "sha256": "aefa5cd4b469df4d35d8a7539c07b3766f4c6779147fc3e5b1b41a1705ea9983",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PrinterBackground.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PrinterBackground.png",
+     "sha256": "09001860b86b7da440b1ae15ef1b0c993b2ce7d9972e4dc54e46b67b9d7028a6",
+     "command": "sips -s format png upstream/boxer/Resources/PrinterBackground.jpg --out assets/runtime/boxer/PrinterBackground.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PrinterClip.png",
+   "sha256": "86b4c775892f0c7ccf891a8829af6071dcad6d9d52fbef4a4cb13587b9d1e493",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PrinterClip.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PrinterClip.png",
+     "sha256": "86b4c775892f0c7ccf891a8829af6071dcad6d9d52fbef4a4cb13587b9d1e493",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PrinterCover.png",
+   "sha256": "f8e03e5ebfb0f69ebcb52ebf46bfa8bc4200f974d1ef6a5355a3b1d012f7513b",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PrinterCover.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PrinterCover.png",
+     "sha256": "f8e03e5ebfb0f69ebcb52ebf46bfa8bc4200f974d1ef6a5355a3b1d012f7513b",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PrinterLighting.png",
+   "sha256": "4de98a13a272373c2855bfa40f8d3d43427f4e08a69cf5c0b0b32a9d6d05e8ab",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PrinterLighting.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PrinterLighting.png",
+     "sha256": "4de98a13a272373c2855bfa40f8d3d43427f4e08a69cf5c0b0b32a9d6d05e8ab",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PrinterPaper.png",
+   "sha256": "63b864b09b3e9041fbfaa84f9b187c34c2df561b87b7b5d01fcab767fd602305",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PrinterPaper.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PrinterPaper.png",
+     "sha256": "63b864b09b3e9041fbfaa84f9b187c34c2df561b87b7b5d01fcab767fd602305",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/PromptFreestandingTemplate.pdf",
+   "sha256": "949f154f793f91a7c75633bf89ea5160c4be331a82510d66bf0bba1c6579953e",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/PromptFreestandingTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/PromptFreestandingTemplate.png",
+     "sha256": "42cd2e0e1d751b4783a909de8e20036da1777a534b0c8556e9ea3e32d49fdc70",
+     "command": "sips -s format png -Z 18 upstream/boxer/Resources/PromptFreestandingTemplate.pdf --out assets/runtime/boxer/PromptFreestandingTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/PromptFreestandingTemplate@2x.png",
+     "sha256": "35c7edc778ba0620393a643f02f4b6925208a62de0a3b6d9c344a26adc8d7ae9",
+     "command": "sips -s format png -Z 36 upstream/boxer/Resources/PromptFreestandingTemplate.pdf --out assets/runtime/boxer/PromptFreestandingTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/RacingWheel.png",
+   "sha256": "7ebdc80b4441d51c0fe59efe33765c8854d03167282176810e06e46dc98bd6b3",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/RacingWheel.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/RacingWheel.png",
+     "sha256": "7ebdc80b4441d51c0fe59efe33765c8854d03167282176810e06e46dc98bd6b3",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/RacingWheel@2x.png",
+   "sha256": "4df96d2204936d8075c92a0bc38f78e92c15dc3246b30682c4c5a34eec84cc52",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/RacingWheel@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/RacingWheel@2x.png",
+     "sha256": "4df96d2204936d8075c92a0bc38f78e92c15dc3246b30682c4c5a34eec84cc52",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/RecentItemsTemplate.pdf",
+   "sha256": "beb7d80efadc445460d1e988fb7e0e9ce093c849d4a2f62462dd9b41d4f9014b",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/RecentItemsTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/RecentItemsTemplate.png",
+     "sha256": "8d16e694d5de644dd2f58b197288a5334ee6f3debe1187d4fabd309b3f6ace51",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/RecentItemsTemplate.pdf --out assets/runtime/boxer/RecentItemsTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/RecentItemsTemplate@2x.png",
+     "sha256": "767dd0ac5f592922fb6507944415b8d8e567b948c0280f343dfb61ba58bb37f7",
+     "command": "sips -s format png -Z 64 upstream/boxer/Resources/RecentItemsTemplate.pdf --out assets/runtime/boxer/RecentItemsTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Sample Game Icons/Commander Keen 4.jpg",
+   "sha256": "55000d19f91b7492dfbb809850efde5a5b8525e77da0860bbf3765cb0708ac99",
+   "category": "c",
+   "reason": "shareware game data/cover art (iD/Apogee, Epic, Origin, MicroProse); Boxer did not relicense it"
+  },
+  {
+   "path": "Resources/Sample Game Icons/Epic Pinball Demo.jpg",
+   "sha256": "581c06dbc32a7f5162de2a0c8c3c85155255343d767a7e28965f4ccaad17815b",
+   "category": "c",
+   "reason": "shareware game data/cover art (iD/Apogee, Epic, Origin, MicroProse); Boxer did not relicense it"
+  },
+  {
+   "path": "Resources/Sample Game Icons/Underworld Demo.jpg",
+   "sha256": "1d0a29d7402fb1be3668e1d5ed6b7fb9ca8eb25dde9d991de4505e65ddea1016",
+   "category": "c",
+   "reason": "shareware game data/cover art (iD/Apogee, Epic, Origin, MicroProse); Boxer did not relicense it"
+  },
+  {
+   "path": "Resources/Sample Game Icons/X-COM Demo.jpg",
+   "sha256": "57b55ec1c073460e7a44954c8b3d375347aa3493670c73d8735696aeea2f9bf3",
+   "category": "c",
+   "reason": "shareware game data/cover art (iD/Apogee, Epic, Origin, MicroProse); Boxer did not relicense it"
+  },
+  {
+   "path": "Resources/Sample Games/About this folder.pdf",
+   "sha256": "f92246a230c129d8d965f481e5c9d64886b7b64e8c809422eb3eee094d0af7ac",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Sample Games/About this folder.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/About this folder.png",
+     "sha256": "4e953560a647eaba1f7aaaffb7e2fea8cdc7263fd4f1dece513e4333d952de12",
+     "command": "sips -s format png -Z 842 'upstream/boxer/Resources/Sample Games/About this folder.pdf' --out 'assets/runtime/boxer/About this folder.png'"
+    },
+    {
+     "file": "assets/runtime/boxer/About this folder@2x.png",
+     "sha256": "88aa92742fd4e5ae0a39462f96e8a2588d88782d5a6529d17ca05d0e5b7b701a",
+     "command": "sips -s format png -Z 1684 'upstream/boxer/Resources/Sample Games/About this folder.pdf' --out 'assets/runtime/boxer/About this folder@2x.png'"
+    }
+   ]
+  },
+  {
+   "path": "Resources/ScreenshotTemplate.pdf",
+   "sha256": "8997ad58fe42c975049d90cb6419e9746b16675643439409c12026d06f7f24f6",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/ScreenshotTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ScreenshotTemplate.png",
+     "sha256": "c3fd294a9c54b09fc618f775887bf7b2593a0b60711b688e0e2f2b1a38a97cdf",
+     "command": "sips -s format png -Z 16 upstream/boxer/Resources/ScreenshotTemplate.pdf --out assets/runtime/boxer/ScreenshotTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/ScreenshotTemplate@2x.png",
+     "sha256": "4358b601b3209ba08d14d29ca2380d3d754532b26b1af1e97b7c304787980b0a",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/ScreenshotTemplate.pdf --out assets/runtime/boxer/ScreenshotTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/ShelfTemplate.jpg",
+   "sha256": "8c815f21caa3154a8d1aa5977cdb0bfc5649f5422a52191b47aee377fc31a441",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/ShelfTemplate.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ShelfTemplate.png",
+     "sha256": "a7073ca5d1d92f9518cf2c7753910ec5e9f54ce2d156dfa72669df19a00b0f29",
+     "command": "sips -s format png upstream/boxer/Resources/ShelfTemplate.jpg --out assets/runtime/boxer/ShelfTemplate.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/ShelfTemplate@2x.jpg",
+   "sha256": "70a984eda88b37faf8602a29bdf73bb3b3cbe4e11c3f022c477a85bb86a188e0",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/ShelfTemplate@2x.jpg",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/ShelfTemplate@2x.png",
+     "sha256": "c5323f952d3fe680f9d1b7d2592e2484ab898edbda4389b1de1e2a969c1fc45c",
+     "command": "sips -s format png upstream/boxer/Resources/ShelfTemplate@2x.jpg --out assets/runtime/boxer/ShelfTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Snapshot.aiff",
+   "sha256": "abab41d6d1dfbd5a90713814d3a8df742d13b9edc2629d1be98578fe873d76b6",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Snapshot.aiff",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Snapshot.wav",
+     "sha256": "f1380c4d290840306c7c9ea1f13f82ff0d2cd81612ed2dd247aadeaaf99dc34d",
+     "command": "afconvert -f WAVE -d LEI16 upstream/boxer/Resources/Snapshot.aiff assets/runtime/boxer/Snapshot.wav"
+    }
+   ]
+  },
+  {
+   "path": "Resources/ThrustmasterFCS.png",
+   "sha256": "e34830049175076432e5a4d63fe674d68a42dc14d3049de3eea2666d68a084d5",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/ThrustmasterFCS@2x.png",
+   "sha256": "4479e2426382aca8f4b5b7afbcb5f9debcdf254adaa630e80da8849c3f7579dd",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Resources/TurtleTemplate.pdf",
+   "sha256": "d7a2f72bb55646942b8c50cdcd6391a104c7667897a7d020cbd5d649285d5364",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/TurtleTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/TurtleTemplate.png",
+     "sha256": "dea0ff19b7be7bcffdbd5c4fd825fd9197bb0a1d8f4e5c448732ded3bbf90f4f",
+     "command": "sips -s format png -Z 18 upstream/boxer/Resources/TurtleTemplate.pdf --out assets/runtime/boxer/TurtleTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/TurtleTemplate@2x.png",
+     "sha256": "a61ba789a60e2bbfbb9d920ca152e0bdeaf85ccca2c1ca613b8af3b46931ceee",
+     "command": "sips -s format png -Z 36 upstream/boxer/Resources/TurtleTemplate.pdf --out assets/runtime/boxer/TurtleTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Volume0PercentCroppedTemplate.pdf",
+   "sha256": "8420bc728d7c2379386983a3d4957b165f11ff73ed0bba0bdc93fe479333be08",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Volume0PercentCroppedTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Volume0PercentCroppedTemplate.png",
+     "sha256": "5504104fcfcb8cd7a9496a5cdb9fa253393308284b5a5829157289f3f2b52f8e",
+     "command": "sips -s format png -Z 12 upstream/boxer/Resources/Volume0PercentCroppedTemplate.pdf --out assets/runtime/boxer/Volume0PercentCroppedTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/Volume0PercentCroppedTemplate@2x.png",
+     "sha256": "1595e865f5c90a30c34bde8df4d1f4e3e8d7391530b084be38d4d74a62cef750",
+     "command": "sips -s format png -Z 24 upstream/boxer/Resources/Volume0PercentCroppedTemplate.pdf --out assets/runtime/boxer/Volume0PercentCroppedTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Volume0PercentTemplate.pdf",
+   "sha256": "02e3f84e3b342f95b3bfb7c1fb8dd6c1440c0192af8195dec3fa08b2ff76f77f",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Volume0PercentTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Volume0PercentTemplate.png",
+     "sha256": "7321d02245af4eafda9d8fd9d7d695c10936ce673f2a2c1ca3301c66625eaa43",
+     "command": "sips -s format png -Z 17 upstream/boxer/Resources/Volume0PercentTemplate.pdf --out assets/runtime/boxer/Volume0PercentTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/Volume0PercentTemplate@2x.png",
+     "sha256": "92ba66ec4edeb42c4693908039222932fb71c0fcedbc505827c29e000f583b06",
+     "command": "sips -s format png -Z 34 upstream/boxer/Resources/Volume0PercentTemplate.pdf --out assets/runtime/boxer/Volume0PercentTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Volume100PercentTemplate.pdf",
+   "sha256": "68d0a898e3e28c52e5bd155c39f7ae5107170f2f7ebb092034a2ca12b3b4d622",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Volume100PercentTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Volume100PercentTemplate.png",
+     "sha256": "ec891a9302d300334f88b42867e8a2bea496876da71aad4b0fd28b787c9e8ea3",
+     "command": "sips -s format png -Z 17 upstream/boxer/Resources/Volume100PercentTemplate.pdf --out assets/runtime/boxer/Volume100PercentTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/Volume100PercentTemplate@2x.png",
+     "sha256": "570b0b342c1afac79bf0c3feb69f27523025e4a3172a9a52960bdde5418dcce5",
+     "command": "sips -s format png -Z 34 upstream/boxer/Resources/Volume100PercentTemplate.pdf --out assets/runtime/boxer/Volume100PercentTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Volume33PercentTemplate.pdf",
+   "sha256": "d7fdd299b3d432b08bd62beed2624813562ee7c2d899cb7c56c8a5a3a2bf07e6",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Volume33PercentTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Volume33PercentTemplate.png",
+     "sha256": "bcb262d24c3228873177f2f87e9383759980a46e5c97d57098a7cad3fe5dc08f",
+     "command": "sips -s format png -Z 17 upstream/boxer/Resources/Volume33PercentTemplate.pdf --out assets/runtime/boxer/Volume33PercentTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/Volume33PercentTemplate@2x.png",
+     "sha256": "9c4b37e164c8454d685b9d0ff65ecd6f790afc788ae405a3a016a581305f4f8c",
+     "command": "sips -s format png -Z 34 upstream/boxer/Resources/Volume33PercentTemplate.pdf --out assets/runtime/boxer/Volume33PercentTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/Volume66PercentTemplate.pdf",
+   "sha256": "0198f835c6d655d7569393f31b3b618f0bc476b3067d6f75cf9af4c4c466e209",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/Volume66PercentTemplate.pdf",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/Volume66PercentTemplate.png",
+     "sha256": "fb3eee5aad69cd7527bbff4090125f394ee468348a54e4f75bb28f8b9da4af3d",
+     "command": "sips -s format png -Z 17 upstream/boxer/Resources/Volume66PercentTemplate.pdf --out assets/runtime/boxer/Volume66PercentTemplate.png"
+    },
+    {
+     "file": "assets/runtime/boxer/Volume66PercentTemplate@2x.png",
+     "sha256": "d9e4091ea34d4d07e84e59517932876ed98bdab0e9d7a52ae37e2294c96cd559",
+     "command": "sips -s format png -Z 34 upstream/boxer/Resources/Volume66PercentTemplate.pdf --out assets/runtime/boxer/Volume66PercentTemplate@2x.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/WelcomeFocusRing.png",
+   "sha256": "941c6e5a111028bc73e6e51220503b9243d02d3a2e3e9e2c460b54782dc97d95",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/WelcomeFocusRing.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/WelcomeFocusRing.png",
+     "sha256": "941c6e5a111028bc73e6e51220503b9243d02d3a2e3e9e2c460b54782dc97d95",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/WelcomeFocusRing@2x.png",
+   "sha256": "75ddb0ab7a0d2daf532055649fbad50dd2cef6f49c27eb918f08b58053a185a1",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/WelcomeFocusRing@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/WelcomeFocusRing@2x.png",
+     "sha256": "75ddb0ab7a0d2daf532055649fbad50dd2cef6f49c27eb918f08b58053a185a1",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/WelcomeSpotlight.png",
+   "sha256": "377d650ae6a56108679f7ce31ffb997241e77c938d79a485aee97b8bf9ba5243",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/WelcomeSpotlight.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/WelcomeSpotlight.png",
+     "sha256": "377d650ae6a56108679f7ce31ffb997241e77c938d79a485aee97b8bf9ba5243",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/WelcomeSpotlight@2x.png",
+   "sha256": "aaa7a05d109c3902462161ea74077dc497f001469fc97e17af70141653e38c02",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/WelcomeSpotlight@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/WelcomeSpotlight@2x.png",
+     "sha256": "aaa7a05d109c3902462161ea74077dc497f001469fc97e17af70141653e38c02",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Resources/boxer.icns",
+   "sha256": "c46b88954f6c0531763f6d416b100eca81661db6f271f17b8c9410dcc8c89978",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/boxer.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/boxer-32.png",
+     "sha256": "9e01120013c0367e1a243e1a07cb021260abf9ede89ecc89524035e286f6e21b",
+     "command": "sips -s format png -Z 32 upstream/boxer/Resources/boxer.icns --out assets/runtime/boxer/boxer-32.png"
+    },
+    {
+     "file": "assets/runtime/boxer/boxer-128.png",
+     "sha256": "9b84b61f43dd51653cdd19f2337983dff81c42ac6b4c4e287527b464ff6c2327",
+     "command": "sips -s format png -Z 128 upstream/boxer/Resources/boxer.icns --out assets/runtime/boxer/boxer-128.png"
+    },
+    {
+     "file": "assets/runtime/boxer/boxer-512.png",
+     "sha256": "e4c1291d828d28fb9fc7df8f79588c372c7310d298d1a6ba0b0e44f738d22b0b",
+     "command": "sips -s format png -Z 512 upstream/boxer/Resources/boxer.icns --out assets/runtime/boxer/boxer-512.png"
+    }
+   ]
+  },
+  {
+   "path": "Resources/executable.icns",
+   "sha256": "58c648bcfd11cca843edec516ec5c3d4610bd6be54f325dfde560c5c2bdbf491",
+   "category": "d",
+   "reason": "page base resembles Apple's generic document icon (page curl); lower confidence than gamefolder/prompt"
+  },
+  {
+   "path": "Resources/gamefolder.icns",
+   "sha256": "97de71c87f6ae178ac1fb30b6d83cccae122a38370ed9a7222729a19adfa0260",
+   "category": "d",
+   "reason": "artwork appears built on Apple system icons (Finder folder body / Terminal bezel); Boxer's GPL grant cannot cover Apple's part",
+   "restored": "2026-10-02",
+   "upstream_revision": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/gamefolder.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/gamefolder-128.png",
+     "sha256": "601ed6e8c5a33f661222b214094f5b7654eadff0bd56004eaa0c2e9c8a89f41e",
+     "command": "iconutil -c iconset Resources/gamefolder.icns; copy icon_128x128.png unchanged (exact 128 px representation, no resampling)"
+    }
+   ],
+   "used_in": "Welcome window, 'Browse your games' button (src/ui/gfx.cpp welcomeImage, WelcomeArt::GameFolder); games folder drawer icon template conf/GamesFolder.info (tools/mkicon.py, area-averaged to 48 px at package time, 2026-10-04)",
+   "open_question": "category (d) note kept as history: visual resemblance only, not a confirmed prohibition"
+  },
+  {
+   "path": "Resources/import.png",
+   "sha256": "cecad008d9610107b1b739d7b362040253c08e8f7843f1f7a46bc9fae3942424",
+   "category": "d",
+   "reason": "rainbow disc element resembles the Mac OS X optical-disc icon; box/C:\\ is Boxer's",
+   "restored": "2026-10-02",
+   "upstream_revision": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/import.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/import.png",
+     "sha256": "cecad008d9610107b1b739d7b362040253c08e8f7843f1f7a46bc9fae3942424",
+     "command": "copy (already PNG at the exact 128 px drawn size, no resampling)"
+    }
+   ],
+   "used_in": "Welcome window, 'Import a new game' button (WelcomeArt::Import)",
+   "open_question": "category (d) note kept as history: visual resemblance only, not a confirmed prohibition; the rainbow disc resembles Apple's optical-disc icon"
+  },
+  {
+   "path": "Resources/import@2x.png",
+   "sha256": "98be4a3cf76b1b46c473b77f11cc7dcd266f9e215d7d6c4b34622ca2f6f187db",
+   "category": "d",
+   "reason": "rainbow disc element resembles the Mac OS X optical-disc icon; box/C:\\ is Boxer's",
+   "restored": "2026-10-02",
+   "upstream_revision": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/import@2x.png",
+   "runtime": [],
+   "used_in": "source only: 256 px Retina variant; the UI draws 128 px, so import.png (exact size) is used",
+   "open_question": "category (d) note kept as history: visual resemblance only, not a confirmed prohibition; the rainbow disc resembles Apple's optical-disc icon"
+  },
+  {
+   "path": "Resources/package.icns",
+   "sha256": "711755498fc0f13499beaa0058591a53b6a80e4c462121db5fc8474b821f988a",
+   "category": "d",
+   "reason": "page base resembles Apple's generic document icon (page curl); lower confidence than gamefolder/prompt"
+  },
+  {
+   "path": "Resources/prompt.icns",
+   "sha256": "dd5f0442a95d7359faa6b4970a518685df8a6bf03100fe32e4350811fffeec80",
+   "category": "d",
+   "reason": "artwork appears built on Apple system icons (Finder folder body / Terminal bezel); Boxer's GPL grant cannot cover Apple's part",
+   "restored": "2026-10-02",
+   "upstream_revision": "0062fc18e154cde6cef3bf3329be4b0658597e31",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Resources/prompt.icns",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/prompt-128.png",
+     "sha256": "3e44630652a3d0a5153979467e0750b44b36a5053fd33dd48674fd378d8e8e2d",
+     "command": "iconutil -c iconset Resources/prompt.icns; copy icon_128x128.png unchanged (exact 128 px representation, no resampling)"
+    }
+   ],
+   "used_in": "Welcome window, 'Open a DOS prompt' button (WelcomeArt::Prompt)",
+   "open_question": "category (d) note kept as history: visual resemblance only, not a confirmed prohibition"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/English.lproj/images/numeric-keypad.png",
+   "sha256": "f599ec340c3c0a024194f1af41030383dc3a3bd616d70f51705ef19c671afe83",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/cs.lproj/images/numeric-keypad.png",
+   "sha256": "f599ec340c3c0a024194f1af41030383dc3a3bd616d70f51705ef19c671afe83",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/360-controller.png",
+   "sha256": "684eb6589991ea8b3efa3208be9e3926068e80385d9faa562a64d81719d77571",
+   "category": "d",
+   "reason": "depicts a named third-party product (CH, Thrustmaster, Microsoft); trademark/logo check needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/application-popout.png",
+   "sha256": "6f880017f6dece77ab9479573466c0e8704fdd7bd5b5942cf7ced5c4431af7ac",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/email-popout.png",
+   "sha256": "00021536d165bf9989cfbdc99bb20a5d2d632106d55b0f2351c878c69a691c6c",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/fast-forward-key.png",
+   "sha256": "40865304b64cdc41bac0825a4b5988c198214d110360e4990894ba1f93d99efb",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/icon.png",
+   "sha256": "1da4639b3d9efe872281f367efdaa20c2753ab3aec2cd801325dcbe2d1a5cf0b",
+   "category": "d",
+   "reason": "help-page renderings of icons; some derive from the (d) icons above; help is not ported"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/info.png",
+   "sha256": "2ccbef49ac76653687bb5e021c8172ac8542feb5ad97ca10299871ec64782d39",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/joypad-logo.png",
+   "sha256": "a701834f09f7e244f91ef59c88151fc614ae528e61a1ee3818814a5b261be225",
+   "category": "c",
+   "reason": "Joypad app logo (third-party product brand); Joypad SDK not ported (D3)"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/keyboard.png",
+   "sha256": "069b06240a9be8c026e3ab558e79a0e618aba24105eb2e9d2e1ab04e29e4f0d4",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/play-pause-key.png",
+   "sha256": "d57cec43ad5506b268326393f5be347ab9dcdba6e873092a79430e171b50ee0e",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/reveal.png",
+   "sha256": "581b3c08d3761a4eadaf84672b0e780a79f744fdfe9d00bc166ebb089c609697",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/site-popout.png",
+   "sha256": "349c1a6d1f810dba668eb31271fd40eebfbba0c4ee896a182fff8512095f2f2c",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/standard-joystick-128.png",
+   "sha256": "056ffc56082e5cb2bcd8b65f957bf008c3760c0d7ab5a01094462af7100274c5",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/topic-arrow.png",
+   "sha256": "9a557c860a2d3bcfe15c9db21ae35cd71b832bd508ab199fba7b565d7534c850",
+   "category": "d",
+   "reason": "help-book images: screenshots with macOS UI/game content or renderings of other assets; help book not ported, not needed"
+  },
+  {
+   "path": "Standalone/Resources/StandaloneLogo.png",
+   "sha256": "ddb8a0bb05e8f66e6987e691a0fc39d3ab0115cd2ecf32641994d43401f3944a",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Standalone/Resources/StandaloneLogo.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/StandaloneLogo.png",
+     "sha256": "ddb8a0bb05e8f66e6987e691a0fc39d3ab0115cd2ecf32641994d43401f3944a",
+     "command": "copy (already PNG)"
+    }
+   ]
+  },
+  {
+   "path": "Standalone/Resources/StandaloneLogo@2x.png",
+   "sha256": "f70286ee3849d11a1e72af58af0a1975928e2f22af8fce73545f2c1092824138",
+   "category": "a",
+   "reason": "Boxer's own; covered by the project GPL-2.0 declaration, no exception listed",
+   "licence": "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public License 2.0')",
+   "notice": "Boxer is copyright (c) 2013 Alun Bestor and contributors.",
+   "copied_to": "assets/source/boxer/Standalone/Resources/StandaloneLogo@2x.png",
+   "runtime": [
+    {
+     "file": "assets/runtime/boxer/StandaloneLogo@2x.png",
+     "sha256": "f70286ee3849d11a1e72af58af0a1975928e2f22af8fce73545f2c1092824138",
+     "command": "copy (already PNG)"
+    }
+   ]
+  }
+ ],
+ "entries_restored_by": "scripts/boxer-assets.py --restore-originals (2026-10-02)"
+}

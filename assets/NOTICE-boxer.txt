@@ -1,0 +1,27 @@
+Boxer artwork and sounds in assets/source/boxer/ and assets/runtime/boxer/
+
+Boxer is copyright (c) 2013 Alun Bestor and contributors.
+Boxer is released under the GNU General Public License 2.0.
+  (Resources/Boxer.help/Contents/Resources/English.lproj/pages/legalese.html,
+   alunbestor/Boxer commit 0062fc18e154cde6cef3bf3329be4b0658597e31;
+   a copy is kept at assets/source/boxer/Resources/Boxer.help/.../legalese.html)
+
+The About panel states "Boxer is designed by Alun Bestor & released under the
+GNU Public License", and acknowledgements.html states "The complete source
+code for Boxer, its graphics and its supporting frameworks are hosted at
+GitHub" under "Boxer is open-source licensed under the GPL 2.0".
+
+Files in assets/runtime/boxer/ are format conversions (PNG rasterisation of
+PDF/ICNS, PNG from JPEG, WAV from AIFF) of those originals; the exact commands
+are in assets/boxer-assets-manifest.json. They remain under GPL-2.0.
+
+A distribution that includes these files must:
+- include the full text of the GNU General Public License version 2;
+- keep this notice and the copyright line above;
+- offer the corresponding source (the originals in assets/source/boxer/ and
+  scripts/boxer-assets.py) as GPL-2.0 section 3 requires.
+
+Not included and not covered by this notice: the DOSBox logo (Brand.png,
+BrandWatermark.png; permission was given to Boxer only), sample game data and
+cover art, Sparkle and BGHUDAppKit images, Apple system images, and the files
+listed as category (d) in the manifest.

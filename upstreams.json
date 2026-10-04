@@ -1,0 +1,8 @@
+{
+  "repositories": {
+    "boxer": {
+      "url": "https://github.com/alinebee/Boxer.git",
+      "commit": "0062fc18e154cde6cef3bf3329be4b0658597e31"
+    }
+  }
+}

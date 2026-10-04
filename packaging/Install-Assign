@@ -1,0 +1,136 @@
+; Install-Assign: make the Boxer: assign that game icons need (their
+; default tool is "Boxer:BoxerUI"), now and after every reboot.
+;
+; Double-click its icon in the Boxer drawer, or from a Shell:
+;   Execute Install-Assign [DIR=<drawer with BoxerUI>] [REPLACE|KEEP|REMOVE]
+; DIR defaults to the current directory, which is the Boxer drawer when
+; started from the icon (IconX changes into the icon's drawer).
+;
+; What it changes:
+;   - Boxer: is assigned to the drawer for this session.
+;   - S:Boxer-Assign is (re)written with that one Assign.
+;   - S:User-Startup gets one marked block ";BEGIN Boxer" .. ";END Boxer"
+;     that runs S:Boxer-Assign at startup. The file is created when it is
+;     missing, existing lines are kept, and a second run finds the block
+;     and adds nothing. The block only reads S:Boxer-Assign, so moving the
+;     drawer needs a new run, not an edit.
+; When Boxer: already points somewhere else nothing is overwritten: KEEP
+; leaves it, REPLACE changes it, and with neither a requester asks.
+; REMOVE undoes it: deletes S:Boxer-Assign and the Boxer: assign. The
+; block in S:User-Startup then does nothing; delete its lines by hand if
+; you want it gone.
+; STARTUP=<file> writes the block to another file (tests only).
+;
+; Why no .def: on AROS a .def default for a /K keyword was not applied,
+; and the script stopped at If EXISTS "" waiting for input (D1,
+; 2026-10-04). Optional values are tested with an "x" prefix, so If never
+; gets an empty string argument.
+.key DIR,REPLACE/S,KEEP/S,REMOVE/S,STARTUP/K
+.bra {
+.ket }
+FailAt 21
+If "x{STARTUP}" EQ "x"
+  Set BxSU "S:User-Startup"
+Else
+  Set BxSU "{STARTUP}"
+EndIf
+; Absolute path of the drawer: CD prints the current directory.
+Set BxOld `CD`
+If NOT "x{DIR}" EQ "x"
+  CD "{DIR}"
+  If WARN
+    Echo "Install-Assign: cannot enter *"{DIR}*" - nothing changed."
+    Quit 20
+  EndIf
+EndIf
+Set BxDir `CD`
+CD "$BxOld"
+If NOT "x{REMOVE}" EQ "x"
+  If EXISTS S:Boxer-Assign
+    Delete S:Boxer-Assign QUIET
+    Echo "Install-Assign: deleted S:Boxer-Assign; Boxer: is no longer set at startup."
+  Else
+    Echo "Install-Assign: S:Boxer-Assign did not exist."
+  EndIf
+  Assign >NIL: Boxer: EXISTS
+  If NOT WARN
+    Assign Boxer: REMOVE
+    Echo "Install-Assign: removed the Boxer: assign."
+  EndIf
+  Echo "Install-Assign: the Boxer block in $BxSU now does nothing; delete it by hand if you like."
+  Quit 0
+EndIf
+If NOT EXISTS "${BxDir}/BoxerUI"
+  Echo "Install-Assign: no BoxerUI in *"$BxDir*" - nothing changed."
+  Echo "Run it from the Boxer drawer, or give DIR=<drawer with BoxerUI>."
+  Quit 20
+EndIf
+Assign >NIL: Boxer: EXISTS
+If WARN
+  Assign Boxer: "$BxDir"
+  Echo "Install-Assign: Boxer: assigned to *"$BxDir*" for this session."
+Else
+  CD Boxer:
+  Set BxCur `CD`
+  CD "$BxOld"
+  If "x$BxCur" EQ "x$BxDir"
+    Echo "Install-Assign: Boxer: already points to *"$BxDir*"."
+  Else
+    Echo "Install-Assign: Boxer: already points to another drawer:"
+    Assign Boxer: EXISTS
+    If NOT "x{KEEP}" EQ "x"
+      Echo "Install-Assign: KEEP given - nothing changed."
+      Quit 5
+    EndIf
+    If "x{REPLACE}" EQ "x"
+      Echo "Install-Assign: asking in a requester whether to replace it..."
+      Set BxAns `RequestChoice "Boxer Install-Assign" "Boxer: already points to another drawer.*NPoint it at $BxDir?" "Replace" "Keep"`
+      If NOT "x$BxAns" EQ "x1"
+        Echo "Install-Assign: kept the existing Boxer: assign - nothing changed."
+        Quit 5
+      EndIf
+    EndIf
+    Assign Boxer: "$BxDir"
+    Echo "Install-Assign: Boxer: now points to *"$BxDir*"."
+  EndIf
+EndIf
+; Persistent part. S:Boxer-Assign holds the path; it is rewritten every run.
+Echo "; Written by Boxer's Install-Assign. Execute Install-Assign REMOVE undoes it." >S:Boxer-Assign
+Echo "If EXISTS *"${BxDir}/BoxerUI*"" >>S:Boxer-Assign
+Echo "  Assign Boxer: *"$BxDir*"" >>S:Boxer-Assign
+Echo "EndIf" >>S:Boxer-Assign
+Echo "Install-Assign: wrote S:Boxer-Assign."
+Set BxHave 0
+If EXISTS "$BxSU"
+  ; Search is never run on an empty file (it damaged memory on AROS).
+  Set BxSz `List "$BxSU" LFORMAT "%L"`
+  If NOT "x$BxSz" EQ "x0"
+    Search >NIL: "$BxSU" ";BEGIN Boxer" QUIET
+    If NOT WARN
+      Set BxHave 1
+    EndIf
+  EndIf
+Else
+  Echo "; User-Startup: run at the end of S:Startup-Sequence" >"$BxSU"
+  Echo "Install-Assign: created $BxSU."
+EndIf
+If "x$BxHave" EQ "x1"
+  Echo "Install-Assign: $BxSU already has the Boxer block - not added again."
+Else
+  ; The empty line ends a last line that has no newline.
+  Echo "" >>"$BxSU"
+  Echo ";BEGIN Boxer (Install-Assign)" >>"$BxSU"
+  Echo "If EXISTS S:Boxer-Assign" >>"$BxSU"
+  Echo "  Execute S:Boxer-Assign" >>"$BxSU"
+  Echo "EndIf" >>"$BxSU"
+  Echo ";END Boxer" >>"$BxSU"
+  Echo "Install-Assign: added the Boxer block to $BxSU."
+EndIf
+Echo "Install-Assign: done. Game icons start Boxer now and after a reboot."
+UnSet BxSU
+UnSet BxOld
+UnSet BxDir
+UnSet BxCur
+UnSet BxAns
+UnSet BxSz
+UnSet BxHave

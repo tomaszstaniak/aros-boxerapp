@@ -1,0 +1,179 @@
+{
+ "purpose": "Clear-provenance replacements for the Apple system images Boxer uses by name (Reveal, lock states) and the full-screen glyph. See assets/README.md.",
+ "date": "2026-10-02",
+ "generated_by": "tools/make-replacement-assets.py",
+ "embedded_by": "scripts/build-ui.sh -> tools/png2inc.py",
+ "origins": {
+  "feather": {
+   "set": "Feather icons (npm feather-icons)",
+   "version": "4.29.2",
+   "archive_url": "https://registry.npmjs.org/feather-icons/-/feather-icons-4.29.2.tgz",
+   "archive_sha256": "28b6cad56600feee25c53051d65326621f2675d30d6f3d9bd3175f6117f84476",
+   "licence": "MIT",
+   "licence_text": "LICENSES/MIT-Feather.txt",
+   "author": "Cole Bemis (Copyright (c) 2013-2023 Cole Bemis)"
+  }
+ },
+ "rejected": [
+  {
+   "candidate": "AROS images/IconSets/Gorilla (System/Shell, Elements/Joystick)",
+   "why": "LEGAL says GPL without version (usable as GPL-2.0 under GPLv2 s.9), but no 128 px rasters and no named author in the tree (shallow clone at 74a2d80b); Tango covers every element in one style with a plainer licence"
+  },
+  {
+   "candidate": "AROS images/IconSets/Mason",
+   "why": "no licence file in the set directory"
+  },
+  {
+   "candidate": "GNOME Adwaita symbolic",
+   "why": "CC-BY-SA 3.0 / LGPL-3.0 dual; CC-BY-SA 3.0 is not GPL-2.0 compatible, LGPL-3.0 not with GPL-2.0-only"
+  },
+  {
+   "candidate": "Papirus",
+   "why": "GPL-3.0: incompatible with a GPL-2.0-only combination"
+  }
+ ],
+ "assets": [
+  {
+   "output": "assets/runtime/replacements/RevealTemplate.png",
+   "sha256": "a439f044b17a5e3c15016b9b160b5c5c41b250af405c4a7c5a86873ceb6cd77e",
+   "sources": [
+    {
+     "path": "assets/source/replacements/feather-icons-4.29.2/dist/icons/search.svg",
+     "archive_member": "feather-icons-4.29.2/dist/icons/search.svg",
+     "sha256": "24e3b3971d3fddce7a25b26ca41d3f959ffca737af076ceb653e80d788ab5648"
+    }
+   ],
+   "origin": "feather",
+   "replaces": "NSRevealFreestandingTemplate (Apple system image, category b)",
+   "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): currentColor -> #000000, stroke-width 2 -> 2.5, sips -z 14 14; alpha used as template mask",
+   "used_in": "DOS window toolbar, Inspector button (Glyph::Reveal)"
+  },
+  {
+   "output": "assets/runtime/replacements/FullScreenTemplate.png",
+   "sha256": "43c0441f4155f5c9aef1db60eedb49dd78a6514c28bc7046fa652e69c3375727",
+   "sources": [
+    {
+     "path": "assets/source/replacements/feather-icons-4.29.2/dist/icons/maximize-2.svg",
+     "archive_member": "feather-icons-4.29.2/dist/icons/maximize-2.svg",
+     "sha256": "299f2f3046bebc37d43427a2f797e95a8fa5c4301e4421291bf0e77fd7806efc"
+    }
+   ],
+   "origin": "feather",
+   "replaces": "system full-screen control (no Boxer resource; V3 toolbar addition)",
+   "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): as RevealTemplate",
+   "used_in": "DOS window toolbar, Fullscreen button (Glyph::FullScreen)"
+  },
+  {
+   "output": "assets/runtime/replacements/LockLockedTemplate.png",
+   "sha256": "a0fd227a28a09803d0edb480a59a9fac8c9707ae037e7d656a972d934e0a3570",
+   "sources": [
+    {
+     "path": "assets/source/replacements/feather-icons-4.29.2/dist/icons/lock.svg",
+     "archive_member": "feather-icons-4.29.2/dist/icons/lock.svg",
+     "sha256": "4d3c4db36888bbe68c1b519a520fb64c2df3bd45ceb15b736eba55cf551b4803"
+    }
+   ],
+   "origin": "feather",
+   "replaces": "NSLockLockedTemplate (Apple system image, category b)",
+   "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): as RevealTemplate",
+   "used_in": "DOS window status bar, mouse-lock button, locked/selected state (Glyph::LockLocked)"
+  },
+  {
+   "output": "assets/runtime/replacements/LockUnlockedTemplate.png",
+   "sha256": "aef121aec4de490a2a8a7253d85978869b216793f94319f3a98a9dc59c791ef0",
+   "sources": [
+    {
+     "path": "assets/source/replacements/feather-icons-4.29.2/dist/icons/unlock.svg",
+     "archive_member": "feather-icons-4.29.2/dist/icons/unlock.svg",
+     "sha256": "03f871fb8742d2f33e0a775b188c07c3049c52f0d833ded03c6b36c71781a644"
+    }
+   ],
+   "origin": "feather",
+   "replaces": "NSLockUnlockedTemplate (Apple system image, category b)",
+   "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): as RevealTemplate",
+   "used_in": "DOS window status bar, mouse-lock button, unlocked state (Glyph::LockUnlocked)"
+  }
+ ],
+ "history": [
+  {
+   "date": "2026-10-02",
+   "change": "Tango stand-ins for gamefolder.icns, prompt.icns, import.png(@2x), Game.png(@2x) removed; Boxer's originals restored (assets/boxer-assets-manifest.json, assets/README.md 'Restored originals').",
+   "tango_origin": {
+    "set": "Tango Desktop Project icon theme",
+    "version": "0.8.90",
+    "archive_url": "http://tango.freedesktop.org/releases/tango-icon-theme-0.8.90.tar.gz",
+    "archive_sha256": "6e98d8032d57d818acc907ec47e6a718851ff251ae7c29aafb868743eb65c88e",
+    "licence": "Public domain (COPYING: 'The icons in this repository are herefore released into the Public Domain.')",
+    "licence_text": "LICENSES/Tango-Public-Domain.txt",
+    "author": "Tango Desktop Project (AUTHORS: Ulisse Perusin, Steven Garrity, Lapo Calamandrei, Ryan Collier, Rodney Dawes, Andreas Nilsson, Tuomas Kuosmanen, Garrett LeSage, Jakub Steiner)"
+   },
+   "removed_entries": [
+    {
+     "output": "assets/runtime/replacements/gamefolder-128.png",
+     "sha256": "4cd43717a7441503ff55c226550e9073b5dd31720985102ac985f6adf9e6c234",
+     "sources": [
+      {
+       "path": "assets/source/replacements/tango-icon-theme-0.8.90/scalable/places/folder.svg",
+       "archive_member": "tango-icon-theme-0.8.90/scalable/places/folder.svg",
+       "sha256": "65e24650244b04139c6bb8a76a5e53382d9a09d4cd3eaa6752eff6ef5fafeff1"
+      },
+      {
+       "path": "assets/source/replacements/tango-icon-theme-0.8.90/scalable/devices/input-gaming.svg",
+       "archive_member": "tango-icon-theme-0.8.90/scalable/devices/input-gaming.svg",
+       "sha256": "d44119ab913ede7634b65b6fccd94f42c1b02e3555cd09510df795a2872afca7"
+      }
+     ],
+     "origin": "tango",
+     "replaces": "Boxer Resources/gamefolder.icns (category d)",
+     "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): sips -z 128 128 folder.svg; sips -z 72 72 input-gaming.svg; gamepad composited source-over at (52,50)",
+     "used_in": "Welcome window, 'Browse your games' button (src/ui/gfx.cpp welcomeImage, WelcomeArt::GameFolder)"
+    },
+    {
+     "output": "assets/runtime/replacements/import-128.png",
+     "sha256": "bb363f8df2b82fb10e6cad88eb5a18d118b26493fac5cc34de81945bfcd3708e",
+     "sources": [
+      {
+       "path": "assets/source/replacements/tango-icon-theme-0.8.90/scalable/apps/system-installer.svg",
+       "archive_member": "tango-icon-theme-0.8.90/scalable/apps/system-installer.svg",
+       "sha256": "d6628db5dd60e393174701e136cfeaef900365228fe841b8da6bf1a49372b4c9"
+      }
+     ],
+     "origin": "tango",
+     "replaces": "Boxer Resources/import.png, import@2x.png (category d)",
+     "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): sips -z 128 128",
+     "used_in": "Welcome window, 'Import a new game' button (WelcomeArt::Import)"
+    },
+    {
+     "output": "assets/runtime/replacements/prompt-128.png",
+     "sha256": "9d4eea25d5927c6d375b9001abfbe937b6cf5298fe687f02263ecb2390e517c3",
+     "sources": [
+      {
+       "path": "assets/source/replacements/tango-icon-theme-0.8.90/scalable/apps/utilities-terminal.svg",
+       "archive_member": "tango-icon-theme-0.8.90/scalable/apps/utilities-terminal.svg",
+       "sha256": "d8e5266cc50e67499b176365fb6ac25da1e7b8d05b3dd57578bd0fc3479f0f24"
+      }
+     ],
+     "origin": "tango",
+     "replaces": "Boxer Resources/prompt.icns (category d)",
+     "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): sips -z 128 128",
+     "used_in": "Welcome window, 'Open a DOS prompt' button (WelcomeArt::Prompt)"
+    },
+    {
+     "output": "assets/runtime/replacements/gamebox-32.png",
+     "sha256": "3d866a8ad935ee2caeb6a80d17f290400543b81c61eaebbb94153685ce39240a",
+     "sources": [
+      {
+       "path": "assets/source/replacements/tango-icon-theme-0.8.90/32x32/mimetypes/package-x-generic.png",
+       "archive_member": "tango-icon-theme-0.8.90/32x32/mimetypes/package-x-generic.png",
+       "sha256": "a9260acc619d7aaeb857e2597b4beaf3aec68bbb618888afad452bb493177b63"
+      }
+     ],
+     "origin": "tango",
+     "replaces": "Boxer Resources/Game.png, Game@2x.png (category d)",
+     "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): the release's 32x32 raster re-encoded as 8-bit RGBA, pixels unchanged",
+     "used_in": "Inspector toolbar, Gamebox tab (src/ui/gfx.cpp tabIcon, TabIcon::Game)"
+    }
+   ]
+  }
+ ]
+}

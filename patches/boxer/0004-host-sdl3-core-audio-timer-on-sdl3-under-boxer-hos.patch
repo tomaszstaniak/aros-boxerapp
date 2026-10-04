@@ -1,0 +1,316 @@
+Title: Host SDL3: core audio/timer on SDL3 under BOXER_HOST_SDL3, SDL2 kept
+Repository: boxer (https://github.com/alinebee/Boxer.git)
+Date: 2026-10-02
+Author: tomaszstaniak <68373859+tomaszstaniak@users.noreply.github.com>
+Base-Commit: 0062fc18e154cde6cef3bf3329be4b0658597e31
+Preceding-Patches:
+  0001-aros-host-sdl-seam.patch
+  0002-aros-config.patch
+  0003-mount-colon-paths.patch
+Problem: The host layer is moving to SDL3 (SDL2 is deprecated upstream; linking the SDK's SDL2 brings gl.library/Mesa in before main on both ABIs). SDL3 removed SDL_OpenAudio/SDL_LockAudio/SDL_PauseAudio, the SDL_mutexP/V macros, and returns Uint64 from SDL_GetTicks; Boxer's port layer paused audio by calling SDL_PauseAudio directly. SDL2 must stay buildable as the comparison point.
+Solution: boxer_host_sdl.h includes <SDL3/SDL.h> when BOXER_HOST_SDL3 is defined (SDL_ENABLE_OLD_NAMES for SDL_mutex, SDL_SwapLE32, AUDIO_S16SYS; SDL_mutexP/V and a 32-bit SDL_GetTicks macro), SDL2 otherwise. mixer.cpp: MIXER_LockHost/UnlockHost (SDL2 global audio lock, or the SDL3 stream lock that SDL holds during the stream callback); SDL3 opens SDL_OpenAudioDeviceStream on the default playback device with S16/2/rate, requests blocksize frames by hint and takes the device's buffer size as blocksize; a stream callback clears a chunk, runs the unchanged MIXER_CallBack and puts the data; MIXER_Stop destroys the stream (joins the device thread). New MIXER_SetHostPaused (replaces the port's direct SDL_PauseAudio) and MIXER_GetHostStats (callbacks, frames, underruns, overflows, emulated vs host ms) for both hosts. Without BOXER_HOST_SDL3 the device code is SDL2's as before; the counters are added on both.
+Platform-Scope: AROS x86_64 ABIv11 and mainline v1 (non-Apple builds); __APPLE__ builds unaffected (seam not used there; mixer counters and MIXER_SetHostPaused compile on any host).
+Upstream-Status: local-only
+Verification: 2026-10-02: build-core/build-ui/build-smoke with BOXER_HOST=sdl3 and sdl2 on ABIv11 (GCC 10.5.0) and mainline v1; SDL3 builds carry no GLBase/SDL2Base libset. Runtime: tested on ABIv11 only; mainline build/link only.
+Removal-Condition: When SDL2 is no longer needed as a comparison build, drop the SDL2 branches; when the core is replaced, drop the patch.
+
+diff --git a/DOSBox/include/boxer_host_sdl.h b/DOSBox/include/boxer_host_sdl.h
+index 0828dfb246bab9adc3fed5170b1fe76895c5a056..b0369508e1de898e99c9f029167ebf545032fa35 100644
+--- a/DOSBox/include/boxer_host_sdl.h
++++ b/DOSBox/include/boxer_host_sdl.h
+@@ -1,15 +1,34 @@
+ /* Host SDL seam for non-Apple builds of Boxer's DOSBox 0.74 core.
+  *
+- * Boxer linked SDL 1.2 frameworks; on AROS the core uses SDL2 instead
+- * (installed in both the ABIv11 and mainline SDKs; SDL3 is the preferred
+- * later target, so all SDL use stays behind this one header).
++ * Boxer linked SDL 1.2 frameworks; on AROS the core uses SDL2 (installed
++ * in both SDKs) or, with BOXER_HOST_SDL3, a static reduced SDL3. All SDL
++ * use stays behind this one header and mixer.cpp's device code.
+  * SDL2 dropped the SDL 1.2 CD-ROM API. Physical-drive CD access through it
+  * is reported as "no drives"; image-based CDs (ISO/CUE) do not use it.
+  */
+ #ifndef BOXER_HOST_SDL_H
+ #define BOXER_HOST_SDL_H
+ 
++#ifdef BOXER_HOST_SDL3
++/* SDL3 host (build flag BOXER_HOST_SDL3, set by scripts/build-core.sh when
++ * BOXER_HOST=sdl3). Only the names the 0.74 core still uses are mapped;
++ * the audio device itself is opened in mixer.cpp, which has an SDL3 path. */
++/* SDL3's own old-name mappings cover SDL_mutex, SDL_SwapLE32 and
++ * AUDIO_S16SYS; without this define it poisons them instead. */
++#define SDL_ENABLE_OLD_NAMES
++#include <SDL3/SDL.h>
++/* Gone in SDL3 (SDL2 compatibility macros returning int); Lock/Unlock now
++ * return void. */
++#define SDL_mutexP(m) (SDL_LockMutex(m), 0)
++#define SDL_mutexV(m) (SDL_UnlockMutex(m), 0)
++/* SDL3 returns Uint64. The core stores ticks in 32-bit fields and compares
++ * sums such as SDL_GetTicks()+ms (parport.cpp), so keep SDL2's 32-bit wrap
++ * semantics everywhere instead of mixing widths. A function-like macro is
++ * not re-expanded inside itself, so this calls the real function. */
++#define SDL_GetTicks() ((Uint32)SDL_GetTicks())
++#else
+ #include <SDL2/SDL.h>
++#endif
+ 
+ #define SDL_INIT_CDROM 0
+ 
+diff --git a/DOSBox/include/mixer.h b/DOSBox/include/mixer.h
+index b9ca882425e80754c65c096e02db017ddd76e34b..9fd60089f3f6737c3455fc1724cd61fa12bf5454 100644
+--- a/DOSBox/include/mixer.h
++++ b/DOSBox/include/mixer.h
+@@ -94,6 +94,23 @@ MixerChannel * MIXER_FindChannel(const char * name);
+ /* Find the device you want to delete with findchannel "delchan gets deleted" */
+ void MIXER_DelChannel(MixerChannel* delchan); 
+ 
++//--Added 2026 for the AROS port: host device control and audio counters.
++struct MixerHostStats {
++	Bit32u open_ms, now_ms;           // host ms (SDL_GetTicks) at open / at the query
++	Bit32u mix_ticks;                 // MIXER_Mix calls = emulated ms with a device
++	Bit32u callbacks;                 // device callbacks (SDL2 buffers, SDL3 chunks)
++	Bit64u frames_requested;          // frames the host pulled
++	Bit32u underruns_full;            // nothing delivered (buffer left silent)
++	Bit32u underruns_stretched;       // < 1 % short, stretched
++	Bit32u underruns_low;             // delivered, but below the prebuffer
++	Bit32u overflows;                 // too much queued, dropped/compressed
++	Bit32u freq, blocksize;
++	bool nosound;
++};
++void MIXER_SetHostPaused(bool paused);
++void MIXER_GetHostStats(MixerHostStats *out);
++//--End of modifications
++
+ /* Object to maintain a mixerchannel; As all objects it registers itself with create
+  * and removes itself when destroyed. */
+ class MixerObject{
+diff --git a/DOSBox/src/hardware/mixer.cpp b/DOSBox/src/hardware/mixer.cpp
+index 5598acc1c997ea8259615f5fad14bb9b0745aa5a..f2ec9af7db04e512fed724b29bc019796912c7e7 100644
+--- a/DOSBox/src/hardware/mixer.cpp
++++ b/DOSBox/src/hardware/mixer.cpp
+@@ -58,6 +58,22 @@
+ #define MIXER_REMAIN ((1<<MIXER_SHIFT)-1)
+ #define MIXER_VOLSHIFT 13
+ 
++//--Added 2026 for the AROS port: host audio API (SDL2 or SDL3, see
++//boxer_host_sdl.h). The emulator thread serialises with the device callback
++//through MIXER_LockHost/UnlockHost: SDL2's global audio lock, or with SDL3
++//the stream lock, which SDL holds while it runs the stream callback.
++#ifdef BOXER_HOST_SDL3
++static SDL_AudioStream *mixer_stream = NULL;
++static inline void MIXER_LockHost(void) { if (mixer_stream) SDL_LockAudioStream(mixer_stream); }
++static inline void MIXER_UnlockHost(void) { if (mixer_stream) SDL_UnlockAudioStream(mixer_stream); }
++#else
++static inline void MIXER_LockHost(void) { SDL_LockAudio(); }
++static inline void MIXER_UnlockHost(void) { SDL_UnlockAudio(); }
++#endif
++//Counters for the port's audio measurements (MIXER_GetHostStats).
++static MixerHostStats mixer_stats;
++//--End of modifications
++
+ static INLINE Bit16s MIXER_CLIP(Bits SAMP) {
+ 	if (SAMP < MAX_AUDIO) {
+ 		if (SAMP > MIN_AUDIO)
+@@ -141,9 +157,9 @@ void MixerChannel::Enable(bool _yesno) {
+ 	enabled=_yesno;
+ 	if (enabled) {
+ 		freq_index=MIXER_REMAIN;
+-		SDL_LockAudio();
++		MIXER_LockHost();
+ 		if (done<mixer.done) done=mixer.done;
+-		SDL_UnlockAudio();
++		MIXER_UnlockHost();
+ 	}
+ }
+ 
+@@ -345,14 +361,14 @@ void MixerChannel::AddSamples_s32_nonnative(Bitu len,const Bit32s * data) {
+ }
+ 
+ void MixerChannel::FillUp(void) {
+-	SDL_LockAudio();
++	MIXER_LockHost();
+ 	if (!enabled || done<mixer.done) {
+-		SDL_UnlockAudio();
++		MIXER_UnlockHost();
+ 		return;
+ 	}
+ 	float index=PIC_TickIndex();
+ 	Mix((Bitu)(index*mixer.needed));
+-	SDL_UnlockAudio();
++	MIXER_UnlockHost();
+ }
+ 
+ extern bool ticksLocked;
+@@ -391,12 +407,13 @@ static void MIXER_MixData(Bitu needed) {
+ }
+ 
+ static void MIXER_Mix(void) {
+-	SDL_LockAudio();
++	MIXER_LockHost();
++	mixer_stats.mix_ticks++;
+ 	MIXER_MixData(mixer.needed);
+ 	mixer.tick_remain+=mixer.tick_add;
+ 	mixer.needed+=(mixer.tick_remain>>MIXER_SHIFT);
+ 	mixer.tick_remain&=MIXER_REMAIN;
+-	SDL_UnlockAudio();
++	MIXER_UnlockHost();
+ }
+ 
+ static void MIXER_Mix_NoSound(void) {
+@@ -425,11 +442,16 @@ static void MIXER_CallBack(void * userdata, Uint8 *stream, int len) {
+ 	Bitu reduce;
+ 	Bitu pos, index, index_add;
+ 	Bits sample;
++	mixer_stats.callbacks++;
++	mixer_stats.frames_requested+=need;
+ 	/* Enough room in the buffer ? */
+ 	if (mixer.done < need) {
+ //		LOG_MSG("Full underrun need %d, have %d, min %d", need, mixer.done, mixer.min_needed);
+-		if((need - mixer.done) > (need >>7) ) //Max 1 procent stretch.
++		if((need - mixer.done) > (need >>7) ) { //Max 1 procent stretch.
++			mixer_stats.underruns_full++;
+ 			return;
++		}
++		mixer_stats.underruns_stretched++;
+ 		reduce = mixer.done;
+ 		index_add = (reduce << MIXER_SHIFT) / need;
+ 		mixer.tick_add = ((mixer.freq+mixer.min_needed) << MIXER_SHIFT)/1000;
+@@ -446,6 +468,7 @@ static void MIXER_CallBack(void * userdata, Uint8 *stream, int len) {
+ 				left = 1 + (2*left) / mixer.min_needed; //left=1,2,3
+ 			}
+ //			LOG_MSG("needed underrun need %d, have %d, min %d, left %d", need, mixer.done, mixer.min_needed, left);
++			mixer_stats.underruns_low++;
+ 			reduce = need - left;
+ 			index_add = (reduce << MIXER_SHIFT) / need;
+ 		} else {
+@@ -471,6 +494,7 @@ static void MIXER_CallBack(void * userdata, Uint8 *stream, int len) {
+ 	} else {
+ 		/* There is way too much data in the buffer */
+ //		LOG_MSG("overflow run need %d, have %d, min %d", need, mixer.done, mixer.min_needed);
++		mixer_stats.overflows++;
+ 		if (mixer.done > MIXER_BUFSIZE)
+ 			index_add = MIXER_BUFSIZE - 2*mixer.min_needed;
+ 		else 
+@@ -524,9 +548,66 @@ static void MIXER_CallBack(void * userdata, Uint8 *stream, int len) {
+ 	}
+ }
+ 
++#ifdef BOXER_HOST_SDL3
++//SDL3 pulls audio through a stream: the callback is asked for "additional"
++//bytes and must put them into the stream. DOSBox's SDL2-style callback fills
++//a caller-supplied buffer of any size (multiple of a frame) and leaves it
++//untouched on a full underrun, so the buffer is cleared first, as SDL2 did.
++static void SDLCALL MIXER_StreamCallBack(void *userdata, SDL_AudioStream *stream, int additional, int total) {
++	static Uint8 chunk[4096*MIXER_SSIZE];
++	(void)total;
++	additional=(additional+MIXER_SSIZE-1)&~(MIXER_SSIZE-1);
++	while (additional>0) {
++		int len=additional>(int)sizeof(chunk)?(int)sizeof(chunk):additional;
++		memset(chunk,0,len);
++		MIXER_CallBack(userdata,chunk,len);
++		SDL_PutAudioStreamData(stream,chunk,len);
++		additional-=len;
++	}
++}
++#endif
++
++static bool mixer_stopped;
++
+ static void MIXER_Stop(Section* sec) {
++	mixer_stats.now_ms=SDL_GetTicks();
++	mixer_stopped=true;
++#ifdef BOXER_HOST_SDL3
++	//Closing the stream also closes its device and joins SDL's device thread,
++	//so no callback runs after the core's mixer is gone.
++	if (mixer_stream) {
++		SDL_AudioStream *stream=mixer_stream;
++		mixer_stream=NULL;
++		SDL_DestroyAudioStream(stream);
++	}
++#endif
++}
++
++//--Added 2026 for the AROS port: pause/resume the host device (Boxer's
++//pause and fast forward) without exposing the host API outside the core.
++void MIXER_SetHostPaused(bool paused) {
++#ifdef BOXER_HOST_SDL3
++	if (!mixer_stream) return;
++	if (paused) SDL_PauseAudioStreamDevice(mixer_stream);
++	else SDL_ResumeAudioStreamDevice(mixer_stream);
++#else
++	SDL_PauseAudio(paused ? 1 : 0);
++#endif
+ }
+ 
++void MIXER_GetHostStats(MixerHostStats *out) {
++	//After MIXER_Stop the counters are final and SDL may be shut down.
++	if (mixer_stopped) { *out=mixer_stats; out->freq=mixer.freq; out->blocksize=mixer.blocksize; out->nosound=mixer.nosound; return; }
++	MIXER_LockHost();
++	*out=mixer_stats;
++	out->now_ms=SDL_GetTicks();
++	out->freq=mixer.freq;
++	out->blocksize=mixer.blocksize;
++	out->nosound=mixer.nosound;
++	MIXER_UnlockHost();
++}
++//--End of modifications
++
+ class MIXER : public Program {
+ public:
+ 	void MakeVolume(char * scan,float & vol0,float & vol1) {
+@@ -643,6 +724,43 @@ void MIXER_Init(Section* sec) {
+ 	mixer.mastervol[1]=1.0f;
+ 
+ 	/* Start the Mixer using SDL Sound at 22 khz */
++	memset(&mixer_stats,0,sizeof(mixer_stats));
++	mixer_stopped=false;
++#ifdef BOXER_HOST_SDL3
++	//The stream converts from this format to the device's, so mixer.freq
++	//stays as configured; blocksize becomes the device's buffer size, which
++	//sizes max_needed below as SDL2's obtained.samples did.
++	SDL_AudioSpec spec;
++	spec.format=SDL_AUDIO_S16;
++	spec.channels=2;
++	spec.freq=mixer.freq;
++	char frames[16];
++	snprintf(frames,sizeof(frames),"%u",(unsigned)mixer.blocksize);
++	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES,frames);
++	mixer.tick_remain=0;
++	if (mixer.nosound) {
++		LOG_MSG("MIXER:No Sound Mode Selected.");
++		mixer.tick_add=((mixer.freq) << MIXER_SHIFT)/1000;
++		TIMER_AddTickHandler(MIXER_Mix_NoSound);
++	} else if ((mixer_stream=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,MIXER_StreamCallBack,NULL))==NULL) {
++		mixer.nosound = true;
++		LOG_MSG("MIXER:Can't open audio: %s , running in nosound mode.",SDL_GetError());
++		mixer.tick_add=((mixer.freq) << MIXER_SHIFT)/1000;
++		TIMER_AddTickHandler(MIXER_Mix_NoSound);
++	} else {
++		SDL_AudioSpec device;
++		int device_frames=0;
++		if (SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(mixer_stream),&device,&device_frames) && device_frames>0) {
++			if ((Bit32u)device_frames!=mixer.blocksize || device.freq!=(int)mixer.freq)
++				LOG_MSG("MIXER:Device differs: freq %d, blocksize %d (stream converts)",device.freq,device_frames);
++			mixer.blocksize=device_frames;
++		}
++		mixer.tick_add=(mixer.freq << MIXER_SHIFT)/1000;
++		mixer_stats.open_ms=SDL_GetTicks();
++		TIMER_AddTickHandler(MIXER_Mix);
++		SDL_ResumeAudioStreamDevice(mixer_stream);
++	}
++#else
+ 	SDL_AudioSpec spec;
+ 	SDL_AudioSpec obtained;
+ 
+@@ -669,9 +787,11 @@ void MIXER_Init(Section* sec) {
+ 		mixer.freq=obtained.freq;
+ 		mixer.blocksize=obtained.samples;
+ 		mixer.tick_add=(mixer.freq << MIXER_SHIFT)/1000;
++		mixer_stats.open_ms=SDL_GetTicks();
+ 		TIMER_AddTickHandler(MIXER_Mix);
+ 		SDL_PauseAudio(0);
+ 	}
++#endif
+ 	mixer.min_needed=section->Get_int("prebuffer");
+ 	if (mixer.min_needed>100) mixer.min_needed=100;
+ 	mixer.min_needed=(mixer.freq*mixer.min_needed)/1000;

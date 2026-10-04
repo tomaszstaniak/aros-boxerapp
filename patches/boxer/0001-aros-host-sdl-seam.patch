@@ -1,0 +1,162 @@
+Title: Host SDL seam: build the core against SDL2 outside macOS
+Repository: boxer (https://github.com/alinebee/Boxer.git)
+Date: 2026-10-01
+Author: tomaszstaniak <68373859+tomaszstaniak@users.noreply.github.com>
+Base-Commit: 0062fc18e154cde6cef3bf3329be4b0658597e31
+Preceding-Patches: none
+Problem: Boxer's DOSBox includes SDL 1.2, SDL_sound and SDL_net through macOS framework paths (#import <SDL/SDL.h>) and CoreFoundation's byte-order header. Neither exists on AROS, and the mainline SDK has no SDL 1.2 at all.
+Solution: On non-Apple hosts the shim headers include one seam header, boxer_host_sdl.h, which uses SDL2 (installed in both AROS SDKs) and supplies the SDL 1.2 CD-ROM types with stubs reporting no physical drives, since SDL2 dropped that API. SDL_sound and SDL_net resolve to nothing; their users are disabled by the AROS config patch. vga_draw.cpp uses SDL_SwapLE32 instead of CFSwapInt32HostToLittle. macOS builds are unchanged. All SDL use stays behind this header so SDL3 (the preferred later target) can replace SDL2 in one place.
+Platform-Scope: AROS x86_64 ABIv11 and mainline v1 (any non-Apple host); no effect on __APPLE__ builds.
+Upstream-Status: local-only
+Verification: 2026-10-01: scripts/build-core.sh compiles all 119 TUs of the Boxer target's Sources phase with GCC 10.5.0 for ABIv11 and mainline v1; boxer-core-smoke links on both. Not run on any guest yet. Physical CD-ROM access is untested and expected absent.
+Removal-Condition: When the core moves to SDL3 or a newer DOSBox core replaces this tree.
+
+diff --git a/DOSBox/include/SDL.h b/DOSBox/include/SDL.h
+index f03ad8db810eb565544a758b865bb52c5fccd2dd..33e2218778e182e6387aeb505f79aa4558bc150f 100644
+--- a/DOSBox/include/SDL.h
++++ b/DOSBox/include/SDL.h
+@@ -3,7 +3,11 @@ extern "C" {
+ #endif
+ 
+ //This cunning file remaps DOSBox's SDL header include to our custom framework instead
++#ifdef __APPLE__
+ #import <SDL/SDL.h>
++#else
++#include "boxer_host_sdl.h"
++#endif
+ 
+ #if __cplusplus
+ } //Extern C
+diff --git a/DOSBox/include/SDL_endian.h b/DOSBox/include/SDL_endian.h
+index 5691858323c773f41cf9b218f4f5d5f4ac9dd1f5..8174cb5899d940ecd6e965629b000d0b8e4f546f 100644
+--- a/DOSBox/include/SDL_endian.h
++++ b/DOSBox/include/SDL_endian.h
+@@ -3,7 +3,11 @@ extern "C" {
+ #endif
+ 
+ //This cunning file remaps DOSBox's SDL header include to our custom framework instead
++#ifdef __APPLE__
+ #import <SDL/SDL_endian.h>
++#else
++#include "boxer_host_sdl.h"
++#endif
+ 
+ #if __cplusplus
+ } //Extern C
+diff --git a/DOSBox/include/SDL_net.h b/DOSBox/include/SDL_net.h
+index 1bbee051bc720229a501907a462386aa99335383..ca5ee94c970ac4e54aa4009f55039901546885e5 100644
+--- a/DOSBox/include/SDL_net.h
++++ b/DOSBox/include/SDL_net.h
+@@ -3,7 +3,9 @@ extern "C" {
+ #endif
+ 
+ //This cunning file remaps DOSBox's SDL header include to our custom framework instead
++#ifdef __APPLE__
+ #import <SDL_net/SDL_net.h>
++#endif
+ 
+ #if __cplusplus
+ } //Extern C
+diff --git a/DOSBox/include/SDL_sound.h b/DOSBox/include/SDL_sound.h
+index b084c8451221925ac76a79256ae14ef3cfba467a..e0d74313a755bc193e928da2179cc1b5710cd0d7 100644
+--- a/DOSBox/include/SDL_sound.h
++++ b/DOSBox/include/SDL_sound.h
+@@ -3,7 +3,9 @@ extern "C" {
+ #endif
+ 
+ //This cunning file remaps DOSBox's SDL_sound header include to our custom framework instead
++#ifdef __APPLE__
+ #import <SDL_sound/SDL_sound.h>
++#endif
+ 
+ #if __cplusplus
+ } //Extern C
+diff --git a/DOSBox/include/SDL_thread.h b/DOSBox/include/SDL_thread.h
+index fc9b135eb6c18bdca4150177bb0fe174f563f12d..3137d6be1524f0806e574d638bf579fbadc3aca8 100644
+--- a/DOSBox/include/SDL_thread.h
++++ b/DOSBox/include/SDL_thread.h
+@@ -3,7 +3,11 @@ extern "C" {
+ #endif
+ 
+ //This cunning file remaps DOSBox's SDL header include to our custom framework instead
++#ifdef __APPLE__
+ #import <SDL/SDL_thread.h>
++#else
++#include "boxer_host_sdl.h"
++#endif
+ 
+ #if __cplusplus
+ } //Extern C
+diff --git a/DOSBox/include/boxer_host_sdl.h b/DOSBox/include/boxer_host_sdl.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..0828dfb246bab9adc3fed5170b1fe76895c5a056
+--- /dev/null
++++ b/DOSBox/include/boxer_host_sdl.h
+@@ -0,0 +1,50 @@
++/* Host SDL seam for non-Apple builds of Boxer's DOSBox 0.74 core.
++ *
++ * Boxer linked SDL 1.2 frameworks; on AROS the core uses SDL2 instead
++ * (installed in both the ABIv11 and mainline SDKs; SDL3 is the preferred
++ * later target, so all SDL use stays behind this one header).
++ * SDL2 dropped the SDL 1.2 CD-ROM API. Physical-drive CD access through it
++ * is reported as "no drives"; image-based CDs (ISO/CUE) do not use it.
++ */
++#ifndef BOXER_HOST_SDL_H
++#define BOXER_HOST_SDL_H
++
++#include <SDL2/SDL.h>
++
++#define SDL_INIT_CDROM 0
++
++#define SDL_MAX_TRACKS 99
++#define SDL_AUDIO_TRACK 0x00
++#define SDL_DATA_TRACK  0x04
++#define CD_FPS 75
++/* Frame/MSF conversions are used by image CDs too, not only by the API. */
++#define FRAMES_TO_MSF(f, M, S, F) { int value = f; \
++	*(F) = value % CD_FPS; value /= CD_FPS; \
++	*(S) = value % 60; value /= 60; *(M) = value; }
++#define MSF_TO_FRAMES(M, S, F) ((M) * 60 * CD_FPS + (S) * CD_FPS + (F))
++
++typedef enum { CD_TRAYEMPTY, CD_STOPPED, CD_PLAYING, CD_PAUSED, CD_ERROR = -1 } CDstatus;
++#define CD_INDRIVE(status) ((int)(status) > 0)
++
++typedef struct SDL_CDtrack {
++	Uint8 id, type; Uint16 unused; Uint32 length, offset;
++} SDL_CDtrack;
++
++typedef struct SDL_CD {
++	int id; CDstatus status; int numtracks, cur_track, cur_frame;
++	SDL_CDtrack track[SDL_MAX_TRACKS + 1];
++} SDL_CD;
++
++static inline int SDL_CDNumDrives(void) { return 0; }
++static inline const char *SDL_CDName(int) { return ""; }
++static inline SDL_CD *SDL_CDOpen(int) { SDL_SetError("CD-ROM API not available"); return NULL; }
++static inline CDstatus SDL_CDStatus(SDL_CD *) { return CD_ERROR; }
++static inline int SDL_CDPlay(SDL_CD *, int, int) { return -1; }
++static inline int SDL_CDPlayTracks(SDL_CD *, int, int, int, int) { return -1; }
++static inline int SDL_CDPause(SDL_CD *) { return -1; }
++static inline int SDL_CDResume(SDL_CD *) { return -1; }
++static inline int SDL_CDStop(SDL_CD *) { return -1; }
++static inline int SDL_CDEject(SDL_CD *) { return -1; }
++static inline void SDL_CDClose(SDL_CD *) {}
++
++#endif
+diff --git a/DOSBox/src/hardware/vga_draw.cpp b/DOSBox/src/hardware/vga_draw.cpp
+index c8e3ef2e609d6a5da1c8c23579315ef52793caae..98547605f2ba11a8c599663a1d763f9b9ab59280 100644
+--- a/DOSBox/src/hardware/vga_draw.cpp
++++ b/DOSBox/src/hardware/vga_draw.cpp
+@@ -29,7 +29,12 @@
+ #include "pic.h"
+ 
+ //--Added 2011-04-18 by Alun Bestor to fix endianness issues in Tandy/CGA line-printing
++#ifdef __APPLE__
+ #import <CoreFoundation/CFByteOrder.h>
++#else
++#include "SDL_endian.h"
++#define CFSwapInt32HostToLittle(x) SDL_SwapLE32(x)
++#endif
+ //--endif
+ 
+ //#undef C_DEBUG

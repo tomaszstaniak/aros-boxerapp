@@ -1,0 +1,139 @@
+Boxer for AROS @VERSION@ (@ABI_NAME@, x86_64)
+=============================================
+
+This is a TEST BUILD of the AROS port of Boxer, the DOS game emulator
+front end by Alun Bestor, with Boxer's DOSBox 0.74 core. It is not a
+release. Expect missing features and bugs.
+
+This build only runs on @ABI_NAME@. Binaries for ABIv11 (AROS One) and for
+mainline AROS (ABI v1) are different files and do not run on each other.
+
+Installing
+----------
+1. Unpack the archive where you want Boxer to live, for example SYS:
+   or Work:. From a Shell:
+     UnZip <archive>.zip -d SYS:      (or: LhA x <archive>.lha SYS:)
+   This makes the drawer "Boxer". You can rename or move it later, but
+   then run Install-Assign again (step 3).
+   Keep these next to BoxerUI: Fonts/, conf/ and dosbox.msg.
+
+2. Open the Boxer drawer in Wanderer.
+
+3. Double-click "Install-Assign". A window shows what it does and stays
+   open until you close it. It:
+     - assigns Boxer: to this drawer for the running system;
+     - writes S:Boxer-Assign, one Assign line pointing at this drawer;
+     - adds a block of five lines, from ";BEGIN Boxer" to ";END Boxer",
+       to S:User-Startup, so Boxer: is set again after every reboot.
+       S:User-Startup is created if your system has none; lines already
+       in it are kept. Running Install-Assign again adds nothing twice.
+   Game icons need Boxer:, because their default tool is Boxer:BoxerUI.
+   If Boxer: already points to another drawer, a requester asks whether
+   to replace it; nothing is changed without your answer.
+   From a Shell instead:
+     CD SYS:Boxer
+     Execute Install-Assign
+   (add KEEP or REPLACE to answer the question in advance).
+
+4. Double-click BoxerUI. On the first start Boxer proposes a folder for
+   your DOS games and one for their saved games; confirm or choose your
+   own. Then import a game. Each imported game gets an icon in the games
+   folder; double-click it to play.
+
+From a Shell BoxerUI needs a larger stack:
+  Stack 65536
+  BoxerUI
+
+Uninstalling
+------------
+1. In a Shell: CD to the Boxer drawer, then
+     Execute Install-Assign REMOVE
+   This deletes S:Boxer-Assign and removes the Boxer: assign. The block
+   in S:User-Startup then does nothing; to remove it too, open
+   S:User-Startup in an editor and delete the lines from ";BEGIN Boxer"
+   to ";END Boxer".
+2. Delete the Boxer drawer. Your games folder and its "Boxer Data"
+   (saved games) are separate; delete them only if you no longer want
+   them. Boxer's settings are in ENVARC:Boxer.
+
+Before you start
+----------------
+This is an EXPERIMENTAL PREVIEW. Use a separate test installation of AROS,
+or a copy of your system, not the one you depend on: a hung game session
+can take the whole AROS system down when it is closed (see Known issues).
+
+Known issues
+------------
+Tested on ABIv11 (AROS One) only, under QEMU. Mainline AROS (ABI v1) has
+not been tested with this package.
+
+Not tested in this package's acceptance runs: paths that contain spaces,
+importing from LhA archives, and keeping icons that a game folder already
+has. They may work; nobody has checked them for this build.
+
+- Loading a Tyrian save from the game's title screen froze the game with
+  noise on the screen, twice, on ABIv11. Loading the same save through the
+  in-game Options menu worked. That is the path that was checked, not a
+  workaround known to avoid every freeze. The same game copy and save
+  loaded fine in a Mac build of Boxer on DOSBox Staging; that is a
+  comparison, not a confirmed cause.
+- After such a freeze, quitting the session caused a DOSBox assertion
+  (CPU_IRET, cpu.cpp:901) and, separately, a crash in the SDL audio
+  thread. These are two separate events and neither is explained yet.
+  Closing a hung session can crash the whole AROS system.
+- The session froze twice at the end of a game installer (when the
+  installer exited) on a machine with live audio output. Eight later
+  attempts did not freeze. How often it happens is not known.
+- Tyrian's first title menu may ignore keys and clicks until its demo has
+  run once (observed; cause not known).
+
+When something goes wrong
+-------------------------
+BoxerUI writes a log, by default to RAM:boxerui.log. Each start of BoxerUI
+(also "Launch game" and every game icon) starts the log again, and
+everything in RAM: is lost when AROS restarts or crashes. If Boxer hangs
+or takes the system down, the RAM: log is usually gone by the time you
+look for it.
+
+To keep the log on disk from the start, choose a drawer you can write to.
+The Boxer drawer itself may be read-only, or on a read-only installation,
+so do not rely on it; Work: is a common choice. Then either:
+  - select the BoxerUI icon, choose Information from the Icon menu and
+    add the ToolType
+      LOG=Work:boxerui.log
+    (game icons use it too), or
+  - from a Shell:
+      Stack 65536
+      BoxerUI LOG Work:boxerui.log
+The log on disk is also restarted by each start of BoxerUI, so copy it
+away before you try again.
+
+If Boxer is still on screen but seems hung:
+1. Open a second Shell (Wanderer menu, or Right-Amiga+W).
+2. Copy the log somewhere that survives a restart, for example:
+     Copy RAM:boxerui.log Work:boxerui-1.log
+3. Type Status to list running programs; note whether BoxerUI is there.
+
+Please send: the log file, what you did just before (which screen, which
+button or key), the AROS version and distribution (Kickstart/Workbench
+version from the Wanderer "About" window), the ABI (ABIv11 or mainline),
+the amount of RAM, whether it runs on real hardware (which) or in an
+emulator (which, with its settings), and the BoxerUI sha256 from
+SHA256SUMS in this drawer.
+
+What the system must have
+-------------------------
+See REQUIREMENTS.txt. No game data and no DOS games are included.
+
+Licence
+-------
+BoxerUI is distributed under the GNU General Public License version 2
+(COPYING). Licences of every component, and their authors, are listed in
+licenses.md; the texts are in LICENSES/. Boxer's artwork, built into
+BoxerUI, is credited in NOTICE-boxer.txt. The complete corresponding source
+of this exact build is in @SOURCE_ARCHIVE@ (see SOURCE-README.txt inside
+it). BUILDINFO.txt identifies the compiler and AROS SDK used, and
+SHA256SUMS lists a checksum for every file.
+
+Port: Tomasz Staniak. Boxer: Alun Bestor and contributors. DOSBox: the
+DOSBox Team.
