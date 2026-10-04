@@ -72,6 +72,9 @@ tested with this package. Game compatibility is not yet broadly tested.
 - Closing a hung session can crash the whole AROS system.
 These problems are still under investigation.
 
+Not yet tested: paths containing spaces, importing from LhA archives, and
+keeping icons that a game folder already has.
+
 When something goes wrong
 -------------------------
 BoxerUI writes a log, by default to RAM:boxerui.log. Each start of BoxerUI

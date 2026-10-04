@@ -40,6 +40,8 @@ x86_64 ABIv11). Checksums are listed with each release.
 an early preview: sessions can freeze, including when leaving a game
 installer, and closing a hung session can crash AROS. These problems are
 still under investigation. Game compatibility is not yet broadly tested.
+Not yet tested: paths containing spaces, importing from LhA archives, and
+keeping icons a game folder already has.
 
 ## Install
 
