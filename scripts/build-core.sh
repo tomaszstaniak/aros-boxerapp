@@ -42,7 +42,8 @@ mkdir -p "$out"
 "$PROJECT_ROOT/tools/xcode-sources.py" "$src" Boxer > "$out/sources.txt" \
   || die "could not derive the source set"
 
-cxxflags=(-O2 -std=gnu++0x -fno-strict-aliasing -Wno-deprecated
+# No build-host path in __FILE__ strings (assertions): the tree is "boxer/".
+cxxflags=(-ffile-prefix-map="$(cd "$src" && pwd)/"=boxer/ -O2 -std=gnu++0x -fno-strict-aliasing -Wno-deprecated
   -I"$src/DOSBox" -I"$src/DOSBox/include" -I"$src/Boxer"
   "${HOST_CFLAGS[@]+"${HOST_CFLAGS[@]}"}" -I"$AROS_SDK/include")
 # DOSBox/include first: several basenames (support.h, cache.h, ...) exist

@@ -85,6 +85,10 @@ core14=(src/emulator/emulator.cpp src/emulator/coalface.cpp src/emulator/filesys
 model17=(src/model/fsutil.cpp src/model/plist.cpp src/model/gamebox.cpp
   src/model/datalocations.cpp src/model/shadowfs.cpp src/model/programs.cpp src/model/importsource.cpp src/model/installerscan.cpp src/model/sourcecopy.cpp src/platform/aros/session_setup.cpp
   src/platform/aros/wbopen.cpp)
+# __FILE__ in assertion messages names the build host's directories; map
+# them to project-relative names (GCC tries the last matching map first,
+# so the core tree, which may lie inside the project, comes last).
+pmap=(-ffile-prefix-map="$PROJECT_ROOT/"= -ffile-prefix-map="$core_src/"=boxer/)
 log="$out/build.log"
 : > "$log"
 objs=()
@@ -92,16 +96,16 @@ set +e
 rc=0
 for f in "${core14[@]}"; do
   o="$out/obj/$(basename "$f").o"; objs+=("$o")
-  "$AROS_CXX" -std=gnu++14 -O2 -Wall -Wno-deprecated -Wno-unknown-pragmas -fno-strict-aliasing \
+  "$AROS_CXX" "${pmap[@]}" -std=gnu++14 -O2 -Wall -Wno-deprecated -Wno-unknown-pragmas -fno-strict-aliasing \
     "${core_flags[@]}" -I"$AROS_SDK/include" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 for f in "${model17[@]}"; do
   o="$out/obj/$(basename "$f").o"; objs+=("$o")
-  "$AROS_CXX" -std=gnu++17 -O2 -Wall -I"$AROS_SDK/include" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
+  "$AROS_CXX" "${pmap[@]}" -std=gnu++17 -O2 -Wall -I"$AROS_SDK/include" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 for f in "${sources[@]}"; do
   o="$out/obj/ui-$(basename "$f").o"; objs+=("$o")
-  "$AROS_CXX" -std=c++17 -O2 -Wall -Wno-narrowing -I"$AROS_SDK/include" -I"$out/gen" \
+  "$AROS_CXX" "${pmap[@]}" -std=c++17 -O2 -Wall -Wno-narrowing -I"$AROS_SDK/include" -I"$out/gen" \
     -DBOXER_ABI="\"$BOXER_ABI\"" ${BOXER_UI_DEFS:-} -c "$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 # Mainline's libgcc never fills dwarf_reg_size_table, so every C++ throw
