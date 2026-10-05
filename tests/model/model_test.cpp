@@ -1104,6 +1104,38 @@ static void testGameboxCreation()
 	CHECK(v.createdGamebox.empty() && !fu::exists(fu::join(base, "No Such Folder")));
 }
 
+// A gamebox name is taken when "<stem>.boxer", "<stem>" (file or drawer)
+// or a lone "<stem>.info" exists; each case moves on to "<stem> (2)" and
+// leaves the existing object byte-identical.
+static void testGameboxNameCollisions()
+{
+	const char *cases[] = {"plain file", "drawer", "lone icon"};
+	for (int c = 0; c < 3; ++c) {
+		const std::string base = fu::join(scratch, std::string("Collide ") + cases[c]);
+		const std::string games = fu::join(base, "Games");
+		const std::string src = fu::join(base, "DUNE");
+		put(fu::join(src, "INSTALL.EXE"), dosExe());
+		fu::makeDirs(games);
+		if (c == 0) put(fu::join(games, "Dune"), "a plain file");
+		if (c == 1) put(fu::join(games, "Dune/inside"), "a drawer's file");
+		if (c == 2) put(fu::join(games, "Dune.info"), std::string("\xe3\x10icon", 6));
+		std::map<std::string, std::string> before, after;
+		snapshot(games, "", before);
+		DataLocations loc; loc.dataDir = fu::join(games, "Boxer Data");
+		ImportSession s;
+		CHECK(s.chooseSource(src, loc, games) == SourceCheck::Ok);
+		std::string err;
+		CHECK(s.createGamebox(games, &err));
+		CHECK_EQ(s.createdGamebox, fu::join(games, "Dune (2).boxer"));
+		CHECK_EQ(s.gameName(), std::string("Dune (2)"));
+		CHECK(!fu::exists(fu::join(games, "Dune.boxer")));
+		CHECK(s.discardGamebox(&err));
+		snapshot(games, "", after);
+		before.erase("/"); after.erase("/");   // the folder's own mtime
+		CHECK(before == after);
+	}
+}
+
 static void testSourceCopy()
 {
 	CHECK_EQ(validDOSName("Tyrian 2000"), std::string("tyrian20"));
@@ -1205,6 +1237,7 @@ int main(int argc, char **argv)
 	testImportSource();
 	testInstallerScan();
 	testGameboxCreation();
+	testGameboxNameCollisions();
 	testSourceCopy();
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;

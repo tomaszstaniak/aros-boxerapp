@@ -2346,8 +2346,14 @@ static bool writeSidecarIcon(std::string &error) {
         dob->do_CurrentX = NO_ICON_POSITION;
         dob->do_CurrentY = NO_ICON_POSITION;
         const std::string path = boxer::fsutil::join(g_import.gamesFolder, g_import.gameName());
-        ok = PutDiskObject((CONST_STRPTR)path.c_str(), dob);
-        if (!ok) error = "could not write " + path + ".info";
+        // createGamebox chose a name with no .info; one that appeared since
+        // belongs to someone else and is never overwritten.
+        if (boxer::fsutil::exists(path + ".info")) {
+            error = path + ".info already exists; it was left unchanged";
+        } else {
+            ok = PutDiskObject((CONST_STRPTR)path.c_str(), dob);
+            if (!ok) error = "could not write " + path + ".info";
+        }
         // FreeDiskObject frees what GetDiskObject allocated, not our strings.
         dob->do_Type = type; dob->do_DefaultTool = tool; dob->do_ToolTypes = oldTypes;
         dob->do_CurrentX = x; dob->do_CurrentY = y;

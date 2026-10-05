@@ -162,6 +162,12 @@ bool ImportSession::createGamebox(const std::string &folder, std::string *error)
 	std::string path;
 	for (unsigned n = 1; n < 1000; ++n) {
 		const std::string candidate = fsutil::join(folder, incrementedGameboxName(name, n));
+		// The import also writes "<stem>.info" beside the gamebox, and
+		// Wanderer shows a lone "<stem>.info" as the icon of "<stem>": a
+		// name is free only when none of the three exist, so no existing
+		// file, drawer or icon is ever overwritten or adopted.
+		const std::string stem = fsutil::stripExtension(candidate);
+		if (fsutil::exists(stem) || fsutil::exists(stem + ".info")) continue;
 		bool existed = false;
 		if (fsutil::makeNewDir(candidate, &existed)) { path = candidate; break; }
 		if (!existed) {
