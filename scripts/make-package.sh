@@ -14,7 +14,8 @@
 #   MANIFEST-<abi>.sha256             every file in the drawer + the archive
 # Contents and decisions: packaging/README.md. The package is refused when
 # the binary does not match its BUILDINFO, has undefined symbols, or when a
-# source file listed in BUILDINFO has changed since the build (the shipped
+# source file listed in BUILDINFO, or the upstream pin or patch series
+# recorded in the core's BUILDINFO, has changed since the build (the shipped
 # source archive would then not correspond to the binary).
 set -euo pipefail
 die() { echo "make-package: $*" >&2; exit 2; }
@@ -73,6 +74,32 @@ rm -f "$BUILD_DIR/.pkg-src.sha256"
 lib="$BUILD_DIR/core$HOST_SUFFIX/libboxer-dosbox.a"
 [ "$(sed -n 's/^core library: \([0-9a-f]*\).*/\1/p' "$info")" = "$(shasum -a 256 "$lib" | cut -d' ' -f1)" ] \
   || die "core library differs from the one BoxerUI was linked with"
+# 2b. The core was built from the current upstream pin and patch series
+# (build-core.sh BUILDINFO). A changed, added, removed or reordered patch
+# means the shipped series would not be the one the binary contains.
+coreinfo="$BUILD_DIR/core$HOST_SUFFIX/BUILDINFO.txt"
+[ -f "$coreinfo" ] || die "no $coreinfo: rebuild the core (build-core.sh $BOXER_ABI) to record its patch series"
+[ "$(sed -n 's/^library: //p' "$coreinfo")" = "$(shasum -a 256 "$lib" | cut -d' ' -f1)" ] \
+  || die "$coreinfo does not describe $lib"
+coredelta=$(diff <(sed '/^library: /d' "$coreinfo") <("$here/core-provenance.sh" "$P") || true)
+if [ -n "$coredelta" ]; then
+  if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
+    [ "$BOXER_PKG_ACCEPTED_BINARY" = "$got" ] \
+      || die "BOXER_PKG_ACCEPTED_BINARY ($BOXER_PKG_ACCEPTED_BINARY) is not this BoxerUI ($got)"
+    [ -n "${BOXER_PKG_SOURCE_NOTE:-}" ] || die "BOXER_PKG_ACCEPTED_BINARY needs BOXER_PKG_SOURCE_NOTE"
+    srcnote="${srcnote:+$srcnote
+}core pin/series changed since the build (< built, > now):
+$coredelta"
+    echo "make-package: packaging accepted binary $got; core patch series changed since the build:" >&2
+    echo "$coredelta" | sed 's/^/  /' >&2
+  elif [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ]; then
+    [ $stale = 1 ] || { stale=1; ver="$ver-STALE"; }
+    echo "make-package: WARNING core patch series changed since the build; dry run, not distributable" >&2
+  else
+    echo "$coredelta" | sed 's/^/  /' >&2
+    die "upstream pin or patch series differs from the one the core was built from; rebuild (build-core.sh, build-ui.sh)"
+  fi
+fi
 
 out="${BOXER_PKG_OUT:-$BUILD_DIR/package$HOST_SUFFIX}"; pkg="$out/Boxer"
 [ -d "$out" ] && chmod -R u+w "$out"; rm -rf "$out"; mkdir -p "$pkg/conf" "$pkg/LICENSES"

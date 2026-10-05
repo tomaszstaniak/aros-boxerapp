@@ -20,7 +20,8 @@
 #
 # Usage: [BOXER_HOST=sdl2|sdl3] build-core.sh <abiv11|mainline-v1> [source-root]
 #   BOXER_HOST (scripts/env.sh): sdl2 -> build/<abi>/core, sdl3 -> core-sdl3.
-#   source-root defaults to work/boxer. Compile errors stop the build (exit 1);
+#   source-root defaults to work/boxer. The library's BUILDINFO.txt records
+#   the upstream pin and the patch series (scripts/core-provenance.sh). Compile errors stop the build (exit 1);
 #   configuration faults exit 2.
 set -euo pipefail
 die() { echo "build-core: $*" >&2; exit 2; }
@@ -90,6 +91,12 @@ done < "$out/sources.txt"
 for p in "${pids[@]+"${pids[@]}"}"; do wait "$p" || fail=$((fail+1)); done
 [ $fail -eq 0 ] || { echo "build-core: $fail TU(s) failed; logs: $out/obj/*.log" >&2; exit 1; }
 
-rm -f "$out/libboxer-dosbox.a"
+rm -f "$out/libboxer-dosbox.a" "$out/BUILDINFO.txt"
 "$AROS_AR" rcs "$out/libboxer-dosbox.a" "${objs[@]}"
+# What the library was built from; make-package.sh refuses a package whose
+# patch series no longer matches it.
+{
+  "$here/core-provenance.sh" "$PROJECT_ROOT"
+  echo "library: $(shasum -a 256 "$out/libboxer-dosbox.a" | cut -d' ' -f1)"
+} > "$out/BUILDINFO.txt"
 echo "built $out/libboxer-dosbox.a (host $BOXER_HOST, ${#objs[@]} objects, $("$AROS_CXX" --version | head -1))"
