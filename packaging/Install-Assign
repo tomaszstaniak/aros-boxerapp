@@ -94,11 +94,81 @@ Else
     Echo "Install-Assign: Boxer: now points to *"$BxDir*"."
   EndIf
 EndIf
-; Persistent part. S:Boxer-Assign holds the path; it is rewritten every run.
-Echo "; Written by Boxer's Install-Assign. Execute Install-Assign REMOVE undoes it." >S:Boxer-Assign
-Echo "If EXISTS *"${BxDir}/BoxerUI*"" >>S:Boxer-Assign
-Echo "  Assign Boxer: *"$BxDir*"" >>S:Boxer-Assign
-Echo "EndIf" >>S:Boxer-Assign
+; Persistent part. S:Boxer-Assign holds the path; it is rewritten every
+; run. Both files are written in full to a temporary file beside them, every
+; write is checked, and only a complete file replaces the old one: the old
+; one is renamed aside, the new one renamed in, and the old one deleted last
+; (Rename does not replace an existing file). Any failure leaves the old
+; file as it was, says so and ends with RC 20, never with "done".
+Set BxNew "S:Boxer-Assign.new"
+Set BxBak "S:Boxer-Assign.old"
+Set BxBad 0
+If EXISTS "$BxNew"
+  Delete "$BxNew" QUIET
+  If WARN
+    Set BxBad 1
+  EndIf
+EndIf
+If "x$BxBad" EQ "x0"
+  Echo "; Written by Boxer's Install-Assign. Execute Install-Assign REMOVE undoes it." >"$BxNew"
+  If WARN
+    Set BxBad 1
+  EndIf
+EndIf
+If "x$BxBad" EQ "x0"
+  Echo "If EXISTS *"${BxDir}/BoxerUI*"" >>"$BxNew"
+  If WARN
+    Set BxBad 1
+  EndIf
+EndIf
+If "x$BxBad" EQ "x0"
+  Echo "  Assign Boxer: *"$BxDir*"" >>"$BxNew"
+  If WARN
+    Set BxBad 1
+  EndIf
+EndIf
+If "x$BxBad" EQ "x0"
+  Echo "EndIf" >>"$BxNew"
+  If WARN
+    Set BxBad 1
+  EndIf
+EndIf
+; A redirection that could not be opened may leave nothing at all.
+If "x$BxBad" EQ "x0"
+  If NOT EXISTS "$BxNew"
+    Set BxBad 1
+  EndIf
+EndIf
+If "x$BxBad" EQ "x0"
+  If EXISTS S:Boxer-Assign
+    If EXISTS "$BxBak"
+      Delete "$BxBak" QUIET
+    EndIf
+    Rename S:Boxer-Assign "$BxBak" QUIET
+    If WARN
+      Set BxBad 1
+    Else
+      Rename "$BxNew" S:Boxer-Assign QUIET
+      If WARN
+        Rename "$BxBak" S:Boxer-Assign QUIET
+        Set BxBad 1
+      Else
+        Delete "$BxBak" QUIET
+      EndIf
+    EndIf
+  Else
+    Rename "$BxNew" S:Boxer-Assign QUIET
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+EndIf
+If NOT "x$BxBad" EQ "x0"
+  Delete >NIL: "$BxNew" QUIET
+  Echo "Install-Assign: FAILED to write S:Boxer-Assign (write-protected or full S:?)."
+  Echo "Install-Assign: the previous S:Boxer-Assign, if any, is unchanged; nothing else was changed."
+  Quit 20
+EndIf
 Echo "Install-Assign: wrote S:Boxer-Assign."
 Set BxHave 0
 If EXISTS "$BxSU"
@@ -110,20 +180,103 @@ If EXISTS "$BxSU"
       Set BxHave 1
     EndIf
   EndIf
-Else
-  Echo "; User-Startup: run at the end of S:Startup-Sequence" >"$BxSU"
-  Echo "Install-Assign: created $BxSU."
 EndIf
 If "x$BxHave" EQ "x1"
   Echo "Install-Assign: $BxSU already has the Boxer block - not added again."
 Else
-  ; The empty line ends a last line that has no newline.
-  Echo "" >>"$BxSU"
-  Echo ";BEGIN Boxer (Install-Assign)" >>"$BxSU"
-  Echo "If EXISTS S:Boxer-Assign" >>"$BxSU"
-  Echo "  Execute S:Boxer-Assign" >>"$BxSU"
-  Echo "EndIf" >>"$BxSU"
-  Echo ";END Boxer" >>"$BxSU"
+  ; The same for the startup file: a copy with the block appended replaces
+  ; it only when every write succeeded.
+  Set BxNew "${BxSU}.boxer-new"
+  Set BxBak "${BxSU}.boxer-old"
+  If EXISTS "$BxNew"
+    Delete "$BxNew" QUIET
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    If EXISTS "$BxSU"
+      Copy "$BxSU" TO "$BxNew" QUIET
+    Else
+      Echo "; User-Startup: run at the end of S:Startup-Sequence" >"$BxNew"
+    EndIf
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    ; The empty line ends a last line that has no newline.
+    Echo "" >>"$BxNew"
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    Echo ";BEGIN Boxer (Install-Assign)" >>"$BxNew"
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    Echo "If EXISTS S:Boxer-Assign" >>"$BxNew"
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    Echo "  Execute S:Boxer-Assign" >>"$BxNew"
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    Echo "EndIf" >>"$BxNew"
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    Echo ";END Boxer" >>"$BxNew"
+    If WARN
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    If NOT EXISTS "$BxNew"
+      Set BxBad 1
+    EndIf
+  EndIf
+  If "x$BxBad" EQ "x0"
+    If EXISTS "$BxSU"
+      If EXISTS "$BxBak"
+        Delete "$BxBak" QUIET
+      EndIf
+      Rename "$BxSU" "$BxBak" QUIET
+      If WARN
+        Set BxBad 1
+      Else
+        Rename "$BxNew" "$BxSU" QUIET
+        If WARN
+          Rename "$BxBak" "$BxSU" QUIET
+          Set BxBad 1
+        Else
+          Delete "$BxBak" QUIET
+        EndIf
+      EndIf
+    Else
+      Rename "$BxNew" "$BxSU" QUIET
+      If WARN
+        Set BxBad 1
+      EndIf
+    EndIf
+  EndIf
+  If NOT "x$BxBad" EQ "x0"
+    Delete >NIL: "$BxNew" QUIET
+    Echo "Install-Assign: FAILED to add the Boxer block to $BxSU; it is unchanged."
+    Echo "Install-Assign: Boxer: is set for this session only. S:Boxer-Assign was written;"
+    Echo "Install-Assign: to run it at startup, add the line Execute S:Boxer-Assign to $BxSU."
+    Quit 20
+  EndIf
   Echo "Install-Assign: added the Boxer block to $BxSU."
 EndIf
 Echo "Install-Assign: done. Game icons start Boxer now and after a reboot."
@@ -134,3 +287,6 @@ UnSet BxCur
 UnSet BxAns
 UnSet BxSz
 UnSet BxHave
+UnSet BxNew
+UnSet BxBak
+UnSet BxBad
