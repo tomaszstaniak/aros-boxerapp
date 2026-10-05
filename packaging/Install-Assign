@@ -104,8 +104,8 @@ Set BxNew "S:Boxer-Assign.new"
 Set BxBak "S:Boxer-Assign.old"
 Set BxBad 0
 If EXISTS "$BxNew"
-  Delete "$BxNew" QUIET
-  If WARN
+  Delete >NIL: "$BxNew" QUIET
+  If EXISTS "$BxNew"
     Set BxBad 1
   EndIf
 EndIf
@@ -133,32 +133,53 @@ If "x$BxBad" EQ "x0"
     Set BxBad 1
   EndIf
 EndIf
-; A redirection that could not be opened may leave nothing at all.
 If "x$BxBad" EQ "x0"
-  If NOT EXISTS "$BxNew"
+  Echo "; end of Boxer-Assign" >>"$BxNew"
+  If WARN
     Set BxBad 1
   EndIf
 EndIf
+; RC is not enough: on AROS an append redirection that cannot be opened
+; leaves RC 0 (seen 2026-10-05 with a delete-protected file). The file is
+; complete only when its last line arrived; Search only on a non-empty file.
+Set BxOk 0
 If "x$BxBad" EQ "x0"
+  If EXISTS "$BxNew"
+    Set BxSz `List "$BxNew" LFORMAT "%L"`
+    If NOT "x$BxSz" EQ "x0"
+      Search >NIL: "$BxNew" "; end of Boxer-Assign" QUIET
+      If NOT WARN
+        Set BxOk 1
+      EndIf
+    EndIf
+  EndIf
+EndIf
+If NOT "x$BxOk" EQ "x1"
+  Set BxBad 1
+EndIf
+If "x$BxBad" EQ "x0"
+  ; Checked by what exists afterwards, not by RC (see above).
   If EXISTS S:Boxer-Assign
     If EXISTS "$BxBak"
-      Delete "$BxBak" QUIET
+      Delete >NIL: "$BxBak" QUIET
     EndIf
-    Rename S:Boxer-Assign "$BxBak" QUIET
-    If WARN
+    If NOT EXISTS "$BxBak"
+      Rename >NIL: S:Boxer-Assign "$BxBak" QUIET
+    EndIf
+    If EXISTS S:Boxer-Assign
       Set BxBad 1
     Else
-      Rename "$BxNew" S:Boxer-Assign QUIET
-      If WARN
-        Rename "$BxBak" S:Boxer-Assign QUIET
-        Set BxBad 1
+      Rename >NIL: "$BxNew" S:Boxer-Assign QUIET
+      If EXISTS S:Boxer-Assign
+        Delete >NIL: "$BxBak" QUIET
       Else
-        Delete "$BxBak" QUIET
+        Rename >NIL: "$BxBak" S:Boxer-Assign QUIET
+        Set BxBad 1
       EndIf
     EndIf
   Else
-    Rename "$BxNew" S:Boxer-Assign QUIET
-    If WARN
+    Rename >NIL: "$BxNew" S:Boxer-Assign QUIET
+    If NOT EXISTS S:Boxer-Assign
       Set BxBad 1
     EndIf
   EndIf
@@ -189,8 +210,8 @@ Else
   Set BxNew "${BxSU}.boxer-new"
   Set BxBak "${BxSU}.boxer-old"
   If EXISTS "$BxNew"
-    Delete "$BxNew" QUIET
-    If WARN
+    Delete >NIL: "$BxNew" QUIET
+    If EXISTS "$BxNew"
       Set BxBad 1
     EndIf
   EndIf
@@ -241,31 +262,44 @@ Else
       Set BxBad 1
     EndIf
   EndIf
+  Set BxOk 0
   If "x$BxBad" EQ "x0"
-    If NOT EXISTS "$BxNew"
-      Set BxBad 1
+    If EXISTS "$BxNew"
+      Set BxSz `List "$BxNew" LFORMAT "%L"`
+      If NOT "x$BxSz" EQ "x0"
+        Search >NIL: "$BxNew" ";END Boxer" QUIET
+        If NOT WARN
+          Set BxOk 1
+        EndIf
+      EndIf
     EndIf
   EndIf
+  If NOT "x$BxOk" EQ "x1"
+    Set BxBad 1
+  EndIf
   If "x$BxBad" EQ "x0"
+    ; Checked by what exists afterwards, not by RC (see above).
     If EXISTS "$BxSU"
       If EXISTS "$BxBak"
-        Delete "$BxBak" QUIET
+        Delete >NIL: "$BxBak" QUIET
       EndIf
-      Rename "$BxSU" "$BxBak" QUIET
-      If WARN
+      If NOT EXISTS "$BxBak"
+        Rename >NIL: "$BxSU" "$BxBak" QUIET
+      EndIf
+      If EXISTS "$BxSU"
         Set BxBad 1
       Else
-        Rename "$BxNew" "$BxSU" QUIET
-        If WARN
-          Rename "$BxBak" "$BxSU" QUIET
-          Set BxBad 1
+        Rename >NIL: "$BxNew" "$BxSU" QUIET
+        If EXISTS "$BxSU"
+          Delete >NIL: "$BxBak" QUIET
         Else
-          Delete "$BxBak" QUIET
+          Rename >NIL: "$BxBak" "$BxSU" QUIET
+          Set BxBad 1
         EndIf
       EndIf
     Else
-      Rename "$BxNew" "$BxSU" QUIET
-      If WARN
+      Rename >NIL: "$BxNew" "$BxSU" QUIET
+      If NOT EXISTS "$BxSU"
         Set BxBad 1
       EndIf
     EndIf
@@ -290,3 +324,4 @@ UnSet BxHave
 UnSet BxNew
 UnSet BxBak
 UnSet BxBad
+UnSet BxOk
