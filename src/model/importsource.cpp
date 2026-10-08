@@ -154,6 +154,11 @@ std::string shortenMiddle(const std::string &text, size_t maxChars)
 	return a + (wordA ? " ..." : "...") + (wordB ? " " : "") + b;
 }
 
+std::string startupProgramText(const std::string &name, size_t maxNameChars)
+{
+	return "Choose the program that starts\n\"" + shortenMiddle(name, maxNameChars) + "\":";
+}
+
 std::string readyToImportText(const std::string &name, size_t maxNameChars)
 {
 	return "\"" + shortenMiddle(name, maxNameChars) + "\"\nis ready to be imported into your games folder.";

@@ -564,7 +564,8 @@ static Object *buildImport() {
     ui.impUse = SimpleButton("Use this program");
     ui.impLaunchGame = SimpleButton("Launch game");
     ui.impDoneClose = SimpleButton("Close");
-    ui.impProgText = TextObject, MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
+    // Two lines from the start, as impReady: the height is taken at layout.
+    ui.impProgText = TextObject, MUIA_Text_Contents, (IPTR)" \n ", MUIA_Text_SetMin, FALSE, End;
     ui.impDoneText = TextObject, MUIA_Text_PreParse, (IPTR)"\33c", MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
     ui.impProgList = ListObject, MUIA_Frame, MUIV_Frame_InputList,
         MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
@@ -2785,8 +2786,13 @@ static void showImportStage() {
         break;   // the DOS window is in front; the Import window stays as it is
     case S::ChoosingStartupProgram: {
         boxer::FileSystem fs;
-        std::string line = "Choose the program that starts \"" + g_import.gameName() + "\":";
+        // Shortened like the ready panel; the full name is the bubble help
+        // (Zune keeps the pointer, so the string must outlive this).
+        static std::string fullName;
+        fullName = g_import.gameName();
+        const std::string line = boxer::startupProgramText(fullName);
         set(ui.impProgText, MUIA_Text_Contents, (IPTR)line.c_str());
+        set(ui.impProgText, MUIA_ShortHelp, (IPTR)fullName.c_str());
         DoMethod(ui.impProgList, MUIM_List_Clear);
         auto progs = boxer::scanExecutables(fs, g_import.rootDrivePath());
         std::vector<std::string> rel;

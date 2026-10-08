@@ -66,6 +66,9 @@ std::string incrementedGameboxName(const std::string &name, unsigned increment);
 // full name as bubble help.
 constexpr size_t kReadyNameChars = 40;
 std::string readyToImportText(const std::string &name, size_t maxNameChars = kReadyNameChars);
+// The startup-program page's heading, built the same way: the sentence on
+// the first line, the name (shortened as above) on the second.
+std::string startupProgramText(const std::string &name, size_t maxNameChars = kReadyNameChars);
 // "...", put in the middle of text longer than maxChars (at least 5), at
 // word breaks when one is near.
 std::string shortenMiddle(const std::string &text, size_t maxChars);

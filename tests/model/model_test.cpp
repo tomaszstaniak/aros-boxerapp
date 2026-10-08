@@ -1309,6 +1309,10 @@ static void testReadyText()
 	CHECK_EQ(shortenMiddle("Abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ", 20), std::string("Abcdefghi...CDEFGHIJ"));
 	CHECK(shortenMiddle("Abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ", 20).size() <= 20);
 	CHECK_EQ(readyToImportText(longer).substr(0, s.size() + 3), "\"" + s + "\"\n");
+	// The startup-program page: same shortening, sentence first.
+	CHECK_EQ(startupProgramText("Tyrian"), std::string("Choose the program that starts\n\"Tyrian\":"));
+	CHECK_EQ(startupProgramText(longer), "Choose the program that starts\n\"" + s + "\":");
+	CHECK_EQ(startupProgramText(longName), "Choose the program that starts\n\"" + longName + "\":");
 	// A tiny limit still keeps something of both ends.
 	CHECK_EQ(shortenMiddle("abcdefghij", 5), std::string("a...j"));
 	CHECK_EQ(shortenMiddle("abcdefghij", 0), std::string("a...j"));
