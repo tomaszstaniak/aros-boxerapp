@@ -20,7 +20,9 @@
 #
 # Usage: [BOXER_HOST=sdl2|sdl3] build-core.sh <abiv11|mainline-v1> [source-root]
 #   BOXER_HOST (scripts/env.sh): sdl2 -> build/<abi>/core, sdl3 -> core-sdl3.
-#   source-root defaults to work/boxer. The library's BUILDINFO.txt records
+#   source-root defaults to work/boxer, which must equal the upstream pin plus
+#   the patch series (checked with scripts/reproduce --source-only before any
+#   compile; a mismatch exits 2). The library's BUILDINFO.txt records
 #   the upstream pin and the patch series (scripts/core-provenance.sh). Compile errors stop the build (exit 1);
 #   configuration faults exit 2.
 set -euo pipefail
@@ -31,6 +33,21 @@ set +e; . "$here/env.sh" "$1"; rc=$?; set -e
 [ $rc -eq 0 ] || die "environment setup failed"
 src=${2:-$WORK_DIR}
 [ -f "$src/DOSBox/include/dosbox.h" ] || die "not a Boxer source tree: $src"
+# The core must be exactly the upstream pin plus the patch series: a local
+# edit in work/boxer would otherwise end up in a build (and a package) whose
+# BUILDINFO names only the pin and the series. scripts/reproduce rebuilds
+# pin + series in a temporary clone and compares; any difference, unsaved
+# or staged change refuses the build. Another source root cannot be checked
+# this way and needs BOXER_CORE_UNCHECKED_SOURCE=1, said in the output.
+if [ "$(cd "$src" && pwd -P)" = "$(cd "$WORK_DIR" && pwd -P)" ]; then
+  check=$("$here/reproduce" --source-only 2>&1) \
+    || { printf '%s\n' "$check" >&2; die "work/boxer differs from pin + series; save or discard the change first"; }
+  echo "build-core: $(grep '^source check:' <<< "$check")"
+elif [ "${BOXER_CORE_UNCHECKED_SOURCE:-}" = 1 ]; then
+  echo "build-core: source root $src is not work/boxer; NOT checked against pin + series" >&2
+else
+  die "source root $src is not work/boxer and cannot be checked against pin + series (BOXER_CORE_UNCHECKED_SOURCE=1 builds it anyway)"
+fi
 AROS_AR="$AROS_TOOLCHAIN/x86_64-aros-ar"
 [ -x "$AROS_AR" ] || die "archiver not executable: $AROS_AR"
 

@@ -85,7 +85,10 @@ build date and time, so two builds of the same source differ in those
 bytes.
 
 - `build-core.sh` compiles the source set of the Boxer target's Sources
-  phase in `Boxer.xcodeproj` (`tools/xcode-sources.py`).
+  phase in `Boxer.xcodeproj` (`tools/xcode-sources.py`). It first runs
+  `scripts/reproduce --source-only` and refuses to build when `work/boxer`
+  differs from the upstream pin plus the patch series, including unsaved or
+  staged changes.
 - `build-ui.sh` runs the host unit tests of `src/ui/` first, embeds Boxer's
   artwork from `assets/runtime/` (`tools/png2inc.py`), builds the private
   font descriptions, links, and rejects the binary if `nm` reports any

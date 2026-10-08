@@ -898,7 +898,7 @@ def cmd_reproduce(cfg, a):
                 rc = 1
         if not os.path.isdir(os.path.join(cfg.work, ".git")):
             print("no work copy to compare")
-            return rc
+            return 1 if a.source_only else rc
         wt = gout(cfg.work, "rev-parse", "HEAD^{tree}")
         td = diff_trees(ls_tree(dest, "HEAD"), ls_tree(cfg.work, "HEAD"))
         print("work saved tree (HEAD) %s: %s" % (wt, "EQUIVALENT" if wt == tree and not td
@@ -920,6 +920,15 @@ def cmd_reproduce(cfg, a):
             print("  - staged " + s)
         if a.strict and (fsd or staged):
             rc = 1
+        if a.source_only:
+            # Only the source decides: the committed tree equals pin + series
+            # and nothing unsaved or staged sits on top of it. A stale
+            # baseline record (e.g. a patch header reworded in place) or a
+            # HEAD other than the baseline commit is reported above, but the
+            # files a build compiles are still exactly pin + series.
+            rc = 0 if wt == tree and not td and not fsd and not staged else 1
+            print("source check: %s" % ("work equals pin + series" if rc == 0
+                                         else "work DIFFERS from pin + series"))
         return rc
     finally:
         if not a.out:
@@ -963,6 +972,9 @@ def main(argv=None):
     r.add_argument("--repo")
     r.add_argument("--out", help="keep the reconstruction in this directory")
     r.add_argument("--strict", action="store_true", help="fail on unsaved deltas too")
+    r.add_argument("--source-only", action="store_true",
+                   help="exit 0 exactly when work equals pin + series with no unsaved or staged "
+                        "changes; baseline record staleness is reported but not counted")
     t = sub.add_parser("status")
     t.add_argument("--repo")
     t.add_argument("--reconstruct", action="store_true")

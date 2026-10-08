@@ -508,6 +508,51 @@ class T7Binary(Fixture):
         self.assertEqual((self.series(), self.baseline(), snapshot(nested)), before)
 
 
+class T9SourceOnly(Fixture):
+    """reproduce --source-only: what build-core.sh runs before compiling."""
+    def setUp(self):
+        super().setUp()
+        self.tool("bootstrap.sh", rc=0)
+        self.edit("run.sh", b"#!/bin/sh\necho two\n")
+        self.save("a change", "run.sh")
+
+    def test_equivalent(self):
+        p = self.tool("reproduce", "--source-only", rc=0)
+        self.assertIn("work equals pin + series", p.stdout)
+
+    def test_stale_record_with_same_source_passes(self):
+        # Rewording a patch header changes its digest (baseline STALE) but not
+        # the tree it produces: plain reproduce fails, the source check passes.
+        name = self.series()[0]
+        path = os.path.join(self.pdir, name)
+        txt = open(path).read().replace("Fixture problem.", "Reworded problem.")
+        open(path, "w").write(txt)
+        self.assertIn("STALE", self.tool("reproduce", rc=1).stdout)
+        p = self.tool("reproduce", "--source-only", rc=0)
+        self.assertIn("STALE", p.stdout)
+        self.assertIn("work equals pin + series", p.stdout)
+
+    def test_patch_content_changed_fails(self):
+        name = self.series()[0]
+        path = os.path.join(self.pdir, name)
+        txt = open(path).read().replace("+echo two", "+echo three")
+        open(path, "w").write(txt)
+        p = self.tool("reproduce", "--source-only", rc=1)
+        self.assertIn("MISMATCH", p.stdout)
+        self.assertIn("work DIFFERS", p.stdout)
+
+    def test_unsaved_or_staged_change_fails(self):
+        self.edit("Other Sources/second file.c", b"int three;\n")
+        self.assertIn("work DIFFERS", self.tool("reproduce", "--source-only", rc=1).stdout)
+        git(self.work, "add", "-A")
+        self.assertIn("work DIFFERS", self.tool("reproduce", "--source-only", rc=1).stdout)
+
+    def test_missing_work_fails(self):
+        subprocess.run(["chmod", "-R", "u+w", self.work])
+        shutil.rmtree(self.work)
+        self.tool("reproduce", "--source-only", rc=1)
+
+
 class T8ReproduceElsewhere(Fixture):
     def test_reproduce_leaves_active_copies_alone(self):
         self.tool("bootstrap.sh", rc=0)
