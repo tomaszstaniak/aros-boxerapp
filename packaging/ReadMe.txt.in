@@ -41,9 +41,10 @@ Installing
    the game and choose its cover: a CD case or diskette with the game's
    name, or a picture of your own (click the icon). Each imported game
    gets an icon in the games folder that shows its cover; double-click it
-   to play. While a game runs, the Gamebox tab of the Inspector (Right
-   Amiga+I) changes the cover at once; a new name is applied when you
-   close the game.
+   to play. "Browse your games" in the Welcome window opens the games
+   folder in Wanderer. While a game runs, the Gamebox tab of the
+   Inspector (Right Amiga+I) changes the cover at once; a new name is
+   applied when you close the game.
 
 From a Shell BoxerUI needs a larger stack:
   Stack 65536
@@ -65,20 +66,20 @@ Before you start
 ----------------
 This is an EXPERIMENTAL PREVIEW. Use a separate test installation of AROS,
 or a copy of your system, not the one you depend on: a hung game session
-can take the whole AROS system down when it is closed (see Known issues).
+can take the whole AROS system down when it is closed.
 
-Known issues
-------------
-Tested on x86_64 ABIv11 (AROS One) only, under QEMU. Other ABIv11
-distributions, real hardware and mainline AROS (ABI v1) have not been
-tested with this package. Game compatibility is not yet broadly tested.
-
-- A game session can freeze, including when a game installer exits.
-- Closing a hung session can crash the whole AROS system.
-These problems are still under investigation.
-
-Not yet tested: paths containing spaces, importing from LhA archives, and
-keeping icons that a game folder already has.
+Limitations
+-----------
+- A game session can freeze, including when you leave a game's
+  installer. Closing a session that has stopped responding can crash
+  AROS. Save your work in other programs before you test.
+- Automatic CPU speed can be very slow after a game is reopened. Set a
+  fixed CPU speed (for example Pentium) for that game in the Inspector.
+- Tested only on x86_64 ABIv11 (AROS One), under QEMU. Game
+  compatibility is not yet broadly tested.
+- Unfinished: the games folder opens in Wanderer as a normal drawer,
+  without Boxer's wooden shelf look, and the cover labels use the
+  system's Vera Sans instead of Boxer's own font.
 
 When something goes wrong
 -------------------------
@@ -109,12 +110,12 @@ If Boxer is still on screen but seems hung:
 
 Report problems through the issue tracker at
   https://github.com/tomaszstaniak/aros-boxerapp/issues
-Please send: which game you tried, the log file, what you did just before (which screen, which
-button or key), the AROS version and distribution (Kickstart/Workbench
-version from the Wanderer "About" window), the ABI (ABIv11 or mainline),
-the amount of RAM, whether it runs on real hardware (which) or in an
-emulator (which, with its settings), and the BoxerUI sha256 from
-SHA256SUMS in this drawer.
+Please send: which game you tried, the log file, what you did just
+before (which screen, which button or key), the AROS version and
+distribution (Kickstart/Workbench version from the Wanderer "About"
+window), the ABI (ABIv11 or mainline), the amount of RAM, whether it
+runs on real hardware (which) or in an emulator (which, with its
+settings), and the BoxerUI sha256 from SHA256SUMS in this drawer.
 
 What the system must have
 -------------------------

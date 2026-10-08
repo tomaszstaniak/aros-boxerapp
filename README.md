@@ -4,22 +4,26 @@ An AROS port of [Boxer](https://github.com/alinebee/Boxer), the DOS game
 emulator front end by Alun Bestor, with Boxer's own DOSBox 0.74 core.
 
 It brings Boxer's gamebox workflow and interface to AROS using Zune.
-**This is a first experimental preview.** It provides
-the foundation for the port; it is not yet the complete Boxer experience.
+**This is an experimental preview.** It provides the foundation for the
+port; it is not yet the complete Boxer experience.
 
 ## What this preview can do
 
-Import a game folder, run its installer or copy a ready-to-play game,
-choose its startup program, give it a name and a cover, and launch it from
-its icon. As in Boxer, the cover is a CD case or a 3.5" or 5.25" diskette
-labelled with the game's name, or a picture of your own; the game's icon
-shows it. You can play, save
-using the game's own save system, close the session, and reopen the game to
-continue. Game saves and other changes made during play are stored
-separately in **Boxer Data**, so the imported gamebox stays unchanged.
+- Import a game folder: run its installer or copy a ready-to-play game,
+  then choose its startup program.
+- Give the game a name and a cover. As in Boxer, the cover is a CD case or
+  a 3.5" or 5.25" diskette labelled with the game's name, or a picture of
+  your own. The game's icon in your games folder shows the cover. You can
+  rename the game and change its cover later in the Inspector.
+- Launch the game from its icon, play, save using the game's own save
+  system, close the session, and reopen the game to continue. Saved games
+  and other changes made during play are stored separately in
+  **Boxer Data**, so the imported gamebox stays unchanged.
+- Open your games folder from the Welcome window with "Browse your games".
+  If the folder has been moved or renamed, Boxer helps you find it and its
+  saved games again.
 
-Music, sound effects, volume control and the basic import-to-play workflow
-have been tested. No games are included; bring your own DOS games.
+No games are included; bring your own DOS games.
 
 ## Supported system
 
@@ -34,19 +38,23 @@ other.
 
 Get the archive from the
 [releases page](https://github.com/tomaszstaniak/aros-boxerapp/releases)
-(currently [0.1.0 preview 1](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview1),
+(currently [0.1.0 preview 3](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview3),
 x86_64 ABIv11). Checksums are listed with each release.
 
-## Before testing
+## Limitations
 
-**Use a separate test installation or a copy of your AROS system.** This is
-an early preview: sessions can freeze, including when leaving a game
-installer, and closing a hung session can crash AROS. These problems are
-still under investigation. Game compatibility is not yet broadly tested.
-Not yet tested: paths containing spaces, importing from LhA archives, and
-keeping icons a game folder already has. The labels of the generated covers
-use the system's Vera Sans for now: Boxer's Marker Felt is an Apple font and
-cannot be included.
+**Use a separate test installation or a copy of your AROS system.**
+
+- A game session can freeze, including when you leave a game's installer.
+  Closing a session that has stopped responding can crash AROS. Save your
+  work in other programs before you test.
+- Automatic CPU speed can be very slow after a game is reopened. Set a
+  fixed CPU speed (for example Pentium) for that game in the Inspector.
+- Tested only on AROS x86_64 ABIv11 (AROS One), under QEMU. Game
+  compatibility is not yet broadly tested.
+- Unfinished: the games folder opens in Wanderer as a normal drawer, without
+  Boxer's wooden shelf look, and the cover labels use the system's Vera Sans
+  instead of Boxer's own font.
 
 ## Install
 
@@ -84,7 +92,6 @@ drawer, for example the ToolType `LOG=Work:boxerui.log` or, from a Shell,
 Please include:
 
 - which game you tried, what worked, and the steps that led to the problem;
-
 - the log file;
 - what you did just before the problem (screen, button or key);
 - the AROS version and distribution, and the ABI (ABIv11 or mainline);
