@@ -24,7 +24,7 @@
 // keeps global state, so one session per process (a new
 // process per session).
 //
-// Product shortcuts (decided 2026-10-02):
+// Product shortcuts:
 // RAmiga+Q quit, RAmiga+F full screen, RAmiga+L and RAmiga+click mouse lock,
 // RAmiga+P pause, RAmiga+G launch panel (toggleLaunchPanel:),
 // RAmiga+Shift+A aspect correction, RAmiga+I Inspector, RAmiga+Alt+F fast
@@ -1703,7 +1703,7 @@ static IPTR coreEntry(CoreCall *call) {
 
 static bool runSession() {
     if (g_ss.ran) {
-        logf("session: the core already ran in this process; start a new BoxerUI (D6)");
+        logf("session: the core already ran in this process and keeps global state, so it cannot run again; start a new BoxerUI");
         return false;
     }
     g_ss.ran = true;

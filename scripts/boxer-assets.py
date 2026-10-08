@@ -28,10 +28,10 @@ GPL = "GPL-2.0 (legalese.html: 'Boxer is released under the GNU General Public L
 RULES = [
     # (c) third party, with their own terms
     (r"^Frameworks/BGHUDAppKit", "c", "BGHUDAppKit (BSD-3, Tim Davis); IB plugin images, not used at runtime"),
-    (r"^Frameworks/Sparkle", "c", "Sparkle (MIT, Andy Matuschak); updater not ported (D3)"),
+    (r"^Frameworks/Sparkle", "c", "Sparkle (MIT, Andy Matuschak); updater not ported to AROS"),
     (r"^Resources/Brand(Watermark)?\.png$", "c", "DOSBox cross logo by Robert Hagenstr\u00f6m, 'used with permission' (acknowledgements.html); permission was given to Boxer, not to this port"),
     (r"^Resources/Sample Game Icons/|^Resources/Sample Games/.*\.boxer/", "c", "shareware game data/cover art (iD/Apogee, Epic, Origin, MicroProse); Boxer did not relicense it"),
-    (r"joypad-logo\.png$", "c", "Joypad app logo (third-party product brand); Joypad SDK not ported (D3)"),
+    (r"joypad-logo\.png$", "c", "Joypad app logo (third-party product brand); Joypad SDK not ported to AROS"),
     # (d) unclear, each with a concrete reason
     (r"^Resources/(gamefolder|prompt)\.icns$", "d", "artwork appears built on Apple system icons (Finder folder body / Terminal bezel); Boxer's GPL grant cannot cover Apple's part"),
     (r"^Resources/(executable|package)\.icns$", "d", "page base resembles Apple's generic document icon (page curl); lower confidence than gamefolder/prompt"),

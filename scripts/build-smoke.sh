@@ -36,7 +36,7 @@ for f in src/emulator/emulator.cpp src/emulator/coalface.cpp src/emulator/filesy
          src/platform/aros/session_setup.cpp \
          src/platform/aros/rawkeys.cpp src/platform/aros/core_smoke.cpp; do
   o="$out/obj/$(basename "$f").o"; objs+=("$o")
-  # The model does not include the core's headers and is C++17 as decided.
+  # The model does not include the core's headers and is C++17.
   # session_setup.cpp uses only the model and emulator.h, no core headers.
   case $f in src/model/*|*/session_setup.cpp) std=-std=gnu++17 ;; *) std=-std=gnu++14 ;; esac
   "$AROS_CXX" "${cxxflags[@]}" "$std" -c "$PROJECT_ROOT/$f" -o "$o"

@@ -59,7 +59,7 @@
     }
    ],
    "origin": "feather",
-   "replaces": "system full-screen control (no Boxer resource; V3 toolbar addition)",
+   "replaces": "system full-screen control (no Boxer resource; a toolbar button added in the AROS port)",
    "conversion": "python3 tools/make-replacement-assets.py (macOS host; sips-316, Python 3.14.7): as RevealTemplate",
    "used_in": "DOS window toolbar, Fullscreen button (Glyph::FullScreen)"
   },

@@ -90,13 +90,13 @@
    "path": "Frameworks/Sparkle.framework/Versions/A/Resources/Autoupdate.app/Contents/Resources/AppIcon.icns",
    "sha256": "f96998658e63a5d83d91ed9b0b3f0558bc235991c172985aef347fc2535fdaab",
    "category": "c",
-   "reason": "Sparkle (MIT, Andy Matuschak); updater not ported (D3)"
+   "reason": "Sparkle (MIT, Andy Matuschak); updater not ported to AROS"
   },
   {
    "path": "Frameworks/Sparkle.framework/Versions/A/Resources/Autoupdate.app/Contents/Resources/Sparkle.icns",
    "sha256": "d3bdf012983d7f5f40414815c3afbb35c740d6151d628e17d7ba51491b319dbe",
    "category": "c",
-   "reason": "Sparkle (MIT, Andy Matuschak); updater not ported (D3)"
+   "reason": "Sparkle (MIT, Andy Matuschak); updater not ported to AROS"
   },
   {
    "path": "Resources/35Diskette.icns",
@@ -610,7 +610,7 @@
    "path": "Resources/Boxer.help/Contents/Resources/shared/images/joypad-logo.png",
    "sha256": "a701834f09f7e244f91ef59c88151fc614ae528e61a1ee3818814a5b261be225",
    "category": "c",
-   "reason": "Joypad app logo (third-party product brand); Joypad SDK not ported (D3)"
+   "reason": "Joypad app logo (third-party product brand); Joypad SDK not ported to AROS"
   },
   {
    "path": "Resources/Boxer.help/Contents/Resources/shared/images/joystick-disabled-128.png",
@@ -2468,7 +2468,7 @@
    "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/joypad-logo.png",
    "sha256": "a701834f09f7e244f91ef59c88151fc614ae528e61a1ee3818814a5b261be225",
    "category": "c",
-   "reason": "Joypad app logo (third-party product brand); Joypad SDK not ported (D3)"
+   "reason": "Joypad app logo (third-party product brand); Joypad SDK not ported to AROS"
   },
   {
    "path": "Standalone/Resources/Help.help/Contents/Resources/shared/images/keyboard.png",

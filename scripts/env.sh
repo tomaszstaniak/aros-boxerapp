@@ -52,7 +52,7 @@ BUILD_DIR="$PROJECT_ROOT/build/$BOXER_ABI"
 # build). Each host has its own core/UI/smoke output directories, so both
 # builds exist side by side from one source tree (patch 0004 selects the
 # code with -DBOXER_HOST_SDL3).
-# Default sdl3 on ABIv11 (decided 2026-10-03):
+# Default sdl3 on ABIv11, because
 # the SDL2 build hung or corrupted memory at flush, SDL2 pulls in gl.library.
 # Mainline keeps sdl2 until its SDL3 build has been run, not just linked.
 case "$BOXER_ABI" in
