@@ -2556,7 +2556,10 @@ static void inspectorRename() {
     }
     g_pendingRename = name;
     nnset(ui.inspName, MUIA_String_Contents, (IPTR)name.c_str());
-    setLabelText(ui.inspNote, ("Renamed to \"" + name + "\" when the game is closed.").c_str());
+    // The drives stay mounted from the old path until the session ends, so
+    // the note must say the rename has not happened yet: the field already
+    // shows the new name, and a past-tense note read as if it were done.
+    setLabelText(ui.inspNote, "Rename pending: applies when the game is closed.");
 }
 
 // Returns false to end the application.
