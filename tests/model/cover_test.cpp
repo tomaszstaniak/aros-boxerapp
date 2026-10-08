@@ -1,4 +1,5 @@
-// Host tests for gamebox cover art (src/model/coverart, coverfont).
+// Host tests for gamebox cover art and pair renaming (src/model/coverart,
+// coverfont, gameboxrename).
 // Usage: cover_test <scratch dir> [<TrueType font>]
 // Without a font the title-rendering checks are skipped (and said so).
 #include "../../src/model/coverart.h"
@@ -6,6 +7,7 @@
 #include "../../src/model/datalocations.h"
 #include "../../src/model/fsutil.h"
 #include "../../src/model/gamebox.h"
+#include "../../src/model/gameboxrename.h"
 #include "../../src/model/importsource.h"
 #include "../../src/model/plist.h"
 #include "../../src/model/sourcecopy.h"
@@ -13,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -31,6 +34,8 @@ static std::string toStr(int n) { return std::to_string(n); }
 static std::string toStr(size_t n) { return std::to_string(n); }
 static std::string toStr(uint32_t n) { return std::to_string(n); }
 static std::string toStr(ReleaseMedium m) { return std::string("medium:") + mediumName(m); }
+static std::string toStr(NameCheck c) { return "check " + std::to_string((int)c); }
+static std::string toStr(RenameOutcome::Kind k) { return "outcome " + std::to_string((int)k); }
 
 static std::string scratch, fontPath;
 
@@ -44,6 +49,19 @@ static std::string get(const std::string &path)
 {
 	std::string d;
 	return fu::readFile(path, d) ? d : "<missing>";
+}
+
+static void snapshot(const std::string &root, const std::string &rel, std::map<std::string, std::string> &out)
+{
+	const std::string p = rel.empty() ? root : fu::join(root, rel);
+	if (fu::isDirectory(p)) {
+		out[rel + "/"] = "dir";
+		std::vector<std::string> names;
+		fu::list(p, names);
+		for (const auto &n : names) snapshot(root, rel.empty() ? n : rel + "/" + n, out);
+	} else {
+		out[rel] = get(p);
+	}
 }
 
 static void setTime(const std::string &path, int year)
@@ -388,6 +406,193 @@ static void testCoverChoice()
 	CHECK(readCoverChoice(box).style == CoverStyle::Automatic);
 }
 
+// --- rename (IS:457-571), roll-back, finding a gamebox from its icon ---
+
+static int iconUpdates;
+static std::string lastIconStem;
+static bool updateIconOk(const std::string &stem, std::string *)
+{
+	++iconUpdates;
+	lastIconStem = stem;
+	return true;
+}
+
+static void testRenameChecks()
+{
+	const std::string games = fu::join(scratch, "Check Games");
+	const std::string box = makeGamebox(games, "Dune", "ID-1", true);
+	std::string s, msg;
+	CHECK_EQ(checkGameboxRename(box, "Dune II", s, &msg), NameCheck::Ok);
+	CHECK_EQ(s, std::string("Dune II"));
+	CHECK_EQ(checkGameboxRename(box, "Dune", s, &msg), NameCheck::Unchanged);
+	CHECK_EQ(checkGameboxRename(box, "...", s, &msg), NameCheck::Empty);
+	CHECK_EQ(checkGameboxRename(box, "a/b:c", s, &msg), NameCheck::Ok);
+	CHECK_EQ(s, std::string("a-b-c"));
+	CHECK_EQ(checkGameboxRename(box, std::string(101, 'x'), s, &msg), NameCheck::TooLong);
+	CHECK_EQ(checkGameboxRename(box, "DUNE", s, &msg), NameCheck::Ok);     // case only: its own objects
+	// Each of the three objects of a name makes it taken (rules of 2d96121).
+	put(fu::join(games, "Taken1.boxer/x"), "x");
+	put(fu::join(games, "Taken2"), "plain file");
+	put(fu::join(games, "Taken3/inside"), "drawer");
+	put(fu::join(games, "Taken4.info"), "lone icon");
+	for (const char *n : {"Taken1", "Taken2", "Taken3", "Taken4"}) {
+		CHECK_EQ(checkGameboxRename(box, n, s, &msg), NameCheck::Taken);
+		CHECK(msg.find("already taken") != std::string::npos);
+	}
+	// Case-only change while a plain object of the new spelling's name exists.
+	const std::string box2 = makeGamebox(games, "Keen", "ID-2", true);
+	put(fu::join(games, "Keen"), "a plain file");
+	CHECK_EQ(checkGameboxRename(box2, "KEEN", s, &msg), NameCheck::Taken);
+}
+
+static void testRenamePair()
+{
+	const std::string games = fu::join(scratch, "Rename Games");
+	DataLocations loc;
+	loc.dataDir = fu::join(scratch, "Rename Data");
+	std::string box = makeGamebox(games, "Dune", "ID-DUNE", true);
+	// A save in the data directory, keyed by the identifier.
+	const std::string save = fu::join(loc.currentStatePath("ID-DUNE"), "C.harddisk/DUNE/SAVE1.SAV");
+	put(save, "a saved game");
+
+	iconUpdates = 0;
+	RenameOutcome o = renameGameboxPair(box, "Dune II", updateIconOk);
+	CHECK_EQ(o.kind, RenameOutcome::Renamed);
+	CHECK(o.message.empty());
+	CHECK_EQ(o.gameboxPath, fu::join(games, "Dune II.boxer"));
+	CHECK_EQ(o.iconStem, fu::join(games, "Dune II"));
+	CHECK(fu::isDirectory(fu::join(games, "Dune II.boxer")));
+	CHECK_EQ(get(fu::join(games, "Dune II.info")), std::string("\xe3\x10icon of Dune"));
+	CHECK(!fu::exists(fu::join(games, "Dune.boxer")) && !fu::exists(fu::join(games, "Dune.info")));
+	CHECK_EQ(iconUpdates, 1);
+	CHECK_EQ(lastIconStem, fu::join(games, "Dune II"));
+	CHECK(o.iconUpdated);
+	// The renamed gamebox has the same identifier, so the same save.
+	Gamebox g;
+	CHECK(g.open(o.gameboxPath));
+	CHECK_EQ(g.identifier(), std::string("ID-DUNE"));
+	CHECK_EQ(get(fu::join(loc.currentStatePath(g.identifier()), "C.harddisk/DUNE/SAVE1.SAV")),
+	         std::string("a saved game"));
+
+	// Case-only rename goes through a temporary name.
+	o = renameGameboxPair(o.gameboxPath, "DUNE II", updateIconOk);
+	CHECK_EQ(o.kind, RenameOutcome::Renamed);
+	std::vector<std::string> names;
+	fu::list(games, names);
+	bool upper = false;
+	for (const auto &n : names) if (n == "DUNE II.boxer") upper = true;
+	CHECK(upper);
+	CHECK(fu::exists(fu::join(games, "DUNE II.info")));
+	box = o.gameboxPath;
+
+	// Refused names change nothing.
+	put(fu::join(games, "Busy.info"), "someone else's icon");
+	std::map<std::string, std::string> before, after;
+	snapshot(games, "", before);
+	o = renameGameboxPair(box, "Busy", updateIconOk);
+	CHECK_EQ(o.kind, RenameOutcome::NotRenamed);
+	CHECK(o.message.find("already taken") != std::string::npos);
+	snapshot(games, "", after);
+	CHECK(before == after);
+
+	// Failure injected between the two renames -> rolled back.
+	snapshot(games, "", before);
+	setRenameFaultHook([](RenameStep s) { return s == RenameStep::MoveIcon; });
+	o = renameGameboxPair(box, "Arrakis", updateIconOk);
+	setRenameFaultHook(nullptr);
+	CHECK_EQ(o.kind, RenameOutcome::RolledBack);
+	CHECK_EQ(o.gameboxPath, box);
+	CHECK(o.message.find("Nothing was changed") != std::string::npos);
+	after.clear();
+	snapshot(games, "", after);
+	CHECK(before == after);
+
+	// The first step fails: nothing changed.
+	setRenameFaultHook([](RenameStep s) { return s == RenameStep::MoveGamebox; });
+	o = renameGameboxPair(box, "Arrakis", updateIconOk);
+	setRenameFaultHook(nullptr);
+	CHECK_EQ(o.kind, RenameOutcome::NotRenamed);
+	after.clear();
+	snapshot(games, "", after);
+	CHECK(before == after);
+
+	// Icon move and the roll-back both fail -> reported, recoverable:
+	// the old icon finds the renamed gamebox by its identifier.
+	setRenameFaultHook([](RenameStep s) { return s == RenameStep::MoveIcon || s == RenameStep::RestoreGamebox; });
+	iconUpdates = 0;
+	o = renameGameboxPair(box, "Arrakis", updateIconOk);
+	setRenameFaultHook(nullptr);
+	CHECK_EQ(o.kind, RenameOutcome::IconLeftBehind);
+	CHECK(o.message.find("still has the old name") != std::string::npos);
+	CHECK_EQ(iconUpdates, 0);
+	CHECK(fu::isDirectory(fu::join(games, "Arrakis.boxer")));
+	CHECK(fu::exists(fu::join(games, "DUNE II.info")));
+	CHECK(!fu::exists(fu::join(games, "DUNE II.boxer")));
+	auto cands = locateSidecarGamebox(games, "DUNE II.boxer", "ID-DUNE");
+	CHECK_EQ(cands.size(), (size_t)1);
+	CHECK(sidecarLookupIsCertain(cands));
+	CHECK_EQ(cands[0].path, fu::join(games, "Arrakis.boxer"));
+	std::string err;
+	CHECK(repairSidecarName(fu::join(games, "DUNE II"), cands[0].path, updateIconOk, &err));
+	CHECK(fu::exists(fu::join(games, "Arrakis.info")) && !fu::exists(fu::join(games, "DUNE II.info")));
+	CHECK_EQ(lastIconStem, fu::join(games, "Arrakis"));
+	box = cands[0].path;
+
+	// The icon update fails: the pair is renamed, the failure reported.
+	setRenameFaultHook([](RenameStep s) { return s == RenameStep::UpdateIcon; });
+	o = renameGameboxPair(box, "Dune", updateIconOk);
+	setRenameFaultHook(nullptr);
+	CHECK_EQ(o.kind, RenameOutcome::Renamed);
+	CHECK(!o.iconUpdated);
+	CHECK(o.message.find("icon could not be updated") != std::string::npos);
+	CHECK(fu::exists(fu::join(games, "Dune.info")) && fu::isDirectory(fu::join(games, "Dune.boxer")));
+
+	// A gamebox without an icon is renamed alone; no icon is made up.
+	const std::string bare = makeGamebox(games, "Bare", "ID-BARE", false);
+	iconUpdates = 0;
+	o = renameGameboxPair(bare, "Bare Game", updateIconOk);
+	CHECK_EQ(o.kind, RenameOutcome::Renamed);
+	CHECK(o.iconStem.empty());
+	CHECK_EQ(iconUpdates, 0);
+	CHECK(!fu::exists(fu::join(games, "Bare Game.info")));
+
+	// Repair never replaces an icon that exists.
+	put(fu::join(games, "Stale.info"), "stale");
+	CHECK(!repairSidecarName(fu::join(games, "Stale"), fu::join(games, "Dune.boxer"), updateIconOk, &err));
+	CHECK_EQ(get(fu::join(games, "Dune.info")), std::string("\xe3\x10icon of Dune"));
+	CHECK(fu::exists(fu::join(games, "Stale.info")));
+
+	// The save is where it was all along.
+	CHECK_EQ(get(save), std::string("a saved game"));
+}
+
+static void testSidecarLookup()
+{
+	const std::string games = fu::join(scratch, "Lookup Games");
+	makeGamebox(games, "Tyrian", "ID-T", false);
+	makeGamebox(games, "Tyrian Copy", "ID-T", false);     // an identifier conflict
+	makeGamebox(games, "Keen", "ID-K", false);
+	// Several gameboxes with the icon's identifier: ask.
+	auto c = locateSidecarGamebox(games, "", "ID-T");
+	CHECK_EQ(c.size(), (size_t)2);
+	CHECK(!sidecarLookupIsCertain(c));
+	// GAMEBOX names one whose identifier is another: ask.
+	c = locateSidecarGamebox(games, "Keen.boxer", "ID-X");
+	CHECK_EQ(c.size(), (size_t)1);
+	CHECK(c[0].namedByIcon && !c[0].identifierMatches);
+	CHECK(!sidecarLookupIsCertain(c));
+	// GAMEBOX and identifier agree: certain.
+	c = locateSidecarGamebox(games, "Keen.boxer", "ID-K");
+	CHECK_EQ(c.size(), (size_t)1);
+	CHECK(c[0].namedByIcon && c[0].identifierMatches);
+	CHECK(sidecarLookupIsCertain(c));
+	// GAMEBOX with a path is not followed; nothing found -> empty.
+	CHECK(locateSidecarGamebox(games, "../Keen.boxer", "").empty());
+	CHECK(locateSidecarGamebox(games, "Gone.boxer", "ID-NONE").empty());
+	CHECK_EQ(gameboxesWithIdentifier(games, "ID-K").size(), (size_t)1);
+	CHECK(gameboxesWithIdentifier(games, "").empty());
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2 || argc > 3) { fprintf(stderr, "usage: cover_test <scratch dir> [<font.ttf>]\n"); return 2; }
@@ -402,6 +607,9 @@ int main(int argc, char **argv)
 	testTitles();
 	testCoverArt();
 	testCoverChoice();
+	testRenameChecks();
+	testRenamePair();
+	testSidecarLookup();
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;
 }
