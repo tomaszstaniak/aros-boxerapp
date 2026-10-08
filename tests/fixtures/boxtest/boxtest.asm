@@ -1281,7 +1281,7 @@ gfx_wait:
         mov     dx, [gfxfile]
         jmp     log_flush
 
-; GFX12 (added 2026-10-02, stage 2c): text -> VGA 640x480x16 (mode 12h) ->
+; GFX12 (added 2026-10-02): text -> VGA 640x480x16 (mode 12h) ->
 ; text, same log format as GFX in BOXGFX12.LOG. Mode 12h is the one VGA mode
 ; whose frame differs in size from 80x25 text (640x400) in DOSBox, so the
 ; front end must reallocate its frame buffer on both switches. Only a white

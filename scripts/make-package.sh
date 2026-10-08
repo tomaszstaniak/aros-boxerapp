@@ -12,7 +12,7 @@
 #   Boxer/ + Boxer.info               the AROS drawer (what users install) and its icon
 #   boxer-<ver>.<target>.lha          the drawer packed as arospkg expects
 #   MANIFEST-<abi>.sha256             every file in the drawer + the archive
-# Contents and decisions: packaging/README.md. The package is refused when
+# Contents and rationale: packaging/README.md. The package is refused when
 # the binary does not match its BUILDINFO, has undefined symbols, or when a
 # source file listed in BUILDINFO, or the upstream pin or patch series
 # recorded in the core's BUILDINFO, has changed since the build (the shipped
@@ -117,7 +117,7 @@ done
 strings="$UPSTREAM_DIR/Resources/Base.lproj/DOSBox.strings"
 chmod 644 "$pkg"/conf/*.conf
 python3 "$P/tools/strings2table.py" "$strings" "$pkg/dosbox.msg" >/dev/null
-# Icons with Boxer's own art (D2, 2026-10-04). The old make-icon.py tool
+# Icons with Boxer's own art. The old make-icon.py tool
 # icon was a plain rectangle, and every game icon BoxerUI writes copies
 # BoxerUI.info's image. Boxer.info makes the drawer visible in Wanderer's
 # default view; conf/GamesFolder.info is the template BoxerUI copies when it

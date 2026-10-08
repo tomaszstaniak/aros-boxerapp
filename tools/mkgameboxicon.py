@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (C) 2026 Tomasz Staniak
-"""Write a Workbench icon for a Boxer gamebox (decision D1). The gamebox
+"""Write a Workbench icon for a Boxer gamebox. The gamebox
 itself is never touched except where --layout inside says so; the icon is
 an addition and never carries format data.
 

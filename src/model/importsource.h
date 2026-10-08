@@ -10,8 +10,8 @@
 // +canImportFromSourceURL: IS:408, GF:398 _isReservedURL).
 //
 // AROS: only folders (and mounted volumes as folders) are accepted for now;
-// disc images wait for decision O6. Reserved sources are refused before
-// anything is created, so a refused or cancelled source leaves no trace (R1).
+// disc images are not supported yet. Reserved sources are refused before
+// anything is created, so a refused or cancelled source leaves no trace.
 #pragma once
 
 #include "installerscan.h"
@@ -38,7 +38,7 @@ enum class ImportStage {
 enum class SourceCheck {
 	Ok,
 	Missing,            // does not exist
-	NotFolder,          // a file: images are not importable yet (O6)
+	NotFolder,          // a file: images are not importable yet
 	Gamebox,            // a .boxer, or inside one: open it instead
 	BoxerData,          // the data directory or any "Boxer Data"
 	GamesFolder,        // the games folder itself or a folder that contains it
@@ -62,7 +62,7 @@ struct ImportSession {
 	ImportStage stage = ImportStage::WaitingForSource;
 	std::string sourcePath;
 	InstallerScanResult scan;
-	// R1: the one directory this session created; only it may ever be
+	// The one directory this session created; only it may ever be
 	// deleted by cancel or failure. Empty until createGamebox succeeds.
 	std::string createdGamebox;
 	std::string createdIdentifier; // its BXGameIdentifier, checked before deleting
@@ -104,7 +104,7 @@ struct ImportSession {
 };
 
 // IS:1421-1474 reduced: the source folder as hard disk D (folder sources
-// only; CD/floppy typing waits for O6) and the commands that start the
+// only; CD/floppy typing is not supported yet) and the commands that start the
 // chosen installer on it. False if the source path cannot be quoted.
 bool installerSessionCommands(const std::string &sourcePath, const std::string &installerRelative,
                               std::vector<std::string> &preflight, std::vector<std::string> &launch);

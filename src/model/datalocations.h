@@ -6,7 +6,7 @@
 // Modified by Tomasz Staniak, 2026: rewritten in C++ for AROS.
 // Distributed under GPL-2.0 only, as the original; see COPYING.
 
-// Where Boxer keeps its own data on AROS (a project decision, see
+// Where Boxer keeps its own data on AROS (see
 // documentation/development.md), in place of the original's
 // ~/Library/Preferences and ~/Library/Application Support/Boxer
 // (BXBaseAppController+BXSupportFiles.m gameStatesURLForGamebox:,
@@ -18,8 +18,8 @@
 //     Gamebox States/<identifier>/Current.boxerstate/<drive file name>/
 //     Screenshots/
 //
-// The data directory is chosen ONCE and kept in the user prefs (D2,
-// clarified 2026-10-02). It is never derived from where an opened gamebox
+// The data directory is chosen ONCE and kept in the user prefs.
+// It is never derived from where an opened gamebox
 // lives: a gamebox's state is found by its identifier under that one
 // directory, so moving or renaming the gamebox keeps its state. The games
 // folder is not assumed writable; prepareDataDir() checks and reports.
@@ -57,11 +57,11 @@ enum class DataDirStatus {
 
 // Creates the data directory if missing, then probes it. Never falls back to
 // another location silently: on anything but Ready the caller must ask the
-// user for a different directory (D2).
+// user for a different directory.
 DataDirStatus prepareDataDir(const std::string &dataDir, std::string *message = nullptr,
                              bool mayCreate = true);
 
-// Boxer Data is excluded from game scanning and import (D2): true for the
+// Boxer Data is excluded from game scanning and import: true for the
 // data directory itself, anything below it, and for any directory named
 // "Boxer Data" (also when the configured data dir is elsewhere, so a stale
 // default under the games folder is not offered as games either).
@@ -115,7 +115,7 @@ DataDirChoice chooseDataDir(const std::string &sessionOverride, const std::strin
                             const UserPrefs &prefs, const std::string &gamesFolder);
 const char *dataDirOriginName(DataDirOrigin o);
 
-// ---- games folder (GF:72-104 defaultGamesFolderURL, decision O1) ----
+// ---- games folder (GF:72-104 defaultGamesFolderURL) ----
 // The original proposes ~/DOS Games. AROS has no home directory: Work: when
 // that volume or assign exists, else SYS:. Existence says nothing about
 // write access; the caller checks with prepareDataDir() and asks.

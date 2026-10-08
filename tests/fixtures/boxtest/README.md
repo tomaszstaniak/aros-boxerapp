@@ -19,7 +19,7 @@ Output: `<project>/build/boxtest/BOXTEST.COM` (generated, not versioned). The
 script prints the nasm version, size and SHA-256. Recorded build:
 
 - NASM 3.02 (compiled on Jun 29 2026), `nasm -f bin`
-- 2026-10-02 stage 2c (GFX12 added): `BOXTEST.COM`, 3839 bytes,
+- 2026-10-02 (GFX12 added): `BOXTEST.COM`, 3839 bytes,
   SHA-256 `4e32e8dd5d709f77cc071f8ca406736a19609283594543ab1186d9f10237075a`
 - 2026-10-02 (TIME, GFX added): `BOXTEST.COM`, 3743 bytes,
   SHA-256 `5cf792d7a0af10a4632cd80d6ff5d75d2721bd505802835a85284c06f3e5c0a9`
@@ -249,7 +249,7 @@ In mode 13h the program draws 16 colour bars (20 px each), a white border
 and a white-outlined 120x100 box, which a 4:3 display shows as a square;
 nothing is printed while in 13h. Errorlevel 5 on WAIT TIMEOUT.
 
-### BOXGFX12.LOG (added 2026-10-02, stage 2c)
+### BOXGFX12.LOG (added 2026-10-02)
 
 Same format as BOXGFX.LOG, with mode `12` (640x480x16) in place of `13`.
 Only a white top and bottom row are drawn. Reason: in DOSBox 0.74 mode 13h

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 Tomasz Staniak
 
-// Workbench arguments -> gamebox path (decision D1). Wanderer opens any
+// Workbench arguments -> gamebox path. Wanderer opens any
 // directory as a drawer whatever its icon type (wanderer.c,
 // ICONWINDOW_ACTION_OPEN dispatches on the file system entry type), so a
 // double-click can reach BoxerUI only through a project icon that is not

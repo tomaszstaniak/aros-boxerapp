@@ -22,8 +22,8 @@
 ; STARTUP=<file> writes the block to another file (tests only).
 ;
 ; Why no .def: on AROS a .def default for a /K keyword was not applied,
-; and the script stopped at If EXISTS "" waiting for input (D1,
-; 2026-10-04). Optional values are tested with an "x" prefix, so If never
+; and the script stopped at If EXISTS "" waiting for input
+; (seen 2026-10-04). Optional values are tested with an "x" prefix, so If never
 ; gets an empty string argument.
 .key DIR,REPLACE/S,KEEP/S,REMOVE/S,STARTUP/K
 .bra {

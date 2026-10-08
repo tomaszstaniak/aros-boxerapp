@@ -52,7 +52,7 @@ struct Task *g_mainTask = nullptr;
 // point size opens). arial.font is the fallback because every AROS install
 // has it as a bitmap font.
 //
-// Fonts (font review rules R1-R7). diskfont
+// Fonts. diskfont
 // makes an outline font's bitmap exactly tf_YSize rows high and cuts every
 // glyph to it (diskfont/bullet.c OTAG_MakeCharData); the baseline goes at
 // the tallest glyph of 0..255, so tops are never cut, only rows below the
@@ -265,13 +265,13 @@ static bool openFamily(const char *regular, const char *bold, bool bboxScale, in
 // on both ABIs, never returned by a flush (measured 2026-10-02).
 bool openFonts(LogFn log, bool fontCheck) {
     g_fontCheck = fontCheck;
-    // R1: own descriptions first, on both ABIs.
+    // Own descriptions first, on both ABIs.
     if (openFamily("PROGDIR:Fonts/BoxerSans.font", "PROGDIR:Fonts/BoxerSansBold.font", true, 0,
                    "PROGDIR:Fonts/BoxerSans.otag", "PROGDIR:Fonts/BoxerSansBold.otag", log)) {
         if (log) log("fonts: BoxerSans (own descriptions, bounding-box metric)");
         return true;
     }
-    // R4: the system Vera Sans; at the bounding-box size when its metric is
+    // Fallback: the system Vera Sans; at the bounding-box size when its metric is
     // 0 (same em as BoxerSans), else at the requested size (cut glyphs logged).
     int metric = otagMetric("FONTS:Vera Sans.otag");
     if (openFamily("Vera Sans.font", "Vera Sans Bold.font", metric == 0, 0, "FONTS:Vera Sans.otag",
@@ -2177,7 +2177,7 @@ static const AbsLayout kLaunchBar = {640, kLPBarH, 160, kLPBarH, MUI_MAXMAX, kLP
 
 Object *newLaunchPanel(Object **searchField, Object **list) {
     // StayActive: Return keeps the field focused (NSSearchField stays the
-    // first responder); Return never launches anything (V5).
+    // first responder); Return never launches anything, as in 2.0-alpha.
     Object *search = (Object *)NewObject(mccSearch->mcc_Class, NULL, MUIA_Frame, MUIV_Frame_String,
                                          MUIA_Font, (IPTR)g_fonts.system13, MUIA_String_MaxLen, 128,
                                          MUIA_String_StayActive, TRUE, MUIA_CycleChain, 1, TAG_DONE);

@@ -250,7 +250,7 @@ bool ImportSession::discardGamebox(std::string *error)
 {
 	if (createdGamebox.empty())
 		return true;
-	// Defence in depth for R1: the recorded path must still be what this
+	// Defence in depth for cancel and failure: the recorded path must still be what this
 	// session made, a ".boxer" directly inside the games folder.
 	const bool shapeOk = fsutil::extension(fsutil::baseName(createdGamebox)) == "boxer" &&
 	                     fsutil::trimTrailingSlash(fsutil::parent(createdGamebox)) == fsutil::trimTrailingSlash(gamesFolder);

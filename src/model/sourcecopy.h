@@ -65,7 +65,7 @@ private:
 	void collect(const std::string &rel, int depth);
 };
 
-// Sidecar icon ToolTypes (decision O10): find-the-gamebox aids.
+// Sidecar icon ToolTypes BOXERID/GAMEBOX: they find a separated gamebox.
 std::vector<std::string> sidecarToolTypes(const std::string &identifier, const std::string &gameboxFileName);
 
 } // namespace boxer

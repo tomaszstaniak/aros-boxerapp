@@ -52,7 +52,7 @@ struct RecentProgram {
 
 // Per-game settings. Where the original used the user defaults key
 // "BXGameSettings: <identifier>", the port keeps one plist per gamebox in
-// the data directory (decision D2: persistent data lives there):
+// the data directory (persistent data lives there):
 // <data>/Game Settings/<identifier>.plist. Unknown keys are kept.
 class GameSettings {
 public:

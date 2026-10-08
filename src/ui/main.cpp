@@ -15,13 +15,13 @@
 //           [MSG=<table>] [OPTCONF=<file>]... [PRE=<cmd>]... [CMD=<cmd>]... [THEN=<cmd>]...
 //           [FONTCHECK=1] [HARNESS=1]
 // DATADIR=<dir> sets the one user data directory (stored in
-// ENVARC:Boxer/Boxer.prefs, D2) without a requester; DATA=<dir> overrides it
+// ENVARC:Boxer/Boxer.prefs) without a requester; DATA=<dir> overrides it
 // for one session. PREFSONLY=1 stores DATADIR and exits; PREFS=<file> and
-// PREFSFAULT=<step>:fail|crash (with HARNESS=1) are for the D2 tests.
+// PREFSFAULT=<step>:fail|crash (with HARNESS=1) are for the data-directory tests.
 // GAMEBOX opens a gamebox session (writes shadowed into DATA), SESSION=dos a
 // plain DOS prompt; without either the windows show the slice-A test pattern
 // and "Open a DOS prompt" starts a session when CONFDIR is known. The core
-// keeps global state, so one session per process (decision D6: a new
+// keeps global state, so one session per process (a new
 // process per session).
 //
 // Product shortcuts (decided 2026-10-02):
@@ -260,8 +260,8 @@ static struct {
     Object *tabbar, *tabs[5], *pages, *speedSlider, *speedDesc, *frameSlider, *frameDesc;
     Object *dynamic, *helpBtn, *volBox;
     Object *dosPages, *lpPanel, *lpSearch, *lpList;   // launch panel (BXLaunchPanelController)
-    // Import window (ImportWindow.xib): tier 1, a standard Window with a
-    // PageMode group, one page per import stage (plan section 3).
+    // Import window (ImportWindow.xib): a standard Window with a
+    // PageMode group, one page per import stage.
     Object *imp, *impPages, *impChoose, *impBack, *impSource, *impLaunch, *impSkip;
     Object *impList, *impReady, *impBack2, *impCreate;
     Object *impProgText, *impProgList, *impUse, *impDoneText, *impLaunchGame, *impDoneClose;
@@ -280,7 +280,7 @@ static struct {
 
 static std::string g_gamesFolder;   // from the prefs; "" until chosen
 static boxer::ImportSession g_import;
-// The installer runs in this process's one core session (D6); the main loop
+// The installer runs in this process's one core session; the main loop
 // starts it, and these say how the user ended it.
 static struct { bool pending = false, finish = false, stop = false; } g_inst;
 // The source copy runs in steps from the main loop so the Gauge moves and
@@ -553,8 +553,8 @@ static Object *buildImport() {
     ui.impCreate = SimpleButton("Import game");
     ui.impSource = TextObject, MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
     ui.impReady = TextObject, MUIA_Text_PreParse, (IPTR)"\33c", MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
-    // Installer choice: a standard single-select List (plan section 3 allows
-    // Cycle or a list; a list shows every candidate with its folder at once).
+    // Installer choice: a standard single-select List rather than a
+    // Cycle: a list shows every candidate with its folder at once.
     ui.impList = ListObject, MUIA_Frame, MUIV_Frame_InputList,
         MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
         MUIA_List_DestructHook, MUIV_List_DestructHook_String, End;
@@ -619,7 +619,7 @@ static Object *buildImport() {
             Child, (IPTR)VSpace(0),
             Child, (IPTR)(HGroup, Child, (IPTR)ui.impDoneClose, Child, (IPTR)HSpace(0), Child, (IPTR)ui.impLaunchGame, End),
             End),
-        // Finalizing panel: progress and Stop (tier 1, Gauge + button).
+        // Finalizing panel: progress and Stop (Gauge + button).
         Child, (IPTR)(VGroup,
             Child, (IPTR)VSpace(0),
             Child, (IPTR)ui.impCopyText,
@@ -743,7 +743,7 @@ static Object *buildInspector() {
         Child, (IPTR)(HGroup, MUIA_Group_Spacing, 4, MUIA_InnerLeft, 0, MUIA_InnerRight, 0,
             MUIA_InnerTop, 0, MUIA_InnerBottom, 0,
             Child, (IPTR)ui.dynamic,
-            // The checkbox is ghosted (O11); AppKit dims a disabled
+            // The checkbox is ghosted (not passed to the core); AppKit dims a disabled
             // checkbox's title with it, and here the title is a separate label.
             Child, (IPTR)newLabel("Optimize for newer games", g_fonts.system13, 0xA0A0A0, 0,
                                   textWidthOf(g_fonts.system13, "Optimize for newer games") + 2, 18),
@@ -824,8 +824,8 @@ static Object *buildInspector() {
         Child, (IPTR)pages[0], Child, (IPTR)pages[1], Child, (IPTR)pages[2],
         Child, (IPTR)pages[3], Child, (IPTR)pages[4], TAG_DONE);
 
-    // The original is a utility NSPanel (small title bar); decision V3 gives
-    // it a standard AROS window frame instead.
+    // The original is a utility NSPanel (small title bar); here it gets
+    // a standard AROS window frame instead.
     return WindowObject,
         MUIA_Window_Title, (IPTR)kTabTitles[1],
         MUIA_Window_LeftEdge, rightEdgeFor(296 + 12), MUIA_Window_TopEdge, 24,
@@ -905,13 +905,13 @@ struct SessionArgs {
     // That icon's GAMEBOX and BOXERID ToolTypes: they find the
     // gamebox when the icon and the gamebox no longer have the same name.
     std::string sidecarGamebox, sidecarId;
-    // D2 data directory. data (DATA) overrides it for one session only;
+    // The user data directory. data (DATA) overrides it for one session only;
     // dataDirChosen (DATADIR, or the BOXER_DATADIR variable) sets the
     // configured one without a requester (setup and test harness).
     std::string dataDirChosen;
     std::string prefsPath;        // PREFS: test only, replaces ENVARC:Boxer/Boxer.prefs, no ENV: copy
     bool prefsOnly = false;       // PREFSONLY=1: resolve and store the data directory, then exit
-    std::string prefsFault;       // PREFSFAULT=<step>:fail|crash, HARNESS only (D2 runtime test)
+    std::string prefsFault;       // PREFSFAULT=<step>:fail|crash, HARNESS only (data dir runtime test)
 };
 static SessionArgs g_args;
 
@@ -950,7 +950,7 @@ static bool windowOpen(Object *win) {
 }
 
 // ---- launch panel (BXLaunchPanelController + the BXSession parts) --------
-// Shown in the DOS window in place of the DOS view (decision V1), only for
+// Shown in the DOS window in place of the DOS view, only for
 // a gamebox session (allowsLauncherPanel; no standalone bundles exist here).
 static void releaseInput(const char *why);
 static void setLocked(bool locked, const char *why);
@@ -1531,9 +1531,9 @@ static void serviceSignals(ULONG got) {
 }
 
 // ---- input from the render views -------------------------------------------
-// Fast forward is held with RAmiga+Alt+F (decision 2026-10-02). The
+// Fast forward is held with RAmiga+Alt+F. The
 // original's Cmd+Option+Cursor Right cannot be used: Amiga+cursor presses
-// never reach a window on either ABI (stage 2c key probe).
+// never reach a window on either ABI (only the release arrives).
 static const unsigned kRawF = 0x23, kRawP = 0x19, kRawG = 0x24, kRawA = 0x20;
 static bool sessionKey(Object *, unsigned code, bool up, unsigned qual) {
     if (!g_ss.running) return false;
@@ -1966,7 +1966,7 @@ static void readToolTypes(struct WBArg *arg, const char *what) {
             // "(KEY=value)" is a disabled ToolType, as Workbench writes it.
             if (eq == std::string::npos || t[0] == '(') continue;
             const std::string key = upper(t.substr(0, eq));
-            // A sidecar's GAMEBOX/BOXERID (O10) only help find a gamebox
+            // A sidecar's GAMEBOX/BOXERID only help find a gamebox
             // that moved; taken as arguments, a relative GAMEBOX would
             // replace the gamebox the icon itself resolves to. They are kept
             // for the lookup when that gamebox is missing.
@@ -1985,7 +1985,7 @@ static void readToolTypes(struct WBArg *arg, const char *what) {
 }
 
 // Workbench start: the program icon's ToolTypes first, then each project
-// argument (a gamebox's own icon with BoxerUI as default tool, decision D1,
+// argument (a gamebox's own icon with BoxerUI as default tool,
 // or a gamebox drawer selected with Shift) adds its own and names the
 // gamebox when it is a *.boxer drawer.
 static void parseToolTypes(struct WBStartup *wb) {
@@ -2014,8 +2014,8 @@ static void parseToolTypes(struct WBStartup *wb) {
 
 // Defaults that keep an icon or a Shell start from any current directory
 // working: resources are looked up in PROGDIR:. The data directory is NOT
-// derived here from the gamebox's location (D2, clarified 2026-10-02: a
-// moved gamebox then started fresh); resolveDataDir() takes it from the
+// derived here from the gamebox's location (a moved gamebox
+// would then start fresh); resolveDataDir() takes it from the
 // user prefs.
 static bool exists(const std::string &p) {
     BPTR l = Lock((CONST_STRPTR)p.c_str(), SHARED_LOCK);
@@ -2035,7 +2035,7 @@ static void applyDefaults() {
     if (g_args.msg.empty() && exists(inProg("dosbox.msg"))) g_args.msg = inProg("dosbox.msg");
 }
 
-// ---- D2: the one user data directory ---------------------------------------
+// ---- the one user data directory ------------------------------------------
 struct Library *AslBase;
 
 static LONG ask(const char *text, const char *gadgets, const char *arg1 = "", const char *arg2 = "") {
@@ -2105,7 +2105,7 @@ static std::string canonicalDir(const std::string &path) {
 
 static const char *kGamesFolderTitle = "Select a folder in which to keep your DOS games:";
 
-// A drawer BoxerUI creates gets an icon (D2, 2026-10-04): without one,
+// A drawer BoxerUI creates gets an icon: without one,
 // Wanderer's default view (icons only) hides it, and a new user cannot find
 // the games folder or the game icons in it. The image comes from
 // PROGDIR:<templ>.info when given, else the system's default drawer icon.
@@ -2138,7 +2138,7 @@ static void addDrawerIcon(const std::string &dir, const char *templ) {
 }
 
 // First run from the Welcome window (BXGamesFolderPanelController, GF:72-104):
-// the games folder is proposed (decision O1), confirmed or replaced, created
+// the games folder is proposed, confirmed or replaced, created
 // and probed for write access. A configured folder that vanished is reported
 // and the user chooses again; nothing is recreated silently. False ends the
 // program. Sets *changed when prefs.gamesFolder must be saved.
@@ -2266,7 +2266,7 @@ static bool resolveDataDir() {
     if (choice.save) {
         prefs.dataDir = choice.dataDir;
         if (g_args.harness && !g_args.prefsFault.empty()) {
-            // <step>:fail|crash on the target filesystem (D2 runtime test).
+            // <step>:fail|crash on the target filesystem (data-directory runtime test).
             auto colon = g_args.prefsFault.find(':');
             bool ok = false;
             auto step = stepNamed(g_args.prefsFault.substr(0, colon), ok);
@@ -2576,8 +2576,8 @@ static void showImportStage() {
         for (const auto &p : g_import.scan.installers)
             DoMethod(ui.impList, MUIM_List_InsertSingle, (IPTR)p.c_str(), MUIV_List_Insert_Bottom);
         set(ui.impList, MUIA_List_Active, 0);   // preferred installer first (IP:246)
-        // D6: one core run per process; a second installer needs a new
-        // BoxerUI (handoff, plan 3.3, deferred).
+        // One core run per process; a second installer needs a new
+        // BoxerUI (handing over to one is not implemented).
         set(ui.impLaunch, MUIA_Disabled, g_ss.ran);
         set(ui.impPages, MUIA_Group_ActivePage, 1);
         break;
@@ -2643,7 +2643,7 @@ static void importAfterInstaller() {
         logf("import: installer finished, files in the gamebox");
     } else {
         // Nothing was installed: the source files are imported instead
-        // (IS:745, copying arrives with L5).
+        // (IS:745).
         g_import.stage = boxer::ImportStage::ReadyToFinalize;
         logf("import: installer finished without installing files");
     }
@@ -2652,7 +2652,7 @@ static void importAfterInstaller() {
     showImportStage();
 }
 
-// Stop or failure while copying: the gamebox goes, the source stays (R1).
+// Stop or failure while copying: only the new gamebox goes; the source stays.
 static void importAbandon(const std::string &why) {
     if (g_copy) { g_copy->close(); delete g_copy; g_copy = nullptr; }
     const std::string name = g_import.gameName(), source = g_import.sourcePath;
@@ -2844,10 +2844,10 @@ static bool handleId(ULONG id) {
         break;
     }
     case ID_IMPORT_LAUNCH_GAME: {
-        // O8/D6: the game runs in a new BoxerUI process (this one may already
+        // The game runs in a new BoxerUI process (this one may already
         // have used its one core run). Opened as Wanderer would open the
         // sidecar icon: a SystemTags start left BoxerUI's drawer locked after
-        // both processes ended (SystemTags drops NP_HomeDir, L6 bisect), the
+        // both processes ended (SystemTags drops NP_HomeDir), the
         // icon start did not. This process ends only after the open succeeded.
         // A name being typed is committed first; a refused one keeps the
         // panel (launchGamebox: makeFirstResponder:nil fails on validation).
@@ -2956,7 +2956,7 @@ static bool handleId(ULONG id) {
     }
     case ID_LP_ENTER:
         // control:textView:doCommandBySelector: insertNewline: is a TODO in
-        // 2.0-alpha ("launch the first search result"): nothing is launched (V5).
+        // 2.0-alpha ("launch the first search result"): nothing is launched.
         logf("launch panel: Return in the search field: no launch (2.0-alpha behaviour)");
         break;
     case ID_LP_ACTION: {
@@ -3311,7 +3311,7 @@ int main(int argc, char **argv) {
     // enabled by the increments that implement them.
     set(ui.wb[0], MUIA_Disabled, TRUE);
     set(ui.recentBtn, MUIA_Disabled, TRUE);
-    // Import works from the Welcome window once a games folder is known (L2).
+    // Import works from the Welcome window once a games folder is known.
     if (g_gamesFolder.empty()) set(ui.wb[1], MUIA_Disabled, TRUE);
     else notifyId(ui.wb[1], MUIA_Pressed, FALSE, ID_IMPORT);
     notifyId(ui.impChoose, MUIA_Pressed, FALSE, ID_IMPORT_CHOOSE);
@@ -3338,7 +3338,7 @@ int main(int argc, char **argv) {
     notifyId(ui.lpSearch, MUIA_String_Acknowledge, MUIV_EveryTime, ID_LP_ENTER);
     g_launcherAction = lpAction;
     set(ui.programs, MUIA_Disabled, TRUE);   // until a gamebox session allows the panel
-    set(ui.manuals, MUIA_Disabled, TRUE);   // no documentation panel yet (V4)
+    set(ui.manuals, MUIA_Disabled, TRUE);   // no documentation panel yet
     for (int i = 0; i < 3; ++i) notifyId(ui.seg[i], MUIA_Selected, TRUE, ID_SEG0 + i);
     notifyId(ui.volMin, MUIA_Pressed, FALSE, ID_VOL_MIN);
     notifyId(ui.volMax, MUIA_Pressed, FALSE, ID_VOL_MAX);
@@ -3379,7 +3379,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 5; ++i) notifyId(ui.tabs[i], MUIA_Selected, TRUE, ID_TAB0 + i);
     notifyId(ui.speedSlider, MUIA_Numeric_Value, MUIV_EveryTime, ID_SPEED);
     notifyId(ui.frameSlider, MUIA_Numeric_Value, MUIV_EveryTime, ID_FRAMES);
-    // Not passed to the core (decision O11) and no help panel: ghosted.
+    // Not passed to the core and no help panel: ghosted.
     // Mouse, Joystick and Drives have only placeholder pages.
     set(ui.dynamic, MUIA_Disabled, TRUE);
     set(ui.helpBtn, MUIA_Disabled, TRUE);
@@ -3475,7 +3475,7 @@ int main(int argc, char **argv) {
         g_pendingRename.clear();
     }
     // IS:1579 _cleanup: an import that did not finish takes its gamebox
-    // with it, and only that directory (R1).
+    // with it, and only that directory.
     if (g_copy) { g_copy->close(); delete g_copy; g_copy = nullptr; }
     if (!g_import.createdGamebox.empty() && g_import.stage != boxer::ImportStage::Finished) {
         std::string err;

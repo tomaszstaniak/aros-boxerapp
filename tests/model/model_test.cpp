@@ -720,7 +720,7 @@ static void testShadowNested()
 	CHECK(before == after);
 }
 
-// --- D2: user prefs, one data directory, state found by identifier ---
+// --- user prefs, one data directory, state found by identifier ---
 static void testPrefsAndDataDir()
 {
 	UserPrefs p;
@@ -824,7 +824,7 @@ static void testPrefsAndDataDir()
 	CHECK(prepareDataDir(gone, &msg, false) == DataDirStatus::Missing);
 	CHECK(!fu::exists(gone));
 
-	// Games folder (O1, GF:398).
+	// Games folder (GF:398).
 	UserPrefs gp;
 	CHECK(parsePrefs("DataDir=DH1:D\ngamesfolder = Work:DOS Games\nX=y\n", gp));
 	CHECK_EQ(gp.gamesFolder, std::string("Work:DOS Games"));
@@ -900,7 +900,7 @@ static void testImportSource()
 	CHECK(checkImportSource(src, loc, "") == SourceCheck::Ok);
 	fu::removeTree(far.dataDir);
 	snapshot(scratch, "", after);
-	CHECK(before == after); // checks never touch the disk (R1)
+	CHECK(before == after); // checks never touch the disk
 
 	ImportSession s;
 	CHECK(s.chooseSource(games, loc, games) == SourceCheck::GamesFolder);
@@ -1020,7 +1020,7 @@ static void testGameboxCreation()
 	CHECK_EQ(incrementedGameboxName("Dune", 1), std::string("Dune.boxer"));
 	CHECK_EQ(incrementedGameboxName("Dune", 3), std::string("Dune (3).boxer"));
 
-	// Layout for R1: <base>/Games is the games folder, the source lies
+	// Layout for cancel and failure: <base>/Games is the games folder, the source lies
 	// beside it in the games folder's parent, and a gamebox called
 	// Dune.boxer already exists with its own files.
 	const std::string base = fu::join(scratch, "R1 Base");
@@ -1053,7 +1053,7 @@ static void testGameboxCreation()
 	auto ls = reread.launchers();
 	CHECK(ls.size() == 1 && ls[0].isDefault && ls[0].path == "C.harddisk/DUNE/DUNE.EXE");
 
-	// Cancel (R1): only "Dune (2).boxer" goes; source, existing gamebox and
+	// Cancel: only "Dune (2).boxer" goes; source, existing gamebox and
 	// everything else in the parent are byte-identical.
 	CHECK(s.discardGamebox(&err));
 	CHECK(s.createdGamebox.empty());
@@ -1181,7 +1181,7 @@ static void testSourceCopy()
 	CHECK(before == after);
 
 	// Disk full in the middle of a file: readable error naming the file;
-	// discarding then removes only the new gamebox (R1).
+	// discarding then removes only the new gamebox.
 	ImportSession f;
 	CHECK(f.chooseSource(src, loc, games) == SourceCheck::Ok);
 	CHECK(f.createGamebox(games));

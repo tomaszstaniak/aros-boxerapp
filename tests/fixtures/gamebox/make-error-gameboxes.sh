@@ -1,12 +1,12 @@
 #!/bin/bash
-# Gameboxes for the failure paths F1-F4 (stage 2 acceptance), next to the
+# Gameboxes for the failure paths of opening a gamebox, next to the
 # valid "BoxTest Game.boxer" from make-boxtest-gamebox.sh.
-#   Corrupt Info.boxer    - Game Info.plist is not a property list (F2)
-#   Missing Drive.boxer   - default launcher on a drive folder that is absent (F3)
-#   ReadOnly NoId.boxer   - no identifier; made read-only on the guest (F4a)
-#   ReadOnly Game.boxer   - identifier present; made read-only on the guest (F4b)
+#   Corrupt Info.boxer    - Game Info.plist is not a property list
+#   Missing Drive.boxer   - default launcher on a drive folder that is absent
+#   ReadOnly NoId.boxer   - no identifier; made read-only on the guest
+#   ReadOnly Game.boxer   - identifier present; made read-only on the guest
 #   Locked NoId/Game.boxer - copies of the two above for the C:Lock cases (F4c/F4d)
-# F1 (missing gamebox) needs no fixture.
+# A missing gamebox needs no fixture.
 # Usage: make-error-gameboxes.sh <BOXTEST.COM> <output-dir>
 set -euo pipefail
 [ $# -eq 2 ] || { echo "usage: $0 <BOXTEST.COM> <output-dir>" >&2; exit 2; }
