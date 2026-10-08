@@ -37,8 +37,13 @@ Installing
 
 4. Double-click BoxerUI. On the first start Boxer proposes a folder for
    your DOS games and one for their saved games; confirm or choose your
-   own. Then import a game. Each imported game gets an icon in the games
-   folder; double-click it to play.
+   own. Then import a game. When the import is finished you can rename
+   the game and choose its cover: a CD case or diskette with the game's
+   name, or a picture of your own (click the icon). Each imported game
+   gets an icon in the games folder that shows its cover; double-click it
+   to play. While a game runs, the Gamebox tab of the Inspector (Right
+   Amiga+I) changes the cover at once; a new name is applied when you
+   close the game.
 
 From a Shell BoxerUI needs a larger stack:
   Stack 65536

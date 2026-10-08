@@ -42,9 +42,13 @@
 #include "gfx.h"
 #include "ui_logic.h"
 #include "launchpanel_logic.h"
+#include "coverassets.h"
 #include "../emulator/emulator.h"
 #include "../emulator/filesystem.h"
+#include "../model/coverart.h"
+#include "../model/coverfont.h"
 #include "../model/datalocations.h"
+#include "../model/gameboxrename.h"
 #include "../model/importsource.h"
 #include "../model/installerscan.h"
 #include "../model/sourcecopy.h"
@@ -53,6 +57,7 @@
 #include "../model/programs.h"
 #include "../model/shadowfs.h"
 #include "../platform/aros/coreinput.h"
+#include "../platform/aros/coverio.h"
 #include "../platform/aros/corecontrol.h"
 #include "../platform/aros/session_setup.h"
 #include "../platform/aros/wbopen.h"
@@ -164,7 +169,8 @@ enum {
     ID_DUMP_LATER, ID_STYLE, ID_SIZE1, ID_SIZE2, ID_SIZE3, ID_ASPECT,
     ID_LP_FILTER, ID_LP_ENTER, ID_LP_ACTION, ID_LP_TOGGLE,
     ID_IMPORT_CHOOSE, ID_IMPORT_BACK, ID_IMPORT_CLOSE, ID_IMPORT_SKIP, ID_IMPORT_BACK2,
-    ID_IMPORT_LAUNCH, ID_IMPORT_USE, ID_IMPORT_DONE_CLOSE, ID_IMPORT_CREATE, ID_IMPORT_STOP, ID_IMPORT_LAUNCH_GAME
+    ID_IMPORT_LAUNCH, ID_IMPORT_USE, ID_IMPORT_DONE_CLOSE, ID_IMPORT_CREATE, ID_IMPORT_STOP, ID_IMPORT_LAUNCH_GAME,
+    ID_IMPORT_NAME, ID_IMPORT_COVER, ID_IMPORT_WELL, ID_INSP_NAME, ID_INSP_COVER, ID_INSP_WELL
 };
 
 // ------------------------------------------------------------- layouts ---
@@ -222,6 +228,26 @@ static const AbsItem kBoxItems[] = {
     {20, 42, 256, 28, 0},     // its help text
 };
 static const AbsLayout kOptionsBox = {296, 86, 296, 86, 296, 86, kBoxItems, 2};
+// Gamebox panel (Inspector.xib "Gamebox Panel", 296x432): the cover well
+// at x=84 (128 pt plus a 6 pt highlight margin), its help text, and the
+// launch box at y=259. AROS adds the name field and the cover choice
+// between them (the original renames a gamebox in the Finder), so the
+// well sits higher than its xib y=56.
+static const AbsItem kGameboxItems[] = {
+    {78, 12, 140, 140, 0},    // cover well
+    {20, 156, 256, 29, 0},    // help text
+    {20, 190, 256, 22, 0},    // name (AROS)
+    {20, 216, 256, 22, 0},    // cover choice (AROS)
+    {20, 241, 256, 14, 0},    // pending-rename note (AROS)
+    {0, 259, 296, 134, 0},    // launch box (xib -1,…,298: side edges off-panel)
+};
+static const AbsLayout kGameboxPage = {296, 432, 296, 432, 296, 432, kGameboxItems, 6};
+static const AbsItem kLaunchBoxItems[] = {
+    {20, 10, 256, 17, 0},     // "When starting up, launch:"
+    {20, 33, 256, 26, 0},     // program popup
+    {21, 64, 230, 18, 0},     // "Close window after exiting"
+};
+static const AbsLayout kLaunchBox = {296, 134, 296, 134, 296, 134, kLaunchBoxItems, 3};
 static const AbsItem kPlaceholderItems[] = {{20, 200, 256, 32, 0}};
 static const AbsLayout kPlaceholder = {296, 432, 296, 432, 296, 432, kPlaceholderItems, 1};
 
@@ -240,6 +266,10 @@ static struct {
     Object *impList, *impReady, *impBack2, *impCreate;
     Object *impProgText, *impProgList, *impUse, *impDoneText, *impLaunchGame, *impDoneClose;
     Object *impCopyText, *impGauge, *impStop;
+    // Name and cover on the finished panel (ImportFinishedPanel) and in
+    // the Inspector's Gamebox tab (Inspector.xib "Gamebox Panel").
+    Object *impWell, *impName, *impCover;
+    Object *inspWell, *inspName, *inspCover, *inspNote, *inspLaunch, *inspCloseOnExit;
 } ui;
 
 static struct {
@@ -491,6 +521,26 @@ static Object *buildWelcome() {
         End;
 }
 
+// The cover choice next to the well (an AROS addition: the original picks
+// the bootleg template itself, BXSession.m:186-201, and takes a picture by
+// drag and drop, which this increment does not have). Index order is
+// kCoverStyles; the last entry asks for a picture.
+static const char *kCoverEntries[] = {"Automatic", "CD-ROM case", "3.5\" diskette", "5.25\" diskette",
+                                      "Own picture...", nullptr};
+static const boxer::CoverStyle kCoverStyles[] = {boxer::CoverStyle::Automatic, boxer::CoverStyle::JewelCase,
+                                                 boxer::CoverStyle::Diskette35, boxer::CoverStyle::Diskette525,
+                                                 boxer::CoverStyle::Picture};
+
+static Object *newNameField() {
+    // NSTextField: the gamebox name, committed with Return (IS:457).
+    return StringObject, StringFrame, MUIA_String_MaxLen, 101, MUIA_CycleChain, 1,
+        MUIA_FixWidth, 256, End;
+}
+
+static Object *newCoverCycle() {
+    return CycleObject, MUIA_Cycle_Entries, (IPTR)kCoverEntries, MUIA_CycleChain, 1, End;
+}
+
 // Pages follow BXImportWindowController.m:75-104: dropzone while waiting
 // for a source, installer panel once the source is loaded. AROS: no drop
 // target yet (deferred), so the dropzone page offers only the chooser.
@@ -517,6 +567,9 @@ static Object *buildImport() {
         MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
         MUIA_List_DestructHook, MUIV_List_DestructHook_String, End;
     ui.impStop = SimpleButton("Stop importing");
+    ui.impWell = newCoverWell();
+    ui.impName = newNameField();
+    ui.impCover = newCoverCycle();
     ui.impCopyText = TextObject, MUIA_Text_PreParse, (IPTR)"\33c", MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
     ui.impGauge = GaugeObject, GaugeFrame, MUIA_Gauge_Horiz, TRUE, MUIA_Gauge_Max, 1000,
         MUIA_FixHeightTxt, (IPTR)"M", End;
@@ -547,10 +600,21 @@ static Object *buildImport() {
             Child, (IPTR)(ListviewObject, MUIA_Listview_List, (IPTR)ui.impProgList, End),
             Child, (IPTR)(HGroup, Child, (IPTR)HSpace(0), Child, (IPTR)ui.impUse, End),
             End),
+        // ImportFinishedPanel: title, the cover well, the name field; AROS
+        // adds the cover choice and a line of text in place of the
+        // ImportCoverArtTip / ImportRenameTip arrows.
         Child, (IPTR)(VGroup,
             Child, (IPTR)VSpace(0),
             Child, (IPTR)(TextObject, MUIA_Text_PreParse, (IPTR)"\33c",
                 MUIA_Text_Contents, (IPTR)"Congratulations! Your new gamebox is ready to play.", End),
+            Child, (IPTR)(HGroup, Child, (IPTR)HSpace(0), Child, (IPTR)ui.impWell, Child, (IPTR)HSpace(0), End),
+            Child, (IPTR)(HGroup, Child, (IPTR)HSpace(0), Child, (IPTR)ui.impName, Child, (IPTR)HSpace(0), End),
+            Child, (IPTR)(HGroup, Child, (IPTR)HSpace(0),
+                Child, (IPTR)(TextObject, MUIA_Text_Contents, (IPTR)"Cover:", MUIA_Text_SetMax, TRUE, End),
+                Child, (IPTR)ui.impCover, Child, (IPTR)HSpace(0), End),
+            Child, (IPTR)(TextObject, MUIA_Text_PreParse, (IPTR)"\33c",
+                MUIA_Text_Contents, (IPTR)"Type a new name and press Return to rename the game.\n"
+                                          "Click the icon to use your own picture as its cover.", End),
             Child, (IPTR)ui.impDoneText,
             Child, (IPTR)VSpace(0),
             Child, (IPTR)(HGroup, Child, (IPTR)ui.impDoneClose, Child, (IPTR)HSpace(0), Child, (IPTR)ui.impLaunchGame, End),
@@ -568,7 +632,7 @@ static Object *buildImport() {
         MUIA_Window_Title, (IPTR)"Import a Game",
         MUIA_Window_LeftEdge, MUIV_Window_LeftEdge_Centered,
         MUIA_Window_TopEdge, MUIV_Window_TopEdge_Centered,
-        MUIA_Window_Width, 480, MUIA_Window_Height, 260,
+        MUIA_Window_Width, 480,
         MUIA_Window_RootObject, (IPTR)ui.impPages,
         End;
 }
@@ -709,9 +773,44 @@ static Object *buildInspector() {
         Child, (IPTR)ui.helpBtn,
         TAG_DONE);
 
+    // Gamebox panel: name and cover work; the launch box (startup
+    // program, close after exiting) is shown ghosted because those options
+    // are not ported yet.
+    ui.inspWell = newCoverWell();
+    ui.inspName = newNameField();
+    ui.inspCover = newCoverCycle();
+    ui.inspNote = newLabel("", g_fonts.small11, 0x555555, 1, 256, 14, 0xFFFFFF, 1);
+    ui.inspLaunch = TextObject, ButtonFrame, MUIA_Background, MUII_ButtonBack,
+        MUIA_Text_Contents, (IPTR)"Nothing (show a DOS prompt)", MUIA_Disabled, TRUE, End;
+    ui.inspCloseOnExit = MUI_MakeObject(MUIO_Checkmark, NULL);
+    set(ui.inspCloseOnExit, MUIA_Disabled, TRUE);
+    Object *launchBox = (Object *)NewObject(mccPaintGroup->mcc_Class, NULL,
+        PGA_Mode, PM_Box, PGA_Layout, (IPTR)&kLaunchBox,
+        Child, (IPTR)textObj("When starting up, launch:", g_fonts.bold13, 0, 256, 17),
+        Child, (IPTR)ui.inspLaunch,
+        Child, (IPTR)(HGroup, MUIA_Group_Spacing, 4, MUIA_InnerLeft, 0, MUIA_InnerRight, 0,
+            MUIA_InnerTop, 0, MUIA_InnerBottom, 0,
+            Child, (IPTR)ui.inspCloseOnExit,
+            Child, (IPTR)newLabel("Close window after exiting", g_fonts.system13, 0xA0A0A0, 0,
+                                  textWidthOf(g_fonts.system13, "Close window after exiting") + 2, 18),
+            Child, (IPTR)(RectangleObject, End), End),
+        TAG_DONE);
+    Object *gameboxPage = (Object *)NewObject(mccPaintGroup->mcc_Class, NULL,
+        PGA_Mode, PM_Panel, PGA_Layout, (IPTR)&kGameboxPage,
+        Child, (IPTR)ui.inspWell,
+        // AROS: a click on the well, not a drop (no drag and drop yet).
+        Child, (IPTR)newLabel("Click the icon to choose your own\ncover art for this game.",
+                              g_fonts.small11, 0x000000, 1, 256, 29, 0xFFFFFF, 1),
+        Child, (IPTR)ui.inspName,
+        Child, (IPTR)ui.inspCover,
+        Child, (IPTR)ui.inspNote,
+        Child, (IPTR)launchBox,
+        TAG_DONE);
+
     Object *pages[5];
     for (int i = 0; i < 5; ++i) {
         if (i == 1) { pages[i] = cpu; continue; }
+        if (i == 0) { pages[i] = gameboxPage; continue; }
         static char msg[5][80];
         std::snprintf(msg[i], 80, "%s panel:\nnot part of UI slice A", kTabLabels[i]);
         pages[i] = (Object *)NewObject(mccPaintGroup->mcc_Class, NULL,
@@ -803,6 +902,9 @@ struct SessionArgs {
     bool harness = false;   // HARNESS=1: test keys (header comment)
     bool fontCheck = false; // FONTCHECK=1: log the per-glyph font check (openFonts)
     std::string missingGamebox;   // sidecar icon whose gamebox is not there
+    // That icon's GAMEBOX and BOXERID ToolTypes: they find the
+    // gamebox when the icon and the gamebox no longer have the same name.
+    std::string sidecarGamebox, sidecarId;
     // D2 data directory. data (DATA) overrides it for one session only;
     // dataDirChosen (DATADIR, or the BOXER_DATADIR variable) sets the
     // configured one without a requester (setup and test harness).
@@ -1866,8 +1968,13 @@ static void readToolTypes(struct WBArg *arg, const char *what) {
             const std::string key = upper(t.substr(0, eq));
             // A sidecar's GAMEBOX/BOXERID (O10) only help find a gamebox
             // that moved; taken as arguments, a relative GAMEBOX would
-            // replace the gamebox the icon itself resolves to.
-            if (!std::strcmp(what, "project") && (key == "GAMEBOX" || key == "BOXERID")) continue;
+            // replace the gamebox the icon itself resolves to. They are kept
+            // for the lookup when that gamebox is missing.
+            if (!std::strcmp(what, "project") && (key == "GAMEBOX" || key == "BOXERID")) {
+                if (key == "GAMEBOX") g_args.sidecarGamebox = t.substr(eq + 1);
+                else g_args.sidecarId = t.substr(eq + 1);
+                continue;
+            }
             if (takeArg(key, t.substr(eq + 1))) ++n;
         }
         FreeDiskObject(dob);
@@ -2212,6 +2319,246 @@ static void resizeRenderTo(int w, int h, bool snap) {
     ChangeWindowBox(win, win->LeftEdge, win->TopEdge, win->Width + (w - cw), win->Height + (h - ch));
 }
 
+// ======================================================= covers and names ===
+// BXCoverArt / BXBootlegCoverArt for the gamebox in hand (the finished
+// import, or the session's gamebox in the Inspector), the sidecar icon that
+// shows the cover, and renaming the gamebox together with its icon.
+
+static boxer::CoverFont g_coverFont;
+static bool g_coverFontTried;
+// Inspector rename while the game runs: the session's drives were mounted
+// from the gamebox's path, so the pair is renamed when the session ends.
+static std::string g_pendingRename;
+static std::string g_pictureDrawer;   // where the last picture was chosen
+
+// The bootleg title font: BoxerSans, which is the system's Vera Sans
+// file, until a free replacement for Marker Felt is chosen.
+static const boxer::CoverFont &coverFont() {
+    if (!g_coverFontTried) {
+        g_coverFontTried = true;
+        const char *path = "Fonts:TrueType/VeraSans.ttf";
+        bool ok = g_coverFont.loadFile(path);
+        logf("cover: title font %s %s", path, ok ? "loaded" : "NOT loaded (covers get no title)");
+    }
+    return g_coverFont;
+}
+
+// -[BXSession representedIcon]: the recorded cover, a picture made into box
+// art, else the bootleg cover of the recorded or detected medium.
+static boxer::RGBAImage renderGameboxCover(const boxer::Gamebox &box) {
+    boxer::CoverChoice c = boxer::readCoverChoice(box);
+    // A gamebox without a record (made elsewhere): the medium is detected
+    // from the gamebox each time; nothing is written into it just for
+    // showing it.
+    if (!box.gameInfo().get("AROSCoverArt")) c.detected = boxer::mediumOfGameAt(box.path());
+    if (c.style == boxer::CoverStyle::Picture) {
+        boxer::RGBAImage pic;
+        std::string err;
+        if (boxer::loadPicture(boxer::fsutil::join(box.path(), c.picture), pic, &err))
+            return boxer::renderCoverArt(pic, boxer_ui::boxArtShine());
+        logf("cover: picture of %s not readable (%s); bootleg cover shown", box.path().c_str(), err.c_str());
+    }
+    const boxer::ReleaseMedium m = c.bootlegMedium();
+    return boxer::renderBootleg(m, box.gameName(), boxer_ui::bootlegArt(m), coverFont());
+}
+
+// A gamebox without a cover record gets the medium the original would
+// have detected (IS:581-609: the source folder while it exists, else the
+// gamebox), recorded so later renders do not depend on the source.
+static void ensureCoverRecord(boxer::Gamebox &box, const std::string &source) {
+    if (box.gameInfo().get("AROSCoverArt")) return;
+    boxer::CoverChoice c;
+    const std::string where = !source.empty() && boxer::fsutil::isDirectory(source) ? source : box.path();
+    c.detected = boxer::mediumOfGameAt(where);
+    boxer::setCoverChoice(box, c);
+    std::string err;
+    bool ok = box.saveGameInfo(&err);
+    logf("cover: %s detected as medium \"%s\" from %s -> %s%s", box.path().c_str(), boxer::mediumName(c.detected),
+         where.c_str(), ok ? "recorded" : "NOT recorded: ", err.c_str());
+}
+
+// Renders the cover and writes it as the sidecar icon "<iconStem>.info".
+// replaceOwn: an existing icon is replaced only when it is this gamebox's.
+static bool writeCoverIcon(const std::string &gameboxPath, const std::string &iconStem, bool replaceOwn,
+                           std::string &err, boxer::RGBAImage *rendered = nullptr) {
+    boxer::Gamebox box;
+    if (!box.open(gameboxPath, &err)) return false;
+    bool persisted = true;
+    const std::string id = box.ensureIdentifier(&persisted, &err);
+    if (id.empty() || !persisted) {
+        if (err.empty()) err = "the gamebox has no identifier";
+        return false;
+    }
+    boxer::RGBAImage icon = renderGameboxCover(box);
+    if (rendered) *rendered = icon;
+    bool ok = boxer::writeSidecarIcon(iconStem, icon, id, boxer::fsutil::baseName(gameboxPath), replaceOwn, &err);
+    logf("cover: icon %s.info %s%s", iconStem.c_str(), ok ? "written" : "NOT written: ", err.c_str());
+    return ok;
+}
+
+static void showCover(Object *well, Object *cycle, Object *name, const std::string &gameboxPath) {
+    boxer::Gamebox box;
+    if (!box.open(gameboxPath)) {
+        coverWellSetImage(well, nullptr, 0, 0);
+        return;
+    }
+    const boxer::RGBAImage icon = renderGameboxCover(box);
+    coverWellSetImage(well, icon.px.data(), icon.w, icon.h);
+    const boxer::CoverChoice c = boxer::readCoverChoice(box);
+    for (int i = 0; i < 5; ++i)
+        if (kCoverStyles[i] == c.style) nnset(cycle, MUIA_Cycle_Active, i);
+    if (name) nnset(name, MUIA_String_Contents, (IPTR)box.gameName().c_str());
+}
+
+// ASL file requester for a picture (BXCoverArtWell takes any image).
+static std::string pickPicture() {
+    std::string out;
+    AslBase = OpenLibrary((STRPTR)"asl.library", 37);
+    if (!AslBase) { logf("cover: asl.library not available"); return out; }
+    const std::string start = g_pictureDrawer.empty() ? std::string("SYS:") : g_pictureDrawer;
+    struct FileRequester *fr = (struct FileRequester *)AllocAslRequestTags(ASL_FileRequest,
+        ASLFR_TitleText, (IPTR)"Choose a picture for the game's cover",
+        ASLFR_InitialDrawer, (IPTR)start.c_str(),
+        ASLFR_DoPatterns, TRUE,
+        ASLFR_InitialPattern, (IPTR)"#?.(png|jpg|jpeg|iff|ilbm|gif|bmp)", TAG_DONE);
+    if (fr) {
+        if (AslRequest(fr, NULL) && fr->fr_File && fr->fr_File[0]) {
+            g_pictureDrawer = fr->fr_Drawer ? (const char *)fr->fr_Drawer : "";
+            out = boxer::fsutil::join(g_pictureDrawer, (const char *)fr->fr_File);
+        }
+        FreeAslRequest(fr);
+    }
+    CloseLibrary(AslBase);
+    AslBase = nullptr;
+    return out;
+}
+
+static std::string iconStemOf(const std::string &gameboxPath) {
+    return boxer::fsutil::stripExtension(boxer::fsutil::trimTrailingSlash(gameboxPath));
+}
+
+// Cover choice from the cycle (index into kCoverStyles) or the well (-1:
+// a picture). Records it, redraws the well and rewrites the icon.
+static void changeCover(const std::string &gameboxPath, int index, Object *win, Object *well, Object *cycle,
+                        Object *name) {
+    boxer::Gamebox box;
+    std::string err;
+    if (!box.open(gameboxPath, &err)) {
+        MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)err.c_str());
+        return;
+    }
+    const boxer::CoverStyle style = index < 0 ? boxer::CoverStyle::Picture : kCoverStyles[index];
+    bool ok = true;
+    if (style == boxer::CoverStyle::Picture) {
+        const std::string pic = pickPicture();
+        if (pic.empty()) { logf("cover: picture chooser cancelled"); showCover(well, cycle, nullptr, gameboxPath); return; }
+        // Only a picture the datatypes can read is taken into the gamebox.
+        boxer::RGBAImage probe;
+        if (!box.gameInfo().get("AROSCoverArt")) {
+            // Kept in the record, for a later return to the bootleg cover.
+            boxer::CoverChoice c;
+            c.detected = boxer::mediumOfGameAt(box.path());
+            boxer::setCoverChoice(box, c);
+        }
+        ok = boxer::loadPicture(pic, probe, &err) && boxer::storeCoverPicture(box, pic, &err);
+        logf("cover: picture \"%s\" (%dx%d) -> %s%s", pic.c_str(), probe.w, probe.h, ok ? "stored" : "NOT stored: ", err.c_str());
+        if (!ok) {
+            std::string text = "This picture cannot be used as the cover:\n" + err;
+            MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
+        }
+    } else {
+        boxer::CoverChoice c = boxer::readCoverChoice(box);
+        if (!box.gameInfo().get("AROSCoverArt")) c.detected = boxer::mediumOfGameAt(box.path());
+        const std::string oldPicture = c.style == boxer::CoverStyle::Picture ? c.picture : std::string();
+        c.style = style;
+        boxer::setCoverChoice(box, c);
+        ok = box.saveGameInfo(&err);
+        // BXImportFinishedPanelController addCoverArt: with no image the
+        // bootleg icon comes back; the picture file is not needed then.
+        if (ok && !oldPicture.empty()) std::remove(boxer::fsutil::join(box.path(), oldPicture).c_str());
+        logf("cover: style %s -> %s%s", boxer::coverStyleName(style), ok ? "recorded" : "NOT recorded: ", err.c_str());
+        if (!ok) MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"The cover could not be changed:\n%s", (IPTR)err.c_str());
+    }
+    if (ok && !writeCoverIcon(gameboxPath, iconStemOf(gameboxPath), true, err)) {
+        std::string text = "The cover was changed, but the game's icon could not be updated:\n" + err;
+        MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
+    }
+    showCover(well, cycle, name, gameboxPath);
+}
+
+// setGameboxName: for the gamebox and its icon. Returns the gamebox's path afterwards;
+// every outcome but a clean rename is reported.
+static std::string renameGamebox(const std::string &gameboxPath, const std::string &newName, Object *win) {
+    boxer::RenameOutcome o = boxer::renameGameboxPair(gameboxPath, newName,
+        [](const std::string &stem, std::string *err) {
+            // The bootleg title follows the name (IS:501-502); the icon's
+            // GAMEBOX ToolType names the renamed gamebox.
+            std::string e;
+            bool ok = writeCoverIcon(stem + ".boxer", stem, true, e);
+            if (err) *err = e;
+            return ok;
+        });
+    logf("rename: \"%s\" -> \"%s\": outcome %d, now \"%s\"%s%s", gameboxPath.c_str(), newName.c_str(), (int)o.kind,
+         o.gameboxPath.c_str(), o.message.empty() ? "" : ": ", o.message.c_str());
+    if (!o.message.empty())
+        MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)o.message.c_str());
+    return o.gameboxPath;
+}
+
+// The finished panel's name field: committed on Return and before the
+// window is left (BXImportFinishedPanelController launchGamebox:).
+static bool commitImportName() {
+    STRPTR text = nullptr;
+    get(ui.impName, MUIA_String_Contents, &text);
+    const std::string want = text ? (const char *)text : "";
+    if (want == g_import.gameName()) return true;
+    const std::string now = renameGamebox(g_import.createdGamebox, want, ui.imp);
+    g_import.createdGamebox = now;
+    showCover(ui.impWell, ui.impCover, ui.impName, now);   // the field shows the name it has now
+    std::string line = "\"" + g_import.gameName() + "\" is in " + g_import.gamesFolder + ".";
+    set(ui.impDoneText, MUIA_Text_Contents, (IPTR)line.c_str());
+    return g_import.gameName() == boxer::validGameboxName(want);
+}
+
+// Inspector Gamebox tab for the session's gamebox; ghosted without one.
+static void inspectorGameboxSync() {
+    boxer::Gamebox box;
+    const bool have = !g_args.gamebox.empty() && box.open(g_args.gamebox);
+    set(ui.tabs[0], MUIA_Disabled, !have);
+    if (!have) return;
+    showCover(ui.inspWell, ui.inspCover, ui.inspName, g_args.gamebox);
+    std::string launch = "Nothing (show a DOS prompt)";
+    for (const auto &l : box.launchers())
+        if (l.isDefault) launch = l.title.empty() ? l.path : l.title;
+    set(ui.inspLaunch, MUIA_Text_Contents, (IPTR)launch.c_str());
+    nnset(ui.inspCloseOnExit, MUIA_Selected, box.closeAfterDefaultProgram());
+    if (!g_pendingRename.empty()) nnset(ui.inspName, MUIA_String_Contents, (IPTR)g_pendingRename.c_str());
+}
+
+// Inspector name field: checked now, applied when the session ends.
+static void inspectorRename() {
+    STRPTR text = nullptr;
+    get(ui.inspName, MUIA_String_Contents, &text);
+    const std::string want = text ? (const char *)text : "";
+    std::string name, msg;
+    const boxer::NameCheck c = boxer::checkGameboxRename(g_args.gamebox, want, name, &msg);
+    logf("rename (inspector): \"%s\" -> check %d \"%s\"", want.c_str(), (int)c, name.c_str());
+    if (c == boxer::NameCheck::Unchanged) {
+        g_pendingRename.clear();
+        setLabelText(ui.inspNote, "");
+        return;
+    }
+    if (c != boxer::NameCheck::Ok) {
+        MUI_Request(ui.app, ui.insp, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)msg.c_str());
+        nnset(ui.inspName, MUIA_String_Contents,
+              (IPTR)(g_pendingRename.empty() ? boxer::fsutil::baseName(iconStemOf(g_args.gamebox)) : g_pendingRename).c_str());
+        return;
+    }
+    g_pendingRename = name;
+    nnset(ui.inspName, MUIA_String_Contents, (IPTR)name.c_str());
+    setLabelText(ui.inspNote, ("Renamed to \"" + name + "\" when the game is closed.").c_str());
+}
+
 // Returns false to end the application.
 // BXImportWindowController panel choice for the session's stage.
 static void showImportStage() {
@@ -2258,6 +2605,7 @@ static void showImportStage() {
     case S::Finished: {
         std::string line = "\"" + g_import.gameName() + "\" is in " + g_import.gamesFolder + ".";
         set(ui.impDoneText, MUIA_Text_Contents, (IPTR)line.c_str());
+        showCover(ui.impWell, ui.impCover, ui.impName, g_import.createdGamebox);
         set(ui.impPages, MUIA_Group_ActivePage, 4);
         break;
     }
@@ -2319,49 +2667,6 @@ static void importAbandon(const std::string &why) {
             "The game folder " + source + " was not changed.";
         MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
     }
-}
-
-// Sidecar launch icon "<name>.info" beside "<name>.boxer" (D1, O10). The
-// image is BoxerUI's own icon for now (cover art: plan 3.9). A failure is
-// reported but does not undo the import: the gamebox is complete without it.
-static bool writeSidecarIcon(std::string &error) {
-    struct Library *base = OpenLibrary((STRPTR)"icon.library", 0);
-    if (!base) { error = "icon.library not available"; return false; }
-    struct Library *saved = IconBase;
-    IconBase = base;
-    struct DiskObject *dob = GetDiskObject((CONST_STRPTR)"PROGDIR:BoxerUI");
-    if (!dob) dob = GetDefDiskObject(WBPROJECT);
-    bool ok = false;
-    if (!dob) {
-        error = "no icon image";
-    } else {
-        const auto tt = boxer::sidecarToolTypes(g_import.createdIdentifier, g_import.gameName() + ".boxer");
-        STRPTR types[3] = {(STRPTR)tt[0].c_str(), (STRPTR)tt[1].c_str(), nullptr};
-        const UBYTE type = dob->do_Type;
-        STRPTR tool = dob->do_DefaultTool, *oldTypes = dob->do_ToolTypes;
-        LONG x = dob->do_CurrentX, y = dob->do_CurrentY;
-        dob->do_Type = WBPROJECT;
-        dob->do_DefaultTool = (STRPTR)"Boxer:BoxerUI";
-        dob->do_ToolTypes = types;
-        dob->do_CurrentX = NO_ICON_POSITION;
-        dob->do_CurrentY = NO_ICON_POSITION;
-        const std::string path = boxer::fsutil::join(g_import.gamesFolder, g_import.gameName());
-        // createGamebox chose a name with no .info; one that appeared since
-        // belongs to someone else and is never overwritten.
-        if (boxer::fsutil::exists(path + ".info")) {
-            error = path + ".info already exists; it was left unchanged";
-        } else {
-            ok = PutDiskObject((CONST_STRPTR)path.c_str(), dob);
-            if (!ok) error = "could not write " + path + ".info";
-        }
-        // FreeDiskObject frees what GetDiskObject allocated, not our strings.
-        dob->do_Type = type; dob->do_DefaultTool = tool; dob->do_ToolTypes = oldTypes;
-        dob->do_CurrentX = x; dob->do_CurrentY = y;
-        FreeDiskObject(dob);
-    }
-    IconBase = saved;
-    CloseLibrary(base);
-    return ok;
 }
 
 // BXCloseAlert closeAlertWhileRunningInstaller. Returns false for Cancel.
@@ -2494,8 +2799,12 @@ static bool handleId(ULONG id) {
                         (char *)"The startup program could not be saved:\n%s", (IPTR)err.c_str());
             break;
         }
+        // Sidecar launch icon "<name>.info" beside "<name>.boxer",
+        // showing the cover. A failure is reported but does not undo
+        // the import: the gamebox is complete without it.
+        ensureCoverRecord(box, g_import.sourcePath);
         std::string iconErr;
-        bool icon = writeSidecarIcon(iconErr);
+        bool icon = writeCoverIcon(g_import.createdGamebox, iconStemOf(g_import.createdGamebox), false, iconErr);
         logf("import: sidecar icon %s%s", icon ? "written" : "NOT written: ", iconErr.c_str());
         if (!icon)
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
@@ -2540,6 +2849,9 @@ static bool handleId(ULONG id) {
         // sidecar icon: a SystemTags start left BoxerUI's drawer locked after
         // both processes ended (SystemTags drops NP_HomeDir, L6 bisect), the
         // icon start did not. This process ends only after the open succeeded.
+        // A name being typed is committed first; a refused one keeps the
+        // panel (launchGamebox: makeFirstResponder:nil fails on validation).
+        if (!commitImportName()) break;
         const std::string icon = boxer::fsutil::join(g_import.gamesFolder, g_import.gameName());
         struct Library *wb = OpenLibrary((STRPTR)"workbench.library", 44);
         BOOL ok = FALSE;
@@ -2560,15 +2872,40 @@ static bool handleId(ULONG id) {
         return false;   // quit this BoxerUI
     }
     case ID_IMPORT_DONE_CLOSE:
+        if (!commitImportName()) break;
         set(ui.imp, MUIA_Window_Open, FALSE);
         logf("import: finished window closed");
         break;
+    case ID_IMPORT_NAME:
+        if (g_import.stage == boxer::ImportStage::Finished) commitImportName();
+        break;
+    case ID_IMPORT_COVER:
+    case ID_IMPORT_WELL: {
+        if (g_import.stage != boxer::ImportStage::Finished) break;
+        IPTR idx = 0;
+        get(ui.impCover, MUIA_Cycle_Active, &idx);
+        changeCover(g_import.createdGamebox, id == ID_IMPORT_WELL ? -1 : (int)idx, ui.imp, ui.impWell, ui.impCover,
+                    ui.impName);
+        break;
+    }
+    case ID_INSP_NAME:
+        if (!g_args.gamebox.empty()) inspectorRename();
+        break;
+    case ID_INSP_COVER:
+    case ID_INSP_WELL: {
+        if (g_args.gamebox.empty()) break;
+        IPTR idx = 0;
+        get(ui.inspCover, MUIA_Cycle_Active, &idx);
+        changeCover(g_args.gamebox, id == ID_INSP_WELL ? -1 : (int)idx, ui.insp, ui.inspWell, ui.inspCover, nullptr);
+        break;
+    }
     case ID_IMPORT_CLOSE:
         if (g_import.stage == boxer::ImportStage::RunningInstaller) {
             if (g_ss.running) askEndInstaller();
             break;
         }
         if (g_import.stage == boxer::ImportStage::Finished) {
+            if (!commitImportName()) break;
             set(ui.imp, MUIA_Window_Open, FALSE);
             break;
         }
@@ -2778,6 +3115,67 @@ static bool handleId(ULONG id) {
     return true;
 }
 
+// A sidecar icon whose "<name>.boxer" is not beside it (renamed or moved
+// apart, or a rename that could not take the icon along): its GAMEBOX
+// and BOXERID ToolTypes find the gamebox. One gamebox with the icon's
+// identifier is offered with a repair of the icon's name; anything else
+// (several, or a GAMEBOX whose identifier differs) is the user's choice.
+// Sets g_args.gamebox when the user picks one. Runs before the windows.
+static void findSidecarGamebox() {
+    const std::string stem = iconStemOf(g_args.missingGamebox);
+    const std::string folder = boxer::fsutil::parent(stem);
+    const auto found = boxer::locateSidecarGamebox(folder, g_args.sidecarGamebox, g_args.sidecarId);
+    logf("start: sidecar \"%s\" (GAMEBOX \"%s\", BOXERID \"%s\"): %u candidate(s)", stem.c_str(),
+         g_args.sidecarGamebox.c_str(), g_args.sidecarId.c_str(), (unsigned)found.size());
+    if (found.empty()) return;
+    const std::string iconName = boxer::fsutil::baseName(stem);
+    std::string chosen;
+    if (boxer::sidecarLookupIsCertain(found)) {
+        const std::string game = boxer::fsutil::baseName(iconStemOf(found[0].path));
+        LONG r = ask("The icon \"%s\" belongs to the game that is now called \"%s\".\n\n"
+                     "Should Boxer give the icon the game's name?",
+                     "Rename the icon|Open without renaming|Cancel", iconName.c_str(), game.c_str());
+        logf("start: sidecar lookup -> answer %d", (int)r);
+        if (r == 0) return;
+        chosen = found[0].path;
+        if (r == 1) {
+            std::string err;
+            bool ok = boxer::repairSidecarName(stem, chosen, [](const std::string &s, std::string *e) {
+                std::string m;
+                bool w = writeCoverIcon(s + ".boxer", s, true, m);
+                if (e) *e = m;
+                return w;
+            }, &err);
+            logf("start: icon \"%s\" renamed for \"%s\" -> %s%s", stem.c_str(), chosen.c_str(),
+                 ok ? "ok" : "FAILED: ", err.c_str());
+            if (!ok) ask("The icon could not be renamed:\n%s\n\nThe game opens anyway.", "OK", err.c_str());
+        }
+    } else {
+        // Ask, never guess: list what was found (at most three choices).
+        std::string text = "The icon \"" + iconName + "\" no longer has a game of the same name beside it.\n"
+                           "These games match it:\n";
+        std::string gadgets;
+        const size_t n = std::min<size_t>(found.size(), 3);
+        for (size_t i = 0; i < found.size(); ++i) {
+            const std::string g = boxer::fsutil::baseName(iconStemOf(found[i].path));
+            text += "\n  " + g + (found[i].identifierMatches ? " (same identifier)" : " (named by the icon, other identifier)");
+            if (i < n) gadgets += g + "|";
+        }
+        text += "\n\nWhich game should open?";
+        gadgets += "Cancel";
+        // EasyRequest formats its text: a % in a name must not be taken as one.
+        std::string safe;
+        for (char c : text) { safe += c; if (c == '%') safe += '%'; }
+        LONG r = ask(safe.c_str(), gadgets.c_str());
+        logf("start: sidecar lookup, %u matches -> answer %d", (unsigned)found.size(), (int)r);
+        if (r <= 0 || (size_t)r > n) return;
+        chosen = found[r - 1].path;
+    }
+    g_args.gamebox = chosen;
+    g_args.missingGamebox.clear();
+    g_screen = "dos";
+}
+
 int main(int argc, char **argv) {
     memInit();
     if (memcp("main-entry")) { memDone(); return 0; }
@@ -2788,7 +3186,7 @@ int main(int argc, char **argv) {
     applyDefaults();
     if (!g_args.gamebox.empty() || g_args.kind == "dos") g_screen = "dos";
     g_log = std::fopen(g_logPath.c_str(), "w");
-    const char *screen = g_screen.c_str();
+    const char *screen = g_screen.c_str();   // refreshed if a sidecar lookup changes g_screen
     logf("BoxerUI, built %s %s, abi %s, screen=%s", __DATE__, __TIME__,
 #ifdef BOXER_ABI
          BOXER_ABI,
@@ -2824,6 +3222,10 @@ int main(int argc, char **argv) {
              g_args.kind.c_str());
     }
 
+    if (!g_args.missingGamebox.empty() && g_args.gamebox.empty()) {
+        findSidecarGamebox();
+        screen = g_screen.c_str();
+    }
     if (!g_args.missingGamebox.empty() && g_args.gamebox.empty()) {
         logf("error: gamebox not found: \"%s\" (the icon was moved or renamed without it)",
              g_args.missingGamebox.c_str());
@@ -2923,6 +3325,12 @@ int main(int argc, char **argv) {
     notifyId(ui.impBack2, MUIA_Pressed, FALSE, ID_IMPORT_BACK2);
     notifyId(ui.impCreate, MUIA_Pressed, FALSE, ID_IMPORT_CREATE);
     notifyId(ui.impStop, MUIA_Pressed, FALSE, ID_IMPORT_STOP);
+    notifyId(ui.impName, MUIA_String_Acknowledge, MUIV_EveryTime, ID_IMPORT_NAME);
+    notifyId(ui.impCover, MUIA_Cycle_Active, MUIV_EveryTime, ID_IMPORT_COVER);
+    notifyId(ui.impWell, MUIA_Pressed, FALSE, ID_IMPORT_WELL);
+    notifyId(ui.inspName, MUIA_String_Acknowledge, MUIV_EveryTime, ID_INSP_NAME);
+    notifyId(ui.inspCover, MUIA_Cycle_Active, MUIV_EveryTime, ID_INSP_COVER);
+    notifyId(ui.inspWell, MUIA_Pressed, FALSE, ID_INSP_WELL);
 
     notifyId(ui.dos, MUIA_Window_CloseRequest, TRUE, ID_QUIT);
     notifyId(ui.programs, MUIA_Selected, MUIV_EveryTime, ID_PROGRAMS);
@@ -2976,6 +3384,8 @@ int main(int argc, char **argv) {
     set(ui.dynamic, MUIA_Disabled, TRUE);
     set(ui.helpBtn, MUIA_Disabled, TRUE);
     for (int i = 2; i < 5; ++i) set(ui.tabs[i], MUIA_Disabled, TRUE);
+    // Gamebox: name and cover of the session's gamebox; ghosted without one.
+    inspectorGameboxSync();
 
     g_wins[0] = ui.welcome; g_wins[1] = ui.dos; g_wins[2] = ui.insp; g_wins[3] = ui.fs;
     for (Object *w : g_wins) notifyId(w, MUIA_Window_Activate, MUIV_EveryTime, ID_ACTIVATION);
@@ -3056,6 +3466,13 @@ int main(int argc, char **argv) {
         get(ui.insp, MUIA_Window_Open, &w3); get(ui.fs, MUIA_Window_Open, &w4);
         IPTR w5 = 0; get(ui.imp, MUIA_Window_Open, &w5);
         if (!w1 && !w2 && !w3 && !w4 && !w5 && !g_inst.pending) running = false;
+    }
+    // An Inspector rename waits for the session's end (its drives were
+    // mounted from the old path); the gamebox and its icon are renamed now.
+    if (!g_pendingRename.empty() && !g_args.gamebox.empty()) {
+        const std::string now = renameGamebox(g_args.gamebox, g_pendingRename, nullptr);
+        logf("rename (inspector, at session end): now \"%s\"", now.c_str());
+        g_pendingRename.clear();
     }
     // IS:1579 _cleanup: an import that did not finish takes its gamebox
     // with it, and only that directory (R1).

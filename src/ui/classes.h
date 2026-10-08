@@ -128,6 +128,11 @@ extern RenderEvents g_renderEvents;
 
 void setLabelText(Object *label, const char *text);
 
+// Cover well (BXCoverArtWell / BXImportIconDropzone): shows an RGBA cover,
+// centred; a click sends MUIA_Pressed. The pixels are copied.
+Object *newCoverWell();
+void coverWellSetImage(Object *well, const uint8_t *rgba, int w, int h);
+
 // ---- Launch panel (LaunchPanel.xib, LauncherHeading/Favorite/Item.xib) ----
 // The panel: a 40 pt search bar (PaintGroup) over a Scrollgroup whose
 // contents are a LauncherList (Virtgroup subclass) of LauncherItems. The

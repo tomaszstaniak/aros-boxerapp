@@ -10,7 +10,10 @@ the foundation for the port; it is not yet the complete Boxer experience.
 ## What this preview can do
 
 Import a game folder, run its installer or copy a ready-to-play game,
-choose its startup program, and launch it from its icon. You can play, save
+choose its startup program, give it a name and a cover, and launch it from
+its icon. As in Boxer, the cover is a CD case or a 3.5" or 5.25" diskette
+labelled with the game's name, or a picture of your own; the game's icon
+shows it. You can play, save
 using the game's own save system, close the session, and reopen the game to
 continue. Game saves and other changes made during play are stored
 separately in **Boxer Data**, so the imported gamebox stays unchanged.
@@ -41,7 +44,9 @@ an early preview: sessions can freeze, including when leaving a game
 installer, and closing a hung session can crash AROS. These problems are
 still under investigation. Game compatibility is not yet broadly tested.
 Not yet tested: paths containing spaces, importing from LhA archives, and
-keeping icons a game folder already has.
+keeping icons a game folder already has. The labels of the generated covers
+use the system's Vera Sans for now: Boxer's Marker Felt is an Apple font and
+cannot be included.
 
 ## Install
 

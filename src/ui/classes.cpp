@@ -1137,6 +1137,85 @@ Object *newToolTab(int icon, const char *label) {
     return o;
 }
 
+// ========================================================== CoverWell ====
+// The gamebox's cover as the user sees it: BXImportIconDropzone on the
+// finished panel and BXCoverArtWell in the Inspector (128 x 128 at x=84 in
+// Inspector.xib). An Area subclass drawing the
+// composed RGBA cover over the parent background. AROS: no drag and drop in
+// this increment, so a click (RelVerify) asks for a picture instead of a drop.
+struct CWData { uint8_t *rgba; int w, h; };
+static struct MUI_CustomClass *mccCover;
+
+BOOPSI_DISPATCHER(IPTR, CW_Dispatcher, cl, obj, msg)
+{
+    CWData *d;
+    switch (msg->MethodID) {
+    case OM_DISPOSE:
+        d = (CWData *)INST_DATA(cl, obj);
+        delete[] d->rgba;
+        d->rgba = nullptr;
+        break;
+    case OM_SET:
+        ownDisabledLook(obj, (struct opSet *)msg);
+        break;
+    case MUIM_AskMinMax: {
+        IPTR r = DoSuperMethodA(cl, obj, msg);
+        struct MUI_MinMax *mm = ((struct MUIP_AskMinMax *)msg)->MinMaxInfo;
+        // 128 pt plus the original's 6 pt highlight margin on every side.
+        mm->MinWidth += 140; mm->DefWidth += 140; mm->MaxWidth += 140;
+        mm->MinHeight += 140; mm->DefHeight += 140; mm->MaxHeight += 140;
+        return r;
+    }
+    case MUIM_Draw: {
+        IPTR r = DoSuperMethodA(cl, obj, msg);
+        if (!(((struct MUIP_Draw *)msg)->flags & (MADF_DRAWOBJECT | MADF_DRAWUPDATE))) return r;
+        d = (CWData *)INST_DATA(cl, obj);
+        Canvas cv;
+        grabBackground(obj, cv);
+        IPTR sel = 0, dis = 0;
+        get(obj, MUIA_Selected, &sel);
+        get(obj, MUIA_Disabled, &dis);
+        if (sel)   // stand-in for the keyboard-focus glow while pressed
+            paintLayers(cv, 0, 0, cv.w, cv.h,
+                        {{{rrect(1, 1, cv.w - 2.0, cv.h - 2.0, 6)}, 0x3874D8, 0x3874D8, 0.25}});
+        if (d->rgba) {
+            Image img;
+            img.w = d->w; img.h = d->h;
+            img.rgba.assign(d->rgba, d->rgba + (size_t)d->w * d->h * 4);
+            drawImage(cv, (cv.w - d->w) / 2, (cv.h - d->h) / 2, img, dis ? 0.4 : 1.0);
+        }
+        blit(obj, cv, _left(obj), _top(obj));
+        return r;
+    }
+    }
+    return DoSuperMethodA(cl, obj, msg);
+}
+BOOPSI_DISPATCHER_END
+
+Object *newCoverWell() {
+    Object *o = (Object *)NewObject(mccCover->mcc_Class, NULL,
+                                    MUIA_FillArea, FALSE,
+                                    MUIA_InputMode, MUIV_InputMode_RelVerify,
+                                    MUIA_ShowSelState, FALSE,
+                                    MUIA_CycleChain, 1,
+                                    TAG_DONE);
+    return o;
+}
+
+void coverWellSetImage(Object *well, const uint8_t *rgba, int w, int h) {
+    if (!well) return;
+    CWData *d = (CWData *)INST_DATA(mccCover->mcc_Class, well);
+    delete[] d->rgba;
+    d->rgba = nullptr;
+    d->w = d->h = 0;
+    if (rgba && w > 0 && h > 0) {
+        d->rgba = new uint8_t[(size_t)w * h * 4];
+        std::memcpy(d->rgba, rgba, (size_t)w * h * 4);
+        d->w = w; d->h = h;
+    }
+    MUI_Redraw(well, MADF_DRAWOBJECT);
+}
+
 // ========================================================== BxSlider ====
 // NSSlider (controlSize small, linear) as a subclass of the standard Numeric
 // class, the superclass of Zune's Slider. Why not a subclass of Slider:
@@ -2202,12 +2281,13 @@ bool createClasses() {
     mccLList   = MUI_CreateCustomClass(NULL, (ClassID)MUIC_Virtgroup, NULL, sizeof(LLData), (APTR)LL_Dispatcher);
     mccLItem   = MUI_CreateCustomClass(NULL, (ClassID)MUIC_Area, NULL, sizeof(LIData), (APTR)LI_Dispatcher);
     mccSearch  = MUI_CreateCustomClass(NULL, (ClassID)MUIC_String, NULL, sizeof(SFData), (APTR)SF_Dispatcher);
+    mccCover   = MUI_CreateCustomClass(NULL, (ClassID)MUIC_Area, NULL, sizeof(CWData), (APTR)CW_Dispatcher);
     return mccPaintGroup && mccLabel && mccGlyph && mccWelcome && mccTab && mccSlider && mccRender &&
-           mccLList && mccLItem && mccSearch;
+           mccLList && mccLItem && mccSearch && mccCover;
 }
 
 void deleteClasses() {
-    struct MUI_CustomClass **all[] = {&mccSearch, &mccLItem, &mccLList, &mccRender, &mccSlider, &mccTab,
+    struct MUI_CustomClass **all[] = {&mccCover, &mccSearch, &mccLItem, &mccLList, &mccRender, &mccSlider, &mccTab,
                                       &mccWelcome, &mccGlyph, &mccLabel, &mccPaintGroup};
     for (auto c : all) if (*c) { MUI_DeleteCustomClass(*c); *c = nullptr; }
 }

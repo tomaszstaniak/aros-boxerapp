@@ -59,6 +59,12 @@ python3 "$PROJECT_ROOT/tools/png2inc.py" "$out/gen/boxer_assets.inc" \
   Gamebox="$art/Game.png" RevealTemplate="$repl/RevealTemplate.png" \
   FullScreenTemplate="$repl/FullScreenTemplate.png" \
   LockLockedTemplate="$repl/LockLockedTemplate.png" LockUnlockedTemplate="$repl/LockUnlockedTemplate.png"
+# Cover templates (BXBootlegCoverArt.m) and BoxArtShine at the 128 px icon
+# size (BXCoverArt.m), Boxer originals (GPL-2.0, category a).
+python3 "$PROJECT_ROOT/tools/png2inc.py" "$out/gen/cover_assets.inc" \
+  CDCase="$art/CDCase-128.png" CDCover="$art/CDCover-128.png" \
+  35Diskette="$art/35Diskette-128.png" 35DisketteShine="$art/35DisketteShine-128.png" \
+  525Diskette="$art/525Diskette-128.png" BoxArtShine="$art/BoxArtShine.png@128"
 # Private outline font descriptions (glyph clipping on mainline v1; see
 # tools/make-fonts.py). AROS_ISO_FONTS: an AROS ISO's Fonts/ directory.
 [ -n "${AROS_ISO_FONTS:-}" ] || die "AROS_ISO_FONTS is not set (an AROS ISO's Fonts/ directory)"
@@ -74,7 +80,8 @@ c++ -std=c++17 -Wall -O1 -o "$out/host/launchpanel_test" "$src/tests/launchpanel
   "$src/launchpanel_logic.cpp" "$PROJECT_ROOT"/src/model/*.cpp "$PROJECT_ROOT/src/emulator/filesystem.cpp"
 "$out/host/launchpanel_test" "$out/host/launchpanel scratch"
 
-sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp")
+sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp"
+  "$src/coverassets.cpp")
 # The emulator layer and the model as in build-smoke.sh: files that include
 # the core's headers compile as gnu++14 (DOSBox 0.74's dynamic exception
 # specifications), the model and the UI as C++17.
@@ -84,7 +91,8 @@ core14=(src/emulator/emulator.cpp src/emulator/coalface.cpp src/emulator/filesys
   src/platform/aros/rawkeys.cpp src/platform/aros/coreinput.cpp src/platform/aros/corecontrol.cpp)
 model17=(src/model/fsutil.cpp src/model/plist.cpp src/model/gamebox.cpp
   src/model/datalocations.cpp src/model/shadowfs.cpp src/model/programs.cpp src/model/importsource.cpp src/model/installerscan.cpp src/model/sourcecopy.cpp src/platform/aros/session_setup.cpp
-  src/platform/aros/wbopen.cpp)
+  src/platform/aros/wbopen.cpp src/model/coverart.cpp src/model/coverfont.cpp src/model/gameboxrename.cpp
+  src/platform/aros/coverio.cpp)
 # __FILE__ in assertion messages names the build host's directories; map
 # them to project-relative names (GCC tries the last matching map first,
 # so the core tree, which may lie inside the project, comes last).
@@ -167,14 +175,16 @@ cp "$out/BoxerUI" "$out/stage/BoxerUI"
   echo "sha256: $(shasum -a 256 "$out/BoxerUI" | cut -d' ' -f1)"
   echo "size: $(stat -f %z "$out/BoxerUI")"
   echo "sources:"
-  for f in "${sources[@]}" "$src/classes.h" "$src/gfx.h" "$src/ui_logic.h" "$src/launchpanel_logic.h"; do
+  for f in "${sources[@]}" "$src/classes.h" "$src/gfx.h" "$src/ui_logic.h" "$src/launchpanel_logic.h" "$src/coverassets.h"; do
     echo "  $(shasum -a 256 "$f" | cut -d' ' -f1)  ${f#$PROJECT_ROOT/}"
   done
-  for f in "${core14[@]}" "${model17[@]}" src/platform/aros/coreinput.h src/platform/aros/corecontrol.h src/platform/aros/session_setup.h src/platform/aros/wbopen.h; do
+  for f in "${core14[@]}" "${model17[@]}" src/platform/aros/coreinput.h src/platform/aros/corecontrol.h src/platform/aros/session_setup.h src/platform/aros/wbopen.h \
+    src/model/coverart.h src/model/coverfont.h src/model/gameboxrename.h src/platform/aros/coverio.h third_party/stb/stb_truetype.h; do
     echo "  $(shasum -a 256 "$PROJECT_ROOT/$f" | cut -d' ' -f1)  $f"
   done
   echo "core library: $(shasum -a 256 "$lib" | cut -d' ' -f1)  ${lib#$PROJECT_ROOT/}"
   echo "embedded art: $(shasum -a 256 "$out/gen/boxer_assets.inc" | cut -d' ' -f1)  (tools/png2inc.py, assets/runtime/boxer)"
+  echo "cover templates: $(shasum -a 256 "$out/gen/cover_assets.inc" | cut -d' ' -f1)  (tools/png2inc.py, assets/runtime/boxer)"
   echo "fonts dir: $AROS_ISO_FONTS"
   (cd "$out/stage/Fonts" && shasum -a 256 *) | sed 's/^/  Fonts\//' 
   [ "$BOXER_ABI" = mainline-v1 ] && echo "unwind fix: $(shasum -a 256 "$BUILD_DIR/unwind-fix/unwind-dw2.o" | cut -d' ' -f1)  unwind-dw2.o linked before libgcc (dwarf_reg_size_table present)"
