@@ -270,55 +270,76 @@ static ReplaceFaultHook faultHook;
 void setReplaceFaultHook(ReplaceFaultHook hook) { faultHook = std::move(hook); }
 
 static const char kNewSuffix[] = ".bxnew", kOldSuffix[] = ".bxold";
-// One undeletable old version must not block the next save, so a backup may
-// take a numbered name. Nine is far more than a reader holding a file for a
-// moment can occupy; when all are taken the save fails and the previous
-// version stays.
-static const int kBackupNames = 9;
+// A name that is taken (by someone else's file, or by an old version of
+// ours that cannot be deleted yet) is skipped for a numbered one. Nine is
+// far more than such leftovers can occupy; when all are taken the save
+// fails and the previous version stays.
+static const int kScratchNames = 9;
 
 std::string tempPathFor(const std::string &path) { return path + kNewSuffix; }
 std::string backupPathFor(const std::string &path) { return path + kOldSuffix; }
 
-static std::string backupName(const std::string &path, int n)
+static std::string numbered(const std::string &first, int n)
 {
-	return n <= 1 ? backupPathFor(path) : backupPathFor(path) + "-" + std::to_string(n);
+	return n <= 1 ? first : first + "-" + std::to_string(n);
 }
 
 std::vector<std::string> ownedScratchPaths(const std::string &path)
 {
-	std::vector<std::string> out{tempPathFor(path)};
-	for (int n = 1; n <= kBackupNames; n++)
-		out.push_back(backupName(path, n));
+	std::vector<std::string> out;
+	for (int n = 1; n <= kScratchNames; n++)
+		out.push_back(numbered(tempPathFor(path), n));
+	for (int n = 1; n <= kScratchNames; n++)
+		out.push_back(numbered(backupPathFor(path), n));
 	return out;
 }
 
+// The scratch files this process made and has not removed yet. Only these
+// are ever deleted or renamed back: a file that carries one of the names but
+// was there before is someone else's (or left by a run that crashed, which
+// cannot be told apart) and is never overwritten or removed.
+static std::vector<std::string> createdList;
 static std::vector<std::string> pendingList;
 
 const std::vector<std::string> &pendingCleanup() { return pendingList; }
 
-static void setPending(const std::string &p, bool pending)
+void forgetReplaceOwnership()
 {
-	auto it = std::find(pendingList.begin(), pendingList.end(), p);
-	if (pending && it == pendingList.end())
-		pendingList.push_back(p);
-	else if (!pending && it != pendingList.end())
-		pendingList.erase(it);
+	createdList.clear();
+	pendingList.clear();
 }
 
-// Only a plain file can be one of ours: a drawer that happens to carry the
-// name was made by someone else, and DeleteFile would remove it if empty.
-static bool isOwnedFile(const std::string &p) { return isFile(p); }
+static void setIn(std::vector<std::string> &list, const std::string &p, bool in)
+{
+	auto it = std::find(list.begin(), list.end(), p);
+	if (in && it == list.end())
+		list.push_back(p);
+	else if (!in && it != list.end())
+		list.erase(it);
+}
 
-// Removes one of this code's scratch files; remembered for later when the
-// filesystem refuses (the file is in use).
+static bool created(const std::string &p)
+{
+	return std::find(createdList.begin(), createdList.end(), p) != createdList.end();
+}
+
+// Removes one of this process's scratch files; remembered for later when the
+// filesystem refuses (the file is in use). Anything else is left alone.
 static bool removeOwned(const std::string &p)
 {
-	if (!isOwnedFile(p)) {
-		setPending(p, false);
+	if (!created(p)) {
+		setIn(pendingList, p, false);
+		return true;
+	}
+	if (!exists(p)) {
+		setIn(createdList, p, false);
+		setIn(pendingList, p, false);
 		return true;
 	}
 	const bool ok = ::unlink(p.c_str()) == 0;
-	setPending(p, !ok);
+	setIn(pendingList, p, !ok);
+	if (ok)
+		setIn(createdList, p, false);
 	return ok;
 }
 
@@ -328,6 +349,14 @@ std::vector<std::string> retryPendingCleanup()
 	for (const auto &p : todo)
 		removeOwned(p);
 	return pendingList;
+}
+
+static std::string freeName(const std::string &first)
+{
+	for (int n = 1; n <= kScratchNames; n++)
+		if (!exists(numbered(first, n)))
+			return numbered(first, n);
+	return std::string();
 }
 
 static FaultAction fault(ReplaceStep s)
@@ -348,34 +377,53 @@ static long modifiedTime(const std::string &p)
 	return ::stat(p.c_str(), &st) == 0 ? (long)st.st_mtime : 0;
 }
 
+// Of the existing plain files among names, the newest (a renamed earlier
+// version keeps its date); "" when there is none.
+static std::string newestFile(const std::vector<std::string> &names)
+{
+	std::string pick;
+	for (const auto &n : names)
+		if (isFile(n) && (pick.empty() || modifiedTime(n) >= modifiedTime(pick)))
+			pick = n;
+	return pick;
+}
+
 bool recoverReplace(const std::string &path)
 {
-	std::vector<std::string> backups;
-	for (int n = 1; n <= kBackupNames; n++)
-		if (isOwnedFile(backupName(path, n)))
-			backups.push_back(backupName(path, n));
+	std::vector<std::string> ours, others;
+	for (int n = 1; n <= kScratchNames; n++) {
+		const std::string b = numbered(backupPathFor(path), n);
+		if (!isFile(b))
+			continue;
+		(created(b) ? ours : others).push_back(b);
+	}
 	bool ok = true;
-	if (!exists(path) && !backups.empty()) {
+	if (!exists(path)) {
 		// Interrupted between moving the old version aside and installing
-		// the new one. Each backup is a renamed earlier version and keeps its
-		// date, so the newest is the version the interrupted save replaced.
-		size_t pick = 0;
-		for (size_t i = 1; i < backups.size(); i++)
-			if (modifiedTime(backups[i]) >= modifiedTime(backups[pick]))
-				pick = i;
-		ok = ::rename(backups[pick].c_str(), path.c_str()) == 0;
-		if (ok) {
-			setPending(backups[pick], false);
-			backups.erase(backups.begin() + (long)pick);
+		// the new one.
+		const std::string mine = newestFile(ours);
+		if (!mine.empty()) {
+			ok = ::rename(mine.c_str(), path.c_str()) == 0;
+			if (ok) {
+				setIn(createdList, mine, false);
+				setIn(pendingList, mine, false);
+				ours.erase(std::find(ours.begin(), ours.end(), mine));
+			}
+		} else if (!others.empty()) {
+			// Most likely an earlier run that stopped at that point, but it
+			// cannot be told from someone else's file: the previous version
+			// comes back as a copy and the file itself stays where it is.
+			ok = copyFile(newestFile(others), path);
 		}
 	}
-	// With the file in place every backup is an older version than it.
+	// With the file in place every backup of ours is older than it.
 	if (exists(path))
-		for (const auto &b : backups)
+		for (const auto &b : ours)
 			removeOwned(b);
-	// A leftover temp was never committed; whether complete or not, it is
+	// A temp of ours was never committed; whether complete or not, it is
 	// not trusted.
-	removeOwned(tempPathFor(path));
+	for (int n = 1; n <= kScratchNames; n++)
+		removeOwned(numbered(tempPathFor(path), n));
 	return ok;
 }
 
@@ -384,26 +432,26 @@ bool replaceFile(const std::string &path, const std::string &data, std::string *
 	retryPendingCleanup();
 	if (!recoverReplace(path))
 		return fail(error, "cannot restore " + path + " from an earlier interrupted save");
-	const std::string tmp = tempPathFor(path);
-	if (exists(tmp))
-		return fail(error, "cannot write " + tmp + ": the name is in use");
+	const std::string tmp = freeName(tempPathFor(path));
+	if (tmp.empty())
+		return fail(error, "cannot write the new version of " + path + ": " + tempPathFor(path) +
+		                       " and its numbered alternatives are all in use");
 
 	FaultAction a = fault(ReplaceStep::WriteTemp);
 	if (a == FaultAction::Crash)
 		return fail(error, "simulated crash");
+	setIn(createdList, tmp, true);
 	if (a == FaultAction::Fail || !writeFile(tmp, data)) {
-		::unlink(tmp.c_str());
+		removeOwned(tmp);
 		return fail(error, "cannot write " + tmp);
 	}
 
 	const bool hadOld = exists(path);
 	std::string bak;
 	if (hadOld) {
-		for (int n = 1; n <= kBackupNames && bak.empty(); n++)
-			if (!exists(backupName(path, n)))
-				bak = backupName(path, n);
+		bak = freeName(backupPathFor(path));
 		if (bak.empty()) {
-			::unlink(tmp.c_str());
+			removeOwned(tmp);
 			return fail(error, "cannot move " + path + " aside: " + backupPathFor(path) +
 			                       " and its numbered alternatives are all in use");
 		}
@@ -411,20 +459,25 @@ bool replaceFile(const std::string &path, const std::string &data, std::string *
 		if (a == FaultAction::Crash)
 			return fail(error, "simulated crash");
 		if (a == FaultAction::Fail || ::rename(path.c_str(), bak.c_str()) != 0) {
-			::unlink(tmp.c_str());
+			removeOwned(tmp);
 			return fail(error, "cannot move " + path + " aside");
 		}
+		setIn(createdList, bak, true);
 	}
 
 	a = fault(ReplaceStep::RenameTemp);
 	if (a == FaultAction::Crash)
 		return fail(error, "simulated crash");
 	if (a == FaultAction::Fail || ::rename(tmp.c_str(), path.c_str()) != 0) {
-		::unlink(tmp.c_str());
-		if (hadOld && ::rename(bak.c_str(), path.c_str()) != 0)
-			return fail(error, "cannot install new " + path + " and the previous version stays at " + bak);
+		removeOwned(tmp);
+		if (hadOld) {
+			if (::rename(bak.c_str(), path.c_str()) != 0)
+				return fail(error, "cannot install new " + path + " and the previous version stays at " + bak);
+			setIn(createdList, bak, false);
+		}
 		return fail(error, "cannot install new " + path + "; previous version kept");
 	}
+	setIn(createdList, tmp, false);
 
 	if (hadOld) {
 		a = fault(ReplaceStep::RemoveBackup);
@@ -433,7 +486,7 @@ bool replaceFile(const std::string &path, const std::string &data, std::string *
 		// The new version is in place; an old one that cannot go yet is
 		// retried later, not reported as a failed save.
 		if (a == FaultAction::Fail)
-			setPending(bak, true);
+			setIn(pendingList, bak, true);
 		else
 			removeOwned(bak);
 	}

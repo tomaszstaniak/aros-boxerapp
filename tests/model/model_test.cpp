@@ -160,6 +160,87 @@ static bool lockFile(const std::string &path, bool lock)
 #endif
 }
 
+// Files that already carry the replace's own names (.bxnew, .bxold and the
+// numbered alternatives) but were not made by this run: someone else's, or
+// left by a run that crashed. They are never overwritten, renamed or removed.
+static void testReplaceForeignScratch(const std::string &dir)
+{
+	using S = fu::ReplaceStep;
+	using A = fu::FaultAction;
+	const std::string f = fu::join(dir, "Foreign Scratch.prefs");
+	const std::string tmp = fu::tempPathFor(f), bak = fu::backupPathFor(f);
+	put(f, "v1");
+	put(tmp, "foreign new");
+	put(bak, "foreign old");
+	put(bak + "-2", "foreign old 2");
+	auto foreignIntact = [&]() {
+		return get(tmp) == "foreign new" && get(bak) == "foreign old" && get(bak + "-2") == "foreign old 2";
+	};
+
+	// Saves go to the next free names and clean up only those.
+	CHECK(fu::replaceFile(f, "v2"));
+	CHECK_EQ(get(f), std::string("v2"));
+	CHECK(foreignIntact());
+	CHECK(!fu::exists(tmp + "-2") && !fu::exists(bak + "-3"));
+	CHECK(fu::recoverReplace(f));
+	CHECK(foreignIntact());
+	// A failed or interrupted save, and its recovery, leave them too.
+	fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Fail : A::Proceed; });
+	CHECK(!fu::replaceFile(f, "bad"));
+	fu::setReplaceFaultHook([](S s) { return s == S::RemoveBackup ? A::Crash : A::Proceed; });
+	CHECK(!fu::replaceFile(f, "v3"));
+	fu::setReplaceFaultHook(nullptr);
+	CHECK(fu::recoverReplace(f));
+	CHECK_EQ(get(f), std::string("v3"));
+	CHECK(foreignIntact());
+	CHECK(!fu::exists(tmp + "-2") && !fu::exists(bak + "-3"));
+	fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
+	CHECK(!fu::replaceFile(f, "v4"));
+	fu::setReplaceFaultHook(nullptr);
+	CHECK(!fu::exists(f));
+	CHECK(fu::recoverReplace(f));
+	CHECK_EQ(get(f), std::string("v3"));
+	CHECK(foreignIntact());
+	CHECK(!fu::exists(tmp + "-2") && !fu::exists(bak + "-3"));
+
+	// A new run finds the scratch files of a run that stopped half-way: they
+	// cannot be told from someone else's. The file is missing, so the newest
+	// earlier version comes back as a copy; nothing is removed.
+	fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
+	CHECK(!fu::replaceFile(f, "v5"));                   // v3 now at bak-3, v5 at tmp-2
+	fu::setReplaceFaultHook(nullptr);
+	setMTime(bak, 1000000000);
+	setMTime(bak + "-2", 1000000000);
+	setMTime(bak + "-3", 1100000000);
+	fu::forgetReplaceOwnership();
+	CHECK(fu::recoverReplace(f));
+	CHECK_EQ(get(f), std::string("v3"));
+	CHECK(foreignIntact());
+	CHECK_EQ(get(bak + "-3"), std::string("v3"));
+	CHECK_EQ(get(tmp + "-2"), std::string("v5"));
+	// Later saves of the new run work around them.
+	CHECK(fu::replaceFile(f, "v6"));
+	CHECK_EQ(get(f), std::string("v6"));
+	CHECK(foreignIntact());
+	CHECK_EQ(get(bak + "-3"), std::string("v3"));
+	CHECK_EQ(get(tmp + "-2"), std::string("v5"));
+	CHECK(!fu::exists(bak + "-4") && !fu::exists(tmp + "-3"));
+
+	// All names taken: the save fails and keeps the file as it is.
+	std::vector<std::string> extra;
+	for (int n = 1; n <= 9; n++) {
+		const std::string t = n == 1 ? tmp : tmp + "-" + std::to_string(n);
+		if (!fu::exists(t)) { put(t, "x"); extra.push_back(t); }
+	}
+	std::string err;
+	CHECK(!fu::replaceFile(f, "v7", &err));
+	CHECK(err.find("in use") != std::string::npos);
+	CHECK_EQ(get(f), std::string("v6"));
+	CHECK(foreignIntact());
+	for (const auto &t : extra) CHECK_EQ(get(t), std::string("x"));
+	CHECK(fu::pendingCleanup().empty());
+}
+
 // The replace only ever deletes its own scratch files, and an old version
 // that cannot be deleted (a game icon Wanderer is still reading) neither
 // fails the save nor stays behind for good.
@@ -205,13 +286,11 @@ static void testReplaceOwnership(const std::string &dir)
 	CHECK_EQ(get(icon), std::string("icon 6"));
 	CHECK(fu::isDirectory(bak) && !fu::exists(bak2));
 	::rmdir(bak.c_str());
-	// A drawer on the temp name blocks the save; the icon stays as it was.
+	// A drawer on the temp name is skipped the same way.
 	fu::makeDirs(tmp);
-	std::string err;
-	CHECK(!fu::replaceFile(icon, "icon 7", &err));
-	CHECK(err.find("in use") != std::string::npos);
-	CHECK_EQ(get(icon), std::string("icon 6"));
-	CHECK(fu::isDirectory(tmp));
+	CHECK(fu::replaceFile(icon, "icon 7"));
+	CHECK_EQ(get(icon), std::string("icon 7"));
+	CHECK(fu::isDirectory(tmp) && !fu::exists(tmp + "-2"));
 	::rmdir(tmp.c_str());
 
 	// The old version is in use when it is to be deleted.
@@ -227,7 +306,7 @@ static void testReplaceOwnership(const std::string &dir)
 	});
 	CHECK(fu::replaceFile(icon, "icon 8"));
 	CHECK_EQ(get(icon), std::string("icon 8"));
-	CHECK_EQ(get(bak), std::string("icon 6"));
+	CHECK_EQ(get(bak), std::string("icon 7"));
 	CHECK_EQ(fu::pendingCleanup(), std::vector<std::string>{bak});
 	// Still in use at the next save: that one goes through on the next name
 	// and cleans up after itself.
@@ -245,31 +324,39 @@ static void testReplaceOwnership(const std::string &dir)
 	CHECK(fu::retryPendingCleanup().empty());
 	CHECK(!fu::exists(bak));
 
-	// Interrupted save while an older backup was still in use: the newest
-	// backup is the version to restore, the older one is cleaned up.
-	put(bak, "icon 0");
-	setMTime(bak, 1000000000);
+	// Interrupted save while an older backup of ours was still in use: the
+	// newest backup is the version to restore, the older one is cleaned up.
+	bool held = false;
+	lockedOnce = false;
+	fu::setReplaceFaultHook([&](S s) {
+		if (s == S::RemoveBackup && !lockedOnce) {
+			lockedOnce = true;
+			setMTime(bak, 1000000000);
+			held = lockFile(bak, true);
+			if (!held) return A::Fail;
+		}
+		return A::Proceed;
+	});
+	CHECK(fu::replaceFile(icon, "icon 10"));                // bak = "icon 9", held
 	setMTime(icon, 1100000000);
-	if (lockFile(bak, true)) {
-		fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
-		CHECK(!fu::replaceFile(icon, "icon 10"));
-		fu::setReplaceFaultHook(nullptr);
-		CHECK(!fu::exists(icon) && fu::exists(bak2));
-		CHECK(fu::recoverReplace(icon));
-		CHECK_EQ(get(icon), std::string("icon 9"));
-		CHECK_EQ(get(bak), std::string("icon 0"));
+	fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
+	CHECK(!fu::replaceFile(icon, "icon 11"));               // bak2 = "icon 10"
+	fu::setReplaceFaultHook(nullptr);
+	CHECK(!fu::exists(icon) && fu::exists(bak2));
+	CHECK(fu::recoverReplace(icon));
+	CHECK_EQ(get(icon), std::string("icon 10"));
+	CHECK_EQ(get(bak), std::string("icon 9"));
+	if (held) {
 		CHECK_EQ(fu::pendingCleanup(), std::vector<std::string>{bak});
 		lockFile(bak, false);
-		CHECK(fu::retryPendingCleanup().empty());
-	} else {
-		fprintf(stderr, "note: no file locking on this host; interrupted save with a held backup not tested\n");
-		CHECK(fu::recoverReplace(icon));
 	}
+	CHECK(fu::retryPendingCleanup().empty());
 	CHECK(!fu::exists(bak) && !fu::exists(bak2) && !fu::exists(tmp));
-	CHECK_EQ(get(icon), std::string("icon 9"));
 	CHECK_EQ(get(foreignBak), std::string("user's own copy"));
 	CHECK_EQ(get(foreignTmp), std::string("another program's file"));
 	CHECK(fu::pendingCleanup().empty());
+
+	testReplaceForeignScratch(dir);
 }
 
 static void testReplace()
