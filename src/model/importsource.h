@@ -58,6 +58,18 @@ std::string validGameboxName(const std::string &name);
 // "Dune (2).boxer", ... ; increment 1 means the plain name.
 std::string incrementedGameboxName(const std::string &name, unsigned increment);
 
+// The ready-to-import panel's text. The name stands on a line of its own,
+// so a long name is not cut off together with the end of the sentence (a
+// Zune Text object neither wraps nor shortens). A name longer than
+// maxNameChars is shortened in the middle with "...", keeping its start and
+// its end, where names usually differ ("... Part 2"); the window shows the
+// full name as bubble help.
+constexpr size_t kReadyNameChars = 40;
+std::string readyToImportText(const std::string &name, size_t maxNameChars = kReadyNameChars);
+// "...", put in the middle of text longer than maxChars (at least 5), at
+// word breaks when one is near.
+std::string shortenMiddle(const std::string &text, size_t maxChars);
+
 struct ImportSession {
 	ImportStage stage = ImportStage::WaitingForSource;
 	std::string sourcePath;

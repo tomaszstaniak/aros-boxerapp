@@ -132,6 +132,33 @@ std::string gameboxNameForSource(const std::string &original)
 	return out.empty() ? original : out;
 }
 
+std::string shortenMiddle(const std::string &text, size_t maxChars)
+{
+	if (maxChars < 5) maxChars = 5;
+	if (text.size() <= maxChars)
+		return text;
+	const size_t keep = maxChars - 3;
+	const size_t head = (keep + 1) / 2, tail = keep - head;
+	std::string a = text.substr(0, head), b = text.substr(text.size() - tail);
+	// Whole words when a word break is near the cut: "The Secret of ...
+	// Part 2" reads better than "The Secret of Monke...on Part 2". Each side
+	// only gets shorter, so the result stays within maxChars.
+	const size_t near = 8;
+	bool wordA = false, wordB = false;
+	const size_t sa = a.rfind(' ');
+	if (sa != std::string::npos && sa > 0 && a.size() - sa <= near) { a.resize(sa); wordA = true; }
+	const size_t sb = b.find(' ');
+	if (sb != std::string::npos && sb < near && sb + 1 < b.size()) { b.erase(0, sb + 1); wordB = true; }
+	while (!a.empty() && a.back() == ' ') a.pop_back();
+	while (!b.empty() && b.front() == ' ') b.erase(0, 1);
+	return a + (wordA ? " ..." : "...") + (wordB ? " " : "") + b;
+}
+
+std::string readyToImportText(const std::string &name, size_t maxNameChars)
+{
+	return "\"" + shortenMiddle(name, maxNameChars) + "\"\nis ready to be imported into your games folder.";
+}
+
 std::string validGameboxName(const std::string &name)
 {
 	size_t i = 0;

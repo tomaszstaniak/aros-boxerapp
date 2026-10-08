@@ -1156,6 +1156,33 @@ static void testInstallerScan()
 	CHECK(s.stage == ImportStage::WaitingForSource && s.sourcePath.empty());
 }
 
+// The ready panel: the name on its own line, a long one shortened in the
+// middle so both ends stay readable.
+static void testReadyText()
+{
+	const std::string longName = "The Long Named BoxTest Adventure Deluxe";
+	CHECK_EQ(readyToImportText(longName),
+	         "\"" + longName + "\"\nis ready to be imported into your games folder.");
+	CHECK_EQ(readyToImportText("Tyrian"), std::string("\"Tyrian\"\nis ready to be imported into your games folder."));
+	// Exactly at the limit: unchanged; one over: shortened to the limit.
+	const std::string forty(kReadyNameChars, 'a');
+	CHECK_EQ(shortenMiddle(forty, kReadyNameChars), forty);
+	const std::string longer = "The Secret of Monkey Island Special Edition Part 2 (Floppy)";
+	const std::string s = shortenMiddle(longer, kReadyNameChars);
+	CHECK(s.size() <= kReadyNameChars);
+	CHECK(s.find("...") != std::string::npos);
+	CHECK_EQ(s.substr(0, 10), std::string("The Secret"));
+	CHECK_EQ(s.substr(s.size() - 8), std::string("(Floppy)"));
+	CHECK_EQ(s, std::string("The Secret of ... Part 2 (Floppy)"));
+	// Without a word break near the cut: straight through the word.
+	CHECK_EQ(shortenMiddle("Abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ", 20), std::string("Abcdefghi...CDEFGHIJ"));
+	CHECK(shortenMiddle("Abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ", 20).size() <= 20);
+	CHECK_EQ(readyToImportText(longer).substr(0, s.size() + 3), "\"" + s + "\"\n");
+	// A tiny limit still keeps something of both ends.
+	CHECK_EQ(shortenMiddle("abcdefghij", 5), std::string("a...j"));
+	CHECK_EQ(shortenMiddle("abcdefghij", 0), std::string("a...j"));
+}
+
 static void testGameboxCreation()
 {
 	// Name cleanup (IP:343-404).
@@ -1385,6 +1412,7 @@ int main(int argc, char **argv)
 	testShadowNested();
 	testImportSource();
 	testInstallerScan();
+	testReadyText();
 	testGameboxCreation();
 	testGameboxNameCollisions();
 	testSourceCopy();

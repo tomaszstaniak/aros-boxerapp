@@ -552,7 +552,10 @@ static Object *buildImport() {
     ui.impBack2 = SimpleButton("Back");
     ui.impCreate = SimpleButton("Import game");
     ui.impSource = TextObject, MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
-    ui.impReady = TextObject, MUIA_Text_PreParse, (IPTR)"\33c", MUIA_Text_Contents, (IPTR)"", MUIA_Text_SetMin, FALSE, End;
+    // Two lines from the start: a Text object takes its height from the
+    // contents it has when the window is laid out, and the ready text set
+    // later has two lines.
+    ui.impReady = TextObject, MUIA_Text_PreParse, (IPTR)"\33c", MUIA_Text_Contents, (IPTR)" \n ", MUIA_Text_SetMin, FALSE, End;
     // Installer choice: a standard single-select List rather than a
     // Cycle: a list shows every candidate with its folder at once.
     ui.impList = ListObject, MUIA_Frame, MUIV_Frame_InputList,
@@ -2718,8 +2721,13 @@ static void showImportStage() {
         // Once a gamebox exists (an installer ran) there is no source
         // choice to go back to; Stop is the window's close question.
         set(ui.impBack2, MUIA_Disabled, !g_import.createdGamebox.empty());
-        std::string line = "\"" + name + "\" is ready to be imported into your games folder.";
+        // A long name is shortened on the panel; the bubble help gives it
+        // in full (Zune keeps the pointer, so the string must outlive this).
+        static std::string fullName;
+        fullName = name;
+        const std::string line = boxer::readyToImportText(name);
         set(ui.impReady, MUIA_Text_Contents, (IPTR)line.c_str());
+        set(ui.impReady, MUIA_ShortHelp, (IPTR)fullName.c_str());
         set(ui.impPages, MUIA_Group_ActivePage, 2);
         break;
     }
