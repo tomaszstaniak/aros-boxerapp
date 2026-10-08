@@ -4,11 +4,14 @@
 """Decode PNG files from assets/runtime/{boxer,replacements} into a C++ include of RGBA
 arrays, so BoxerUI carries the original Boxer artwork without a PNG decoder
 on the guest. Handles what those files use: 8-bit RGBA (colour type 6),
-8-bit RGB (2) and 8-bit palette (3, with tRNS), non-interlaced.
+8-bit RGB (2), 8-bit grey with alpha (4) and 8-bit palette (3, with tRNS),
+non-interlaced.
 
-Usage: png2inc.py OUT.inc NAME=path.png ...
+Usage: png2inc.py OUT.inc NAME=path.png[@N] ...
 Each NAME becomes `static const unsigned char kAsset_NAME[]` (RGBA rows)
-plus `kAsset_NAME_w` / `_h`.
+plus `kAsset_NAME_w` / `_h`. "@N" first scales the image to N x N (area
+average, alpha-weighted), as AppKit draws an image set to another size
+(BoxArtShine is 512 px and is drawn at the 128 px icon size).
 """
 import struct, sys, zlib
 
@@ -30,9 +33,9 @@ def decode(path):
             trns = body
         elif kind == b"IDAT":
             idat += body
-    if depth != 8 or inter != 0 or ctype not in (2, 3, 6):
+    if depth != 8 or inter != 0 or ctype not in (2, 3, 4, 6):
         raise SystemExit("%s: unsupported PNG (depth %d type %d interlace %d)" % (path, depth, ctype, inter))
-    bpp = {2: 3, 3: 1, 6: 4}[ctype]
+    bpp = {2: 3, 3: 1, 4: 2, 6: 4}[ctype]
     raw = zlib.decompress(idat)
     stride = w * bpp
     rows, prev, i = [], bytearray(stride), 0
@@ -57,10 +60,40 @@ def decode(path):
                 out += line[x * 4:x * 4 + 4]
             elif ctype == 2:
                 out += line[x * 3:x * 3 + 3] + b"\xff"
+            elif ctype == 4:
+                g, a = line[x * 2], line[x * 2 + 1]
+                out += bytes([g, g, g, a])
             else:
                 k = line[x]
                 out += plte[k * 3:k * 3 + 3] + bytes([trns[k] if trns and k < len(trns) else 255])
     return w, h, bytes(out)
+
+
+def scale(w, h, rgba, n):
+    """Area-average resample to n x n, alpha-weighted so transparent pixels
+    do not darken the edges (the same rule as tools/mkicon.py)."""
+    out = bytearray(n * n * 4)
+    for oy in range(n):
+        y0, y1 = oy * h / n, (oy + 1) * h / n
+        for ox in range(n):
+            x0, x1 = ox * w / n, (ox + 1) * w / n
+            acc = [0.0, 0.0, 0.0, 0.0]
+            tot = 0.0
+            for sy in range(int(y0), min(h, int(y1 + 0.999999))):
+                fy = min(y1, sy + 1) - max(y0, sy)
+                for sx in range(int(x0), min(w, int(x1 + 0.999999))):
+                    f = (min(x1, sx + 1) - max(x0, sx)) * fy
+                    if f <= 0:
+                        continue
+                    r, g, b, a = rgba[(sy * w + sx) * 4:(sy * w + sx) * 4 + 4]
+                    acc[0] += r * a * f; acc[1] += g * a * f; acc[2] += b * a * f
+                    acc[3] += a * f
+                    tot += f
+            o = (oy * n + ox) * 4
+            if acc[3] > 0:
+                out[o:o + 3] = bytes(min(255, int(acc[i] / acc[3] + 0.5)) for i in range(3))
+            out[o + 3] = min(255, int(acc[3] / tot + 0.5)) if tot else 0
+    return n, n, bytes(out)
 
 
 def main():
@@ -72,7 +105,12 @@ def main():
                 "// (see assets/NOTICE-replacements.txt). Do not edit.\n")
         for arg in sys.argv[2:]:
             name, path = arg.split("=", 1)
+            size = None
+            if "@" in path:
+                path, size = path.rsplit("@", 1)
             w, h, px = decode(path)
+            if size:
+                w, h, px = scale(w, h, px, int(size))
             f.write("static const int kAsset_%s_w = %d, kAsset_%s_h = %d;\n" % (name, w, name, h))
             f.write("static const unsigned char kAsset_%s[] = {\n" % name)
             for j in range(0, len(px), 24):

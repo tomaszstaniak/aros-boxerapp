@@ -19,7 +19,7 @@ need() {   # need <path in package> <reference file or ->
     else echo "ok       $1"; fi
 }
 need COPYING "$root/COPYING"
-for l in AROS-APL-1.1 GCC-exception-3.1 LGPL-2.1 Bitstream-Vera BSD-2-Clause-ADBToolkit; do
+for l in AROS-APL-1.1 GCC-exception-3.1 LGPL-2.1 Bitstream-Vera BSD-2-Clause-ADBToolkit MIT-stb; do
     need "LICENSES/$l.txt" "$root/LICENSES/$l.txt"
 done
 # The SDL notice follows the host the package's BoxerUI was built with

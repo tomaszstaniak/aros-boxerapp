@@ -21,3 +21,18 @@ command -v "$cxx" >/dev/null || { echo "run.sh: $cxx not found (set CXX)" >&2; e
 scratch="$out/scratch dir with spaces"
 "$out/model_test" "$scratch"
 rm -rf "$scratch"
+
+# Cover art and renaming. The title checks need a TrueType font: the
+# system Vera Sans of an AROS ISO (AROS_ISO_FONTS, see local.env.example),
+# or COVER_TEST_FONT; without one they are skipped and the run says so.
+"$cxx" -std=c++17 -Wall -Wextra -Wno-unused-parameter -O1 -g -o "$out/cover_test" \
+  "$here/cover_test.cpp" "$root"/src/model/*.cpp "$root/src/emulator/filesystem.cpp"
+font=${COVER_TEST_FONT:-}
+if [ -z "$font" ] && [ -f "$root/local.env" ]; then
+  iso=$(sed -n 's/^AROS_ISO_FONTS="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$root/local.env" | head -1)
+  [ -n "${AROS_ISO_FONTS:-}" ] && iso=$AROS_ISO_FONTS
+  [ -n "$iso" ] && [ -f "$iso/TrueType/VeraSans.ttf" ] && font="$iso/TrueType/VeraSans.ttf"
+fi
+scratch="$out/cover scratch with spaces"
+"$out/cover_test" "$scratch" ${font:+"$font"}
+rm -rf "$scratch"

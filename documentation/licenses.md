@@ -23,6 +23,7 @@ derived from ADBToolkit stay BSD-2-Clause.
 | GCC runtime (libstdc++, libgcc) | Free Software Foundation | GPL-3.0 with GCC Runtime Library Exception 3.1 | both ABIs, statically linked | `LICENSES/GCC-exception-3.1.txt` |
 | AROS startup code and link libraries | The AROS Development Team | AROS Public License 1.1 | both ABIs (see list below) | `LICENSES/AROS-APL-1.1.txt` |
 | Replacement icons (`assets/runtime/replacements/`) | Cole Bemis (Feather: search, maximize-2, lock, unlock) | MIT | both ABIs, embedded in BoxerUI | `LICENSES/Tango-Public-Domain.txt`, `LICENSES/MIT-Feather.txt`, `assets/NOTICE-replacements.txt` |
+| stb_truetype 1.26 (`third_party/stb/`) | Sean Barrett | MIT (dual MIT / public domain; MIT chosen) | both ABIs, compiled into BoxerUI (draws the titles of generated cover art) | `LICENSES/MIT-stb.txt` |
 | BoxerSans font descriptions | Bitstream, Inc. (Vera); description files from AROS; metric value and family name changed by this project | Bitstream Vera Fonts licence | shipped as `Fonts/BoxerSans*.otag`, `.font`; the font outlines are **not** shipped | `LICENSES/Bitstream-Vera.txt` |
 | BOXTEST (`tests/fixtures/boxtest`) | Tomasz Staniak | as the project's own code | not in BoxerUI; test fixture only | `COPYING` |
 
@@ -137,6 +138,12 @@ licence requires for modified Font Software, the family name inside the
 descriptions is "BoxerSans", without "Bitstream" or "Vera"; the only
 remaining "Vera" is the path of the unmodified system font they refer to.
 
+The titles of generated cover art (the bootleg CD case and diskette icons)
+are drawn from the same installed file, `Fonts:TrueType/VeraSans.ttf`, read
+at run time by `stb_truetype`; no font file is shipped for them either. This
+is temporary until a replacement for Boxer's Marker Felt (an Apple font that
+cannot be shipped) is chosen.
+
 Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved. Bitstream Vera is
 a trademark of Bitstream, Inc. The licence text is in
 `LICENSES/Bitstream-Vera.txt` and must accompany the description files.
@@ -147,7 +154,8 @@ For every binary package, per ABI:
 
 1. Include `COPYING`, the whole `LICENSES/` directory (including
    `BSD-2-Clause-ADBToolkit.txt`, which the BSD licence requires in the
-   documentation of binary distributions), `assets/NOTICE-boxer.txt` as
+   documentation of binary distributions, and `MIT-stb.txt`, whose notice
+   the MIT licence requires with copies of the software), `assets/NOTICE-boxer.txt` as
    `NOTICE-boxer.txt`, this file as `licenses.md`, and
    `Fonts/Bitstream-Vera.txt`. `scripts/check-package-notices.sh <abi>
    <package dir>` checks a staged package for these files.
