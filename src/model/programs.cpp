@@ -155,8 +155,13 @@ bool GameSettings::load(const std::string &path, std::string *error)
 	path_ = path;
 	dict_ = PlistValue::dict();
 	fsutil::recoverReplace(path);
-	if (!fsutil::exists(path))
-		return true;
+	if (!fsutil::exists(path)) {
+		const std::string left = fsutil::describeLeftovers(path);
+		if (left.empty())
+			return true;
+		if (error) *error = left;
+		return false;
+	}
 	PlistValue v;
 	if (!readPlistFile(path, v, error))
 		return false;

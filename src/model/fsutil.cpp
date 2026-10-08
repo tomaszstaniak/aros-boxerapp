@@ -371,51 +371,52 @@ static bool fail(std::string *error, const std::string &msg)
 	return false;
 }
 
-static long modifiedTime(const std::string &p)
+std::vector<std::string> leftoversOf(const std::string &path)
 {
-	struct stat st;
-	return ::stat(p.c_str(), &st) == 0 ? (long)st.st_mtime : 0;
+	std::vector<std::string> out;
+	for (const auto &n : ownedScratchPaths(path))
+		if (isFile(n) && !created(n))
+			out.push_back(n);
+	return out;
 }
 
-// Of the existing plain files among names, the newest (a renamed earlier
-// version keeps its date); "" when there is none.
-static std::string newestFile(const std::vector<std::string> &names)
+std::string describeLeftovers(const std::string &path)
 {
-	std::string pick;
-	for (const auto &n : names)
-		if (isFile(n) && (pick.empty() || modifiedTime(n) >= modifiedTime(pick)))
-			pick = n;
-	return pick;
+	const std::vector<std::string> left = leftoversOf(path);
+	if (left.empty() || exists(path))
+		return std::string();
+	std::string s = path + " is missing. Next to it are files that look like an interrupted save:";
+	for (const auto &n : left)
+		s += "\n  " + n;
+	s += "\nBoxer did not use, change or delete them. To get the earlier version back, "
+	     "rename the right one to " + baseName(path) + ".";
+	return s;
 }
 
 bool recoverReplace(const std::string &path)
 {
-	std::vector<std::string> ours, others;
-	for (int n = 1; n <= kScratchNames; n++) {
-		const std::string b = numbered(backupPathFor(path), n);
-		if (!isFile(b))
-			continue;
-		(created(b) ? ours : others).push_back(b);
-	}
+	// Only files this process created count: their names, numbers and dates
+	// prove nothing about who made them. Of ours, the one made last is the
+	// version an interrupted save had just moved aside.
+	std::vector<std::string> ours;
+	for (const auto &c : createdList)
+		if (c.compare(0, path.size() + 1, path + ".") == 0 && isFile(c)) {
+			for (int n = 1; n <= kScratchNames; n++)
+				if (c == numbered(backupPathFor(path), n))
+					ours.push_back(c);
+		}
 	bool ok = true;
-	if (!exists(path)) {
-		// Interrupted between moving the old version aside and installing
-		// the new one.
-		const std::string mine = newestFile(ours);
-		if (!mine.empty()) {
-			ok = ::rename(mine.c_str(), path.c_str()) == 0;
-			if (ok) {
-				setIn(createdList, mine, false);
-				setIn(pendingList, mine, false);
-				ours.erase(std::find(ours.begin(), ours.end(), mine));
-			}
-		} else if (!others.empty()) {
-			// Most likely an earlier run that stopped at that point, but it
-			// cannot be told from someone else's file: the previous version
-			// comes back as a copy and the file itself stays where it is.
-			ok = copyFile(newestFile(others), path);
+	if (!exists(path) && !ours.empty()) {
+		const std::string mine = ours.back();
+		ok = ::rename(mine.c_str(), path.c_str()) == 0;
+		if (ok) {
+			setIn(createdList, mine, false);
+			setIn(pendingList, mine, false);
+			ours.pop_back();
 		}
 	}
+	// Anything else of that name (someone else's, or left by an earlier run,
+	// which cannot be told apart) is not used: see describeLeftovers().
 	// With the file in place every backup of ours is older than it.
 	if (exists(path))
 		for (const auto &b : ours)

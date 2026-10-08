@@ -2293,6 +2293,19 @@ static bool resolveDataDir() {
          src == boxer::PrefsSource::Env ? "ENV" : src == boxer::PrefsSource::Envarc ? "ENVARC"
          : src == boxer::PrefsSource::Unreadable ? ("unreadable: " + err).c_str() : "none",
          prefs.dataDir.c_str());
+    // Settings that cannot be read (or only leftovers of an interrupted save
+    // are there) are reported, never guessed at; the start goes on as the
+    // first one and the files named stay as they are.
+    if (src == boxer::PrefsSource::Unreadable) {
+        if (g_args.prefsOnly) {
+            std::fprintf(stderr, "BoxerUI: settings not read: %s\n", err.c_str());
+        } else {
+            LONG r = ask("Boxer could not read its settings.\n\n%s\n\nContinue and set Boxer up again?",
+                         "Continue|Quit", err.c_str());
+            logf("datadir: settings not read, requester -> %d", (int)r);
+            if (r != 1) return false;
+        }
+    }
     // The Welcome start is where a new user begins (scenario step 2), so it
     // settles the games folder first; the data directory proposal follows it.
     bool gamesChanged = false;
@@ -2590,6 +2603,8 @@ static bool writeCoverIcon(const std::string &gameboxPath, const std::string &ic
     logf("cover: icon %s.info %s%s", iconStem.c_str(), ok ? "written" : "NOT written: ", err.c_str());
     for (const auto &p : boxer::fsutil::pendingCleanup())
         logf("cover: old version \"%s\" in use, removed later", p.c_str());
+    for (const auto &p : boxer::fsutil::leftoversOf(iconStem + ".info"))
+        logf("cover: \"%s\" is not Boxer's from this run; left as it is", p.c_str());
     return ok;
 }
 

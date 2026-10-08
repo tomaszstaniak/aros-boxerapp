@@ -135,6 +135,15 @@ bool Gamebox::open(const std::string &pathIn, std::string *error)
 	}
 	path_ = p;
 	info_ = PlistValue::dict();
+	// A gamebox without Game Info is valid (an older one), but not when an
+	// interrupted save left its earlier versions: going on would give the
+	// game a new identifier and separate it from its saved state.
+	fsutil::recoverReplace(gameInfoPath());
+	const std::string left = fsutil::describeLeftovers(gameInfoPath());
+	if (!left.empty()) {
+		if (error) *error = left;
+		return false;
+	}
 	if (fsutil::exists(gameInfoPath())) {
 		PlistValue v;
 		std::string e;

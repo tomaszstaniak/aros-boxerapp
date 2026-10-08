@@ -417,7 +417,8 @@ bool readPlistFile(const std::string &path, PlistValue &out, std::string *error)
 	fsutil::recoverReplace(path);
 	std::string data;
 	if (!fsutil::readFile(path, data)) {
-		if (error) *error = "cannot read " + path;
+		const std::string left = fsutil::describeLeftovers(path);
+		if (error) *error = left.empty() ? "cannot read " + path : left;
 		return false;
 	}
 	std::string e;

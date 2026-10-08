@@ -135,6 +135,10 @@ PrefsSource loadUserPrefs(const DataLocations &where, UserPrefs &out, std::strin
 		return PrefsSource::Env;
 	if (readPrefsFile(where.envarcPrefsPath, out, &why))
 		return PrefsSource::Envarc;
+	if (why.empty())
+		why = fsutil::describeLeftovers(where.envarcPrefsPath);
+	if (why.empty() && !where.envPrefsPath.empty())
+		why = fsutil::describeLeftovers(where.envPrefsPath);
 	if (!why.empty()) {
 		if (error) *error = why;
 		return PrefsSource::Unreadable;

@@ -86,6 +86,9 @@ enum class PrefsSource { Env, Envarc, None, Unreadable };
 // ENV: is the live copy AROS makes of ENVARC: at boot; it is read first, and
 // ENVARC: when ENV: has no copy (e.g. ENV: cleared). recoverReplace() runs on
 // both before reading, so an interrupted save is finished or rolled back.
+// Unreadable also when no prefs file exists but an interrupted save left
+// files next to one (fsutil::describeLeftovers): they are not used, and the
+// error names them for the user.
 PrefsSource loadUserPrefs(const DataLocations &where, UserPrefs &out, std::string *error = nullptr);
 // ENVARC: (persistent) first, then ENV:, each through fsutil::replaceFile so
 // a failed write keeps the last good version. An empty envPrefsPath skips

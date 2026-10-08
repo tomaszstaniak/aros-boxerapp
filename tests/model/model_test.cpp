@@ -9,6 +9,7 @@
 #include "../../src/model/fsutil.h"
 #include "../../src/model/gamebox.h"
 #include "../../src/model/plist.h"
+#include "../../src/model/programs.h"
 #include "../../src/model/shadowfs.h"
 
 #include <cstdio>
@@ -204,26 +205,37 @@ static void testReplaceForeignScratch(const std::string &dir)
 	CHECK(!fu::exists(tmp + "-2") && !fu::exists(bak + "-3"));
 
 	// A new run finds the scratch files of a run that stopped half-way: they
-	// cannot be told from someone else's. The file is missing, so the newest
-	// earlier version comes back as a copy; nothing is removed.
+	// cannot be told from someone else's. The file stays missing, nothing is
+	// used, renamed or removed, and the leftovers are named for the user.
 	fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
 	CHECK(!fu::replaceFile(f, "v5"));                   // v3 now at bak-3, v5 at tmp-2
 	fu::setReplaceFaultHook(nullptr);
-	setMTime(bak, 1000000000);
-	setMTime(bak + "-2", 1000000000);
-	setMTime(bak + "-3", 1100000000);
+	setMTime(bak + "-3", 1100000000);                    // newest by date: still not used
 	fu::forgetReplaceOwnership();
+	auto leftoversIntact = [&]() {
+		return foreignIntact() && get(bak + "-3") == "v3" && get(tmp + "-2") == "v5";
+	};
 	CHECK(fu::recoverReplace(f));
-	CHECK_EQ(get(f), std::string("v3"));
-	CHECK(foreignIntact());
-	CHECK_EQ(get(bak + "-3"), std::string("v3"));
-	CHECK_EQ(get(tmp + "-2"), std::string("v5"));
-	// Later saves of the new run work around them.
+	CHECK(!fu::exists(f));
+	CHECK(leftoversIntact());
+	CHECK_EQ(fu::leftoversOf(f), (std::vector<std::string>{tmp, tmp + "-2", bak, bak + "-2", bak + "-3"}));
+	const std::string msg = fu::describeLeftovers(f);
+	CHECK(msg.find(f + " is missing") != std::string::npos);
+	for (const auto &n : fu::leftoversOf(f)) CHECK(msg.find(n) != std::string::npos);
+	// Reading it as a plist fails with that message instead of guessing.
+	PlistValue pv;
+	std::string perr;
+	CHECK(!readPlistFile(f, pv, &perr));
+	CHECK_EQ(perr, msg);
+	CHECK(!fu::exists(f) && leftoversIntact());
+	// Writing it anew does not use them either.
 	CHECK(fu::replaceFile(f, "v6"));
 	CHECK_EQ(get(f), std::string("v6"));
-	CHECK(foreignIntact());
-	CHECK_EQ(get(bak + "-3"), std::string("v3"));
-	CHECK_EQ(get(tmp + "-2"), std::string("v5"));
+	CHECK(leftoversIntact());
+	CHECK(fu::describeLeftovers(f).empty());           // the file is there now
+	CHECK(fu::recoverReplace(f));
+	CHECK_EQ(get(f), std::string("v6"));
+	CHECK(leftoversIntact());
 	CHECK(!fu::exists(bak + "-4") && !fu::exists(tmp + "-3"));
 
 	// All names taken: the save fails and keeps the file as it is.
@@ -1075,6 +1087,76 @@ static void testMovedDataDir()
 	}
 }
 
+// The main file is missing and only files from someone else (or from an
+// earlier run that stopped half-way) sit on the replace's names, plain and
+// numbered. Whatever reads the file reports them; none is used, renamed,
+// overwritten or deleted, and a later save goes around them.
+static void testLeftoversNotUsed()
+{
+	const std::string base = fu::join(scratch, "leftovers test");
+	std::map<std::string, std::string> planted;
+	auto plant = [&](const std::string &file) {
+		for (const char *suffix : {".bxnew", ".bxnew-2", ".bxold", ".bxold-2", ".bxold-7"}) {
+			const std::string n = file + suffix;
+			put(n, std::string("left ") + suffix);
+			planted[n] = std::string("left ") + suffix;
+		}
+		fu::forgetReplaceOwnership();
+	};
+	auto intact = [&]() {
+		for (const auto &kv : planted)
+			if (get(kv.first) != kv.second) return false;
+		return true;
+	};
+
+	// Settings: no Boxer.prefs, only leftovers.
+	DataLocations where;
+	where.envPrefsPath = fu::join(base, "ENV/Boxer/Boxer.prefs");
+	where.envarcPrefsPath = fu::join(base, "ENVARC/Boxer/Boxer.prefs");
+	fu::makeDirs(fu::parent(where.envPrefsPath));
+	plant(where.envarcPrefsPath);
+	UserPrefs got;
+	std::string err;
+	CHECK(loadUserPrefs(where, got, &err) == PrefsSource::Unreadable);
+	CHECK(err.find(where.envarcPrefsPath + ".bxold-7") != std::string::npos);
+	CHECK(err.find(where.envarcPrefsPath + ".bxnew") != std::string::npos);
+	CHECK(got.dataDir.empty());
+	CHECK(!fu::exists(where.envarcPrefsPath) && intact());
+	// The user goes on: the new settings do not touch them.
+	UserPrefs fresh; fresh.dataDir = "DH1:New";
+	CHECK(saveUserPrefs(where, fresh, &err));
+	CHECK(loadUserPrefs(where, got) == PrefsSource::Env && got.dataDir == "DH1:New");
+	CHECK(get(where.envarcPrefsPath).find("DH1:New") != std::string::npos);
+	CHECK(intact());
+
+	// A gamebox whose Game Info.plist is missing: not opened as a new game
+	// (that would give it a new identifier), the reason names the files.
+	const std::string box = fu::join(base, "Games/Dune.boxer");
+	fu::makeDirs(box);
+	const std::string info = fu::join(box, "Game Info.plist");
+	plant(info);
+	Gamebox g;
+	err.clear();
+	CHECK(!g.open(box, &err));
+	CHECK(err.find(info + " is missing") != std::string::npos);
+	CHECK(err.find(info + ".bxold-2") != std::string::npos);
+	CHECK(!fu::exists(info) && intact());
+
+	// Per-game settings.
+	const std::string settings = fu::join(base, "Data/Game Settings/DUNE.plist");
+	fu::makeDirs(fu::parent(settings));
+	plant(settings);
+	GameSettings gs;
+	err.clear();
+	CHECK(!gs.load(settings, &err));
+	CHECK(err.find(settings + ".bxnew-2") != std::string::npos);
+	CHECK(!fu::exists(settings) && intact());
+
+	// A plain file without leftovers is still just "not there".
+	CHECK(fu::describeLeftovers(fu::join(base, "Games/Other.plist")).empty());
+	CHECK(fu::pendingCleanup().empty());
+}
+
 static void testPrefsAndDataDir()
 {
 	UserPrefs p;
@@ -1630,6 +1712,7 @@ int main(int argc, char **argv)
 	testQuoting();
 	testDataLocations();
 	testPrefsAndDataDir();
+	testLeftoversNotUsed();
 	testMovedDataDir();
 	testShadow();
 	testShadowNested();

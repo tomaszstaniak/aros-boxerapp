@@ -66,9 +66,11 @@ bool isWritableDirectory(const std::string &dir);
 // (someone else's, or left by a run that crashed, which cannot be told
 // apart) is never overwritten or removed; the save takes the next numbered
 // name ("<path>.bxold-2" .. "-9", the same for .bxnew), and fails, keeping
-// the previous version, when all are taken. If <path> itself is missing and
-// only such a file holds an earlier version, recoverReplace() puts a copy of
-// the newest one in place and leaves the file as it is. A "<path>.bak" or
+// the previous version, when all are taken. Such a file is never used
+// either: if <path> itself is missing, recoverReplace() leaves it so, and
+// the caller reports describeLeftovers() instead of reading or writing on
+// silently. Only a save interrupted in this process is rolled back,
+// because only there is it known which file is whose. A "<path>.bak" or
 // "<path>.tmp" is never touched at all.
 //
 // The old version can outlive a successful replace: a file manager that is
@@ -89,6 +91,12 @@ bool recoverReplace(const std::string &path);
 // The first-choice names; replaceFile() may use a numbered alternative.
 std::string tempPathFor(const std::string &path);
 std::string backupPathFor(const std::string &path);
+// Existing files on the scratch names of path that this process did not
+// create: someone else's, or left by a run that stopped half-way.
+std::vector<std::string> leftoversOf(const std::string &path);
+// When path is missing and such files exist: a message naming them for the
+// user; "" otherwise.
+std::string describeLeftovers(const std::string &path);
 // Every scratch name of path that replaceFile() may use, first choices first.
 std::vector<std::string> ownedScratchPaths(const std::string &path);
 // Old versions whose removal failed and is still to be done.
