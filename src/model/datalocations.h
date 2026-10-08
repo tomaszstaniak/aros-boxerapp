@@ -27,6 +27,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 namespace boxer {
 
@@ -134,6 +135,39 @@ bool acceptableGamesFolder(const std::string &path, const DataLocations &locatio
 // recreated silently. NotSet when no games folder has been chosen yet.
 enum class GamesFolderBrowse { Open, Missing, NotSet };
 GamesFolderBrowse browseGamesFolder(const std::string &gamesFolder);
+
+// A configured data directory that is gone most often went along with the
+// games folder it lived in (the default is "<games folder>/Boxer Data").
+// findMovedDataDir() looks for it where it would be now, in each folder of
+// gamesFolders (the current games folder, the drawer of the gamebox being
+// opened): at the same place relative to oldGamesFolder when the old data
+// directory was inside it, under its old name, and under the default name.
+//
+// A name alone is never taken as proof. A candidate counts as the moved data
+// directory only when its "Gamebox States" holds the state of a gamebox in
+// that games folder (the state drawers are named by gamebox identifier).
+//   Found      exactly one candidate holds state of the folder's games
+//   Ambiguous  more than one does
+//   Uncertain  a candidate exists but holds no state, or the folder has no
+//              gamebox to compare with: only the user can tell
+//   NotFound   no candidate, or only ones holding other games' state
+// Nothing is created, moved or written.
+enum class MovedDataDir { Found, Ambiguous, Uncertain, NotFound };
+struct MovedDataDirSearch {
+	MovedDataDir result = MovedDataDir::NotFound;
+	std::string path;                   // Found: the directory; Uncertain: where to start looking
+	std::vector<std::string> matching;  // Found/Ambiguous: candidates holding state of the folder's games
+	size_t matchedGames = 0;            // Found: games of the folder whose state is there
+};
+MovedDataDirSearch findMovedDataDir(const std::string &missingDataDir, const std::string &oldGamesFolder,
+                                    const std::vector<std::string> &gamesFolders);
+std::vector<std::string> movedDataDirCandidates(const std::string &missingDataDir,
+                                                const std::string &oldGamesFolder,
+                                                const std::vector<std::string> &gamesFolders);
+// Identifiers of the gameboxes in a games folder and its drawers (three
+// levels; gamebox contents and any "Boxer Data" are not searched), as
+// state drawer names (safeFolderName). Gameboxes without one are skipped.
+std::vector<std::string> gameboxStateNamesIn(const std::string &gamesFolder);
 
 // Characters that cannot appear in an AROS file name are replaced, so an
 // identifier (UUID, hex digest or reverse-DNS) is always a usable folder.

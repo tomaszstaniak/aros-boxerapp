@@ -139,7 +139,11 @@ In place of the original's `~/Library` locations:
   `<games folder>/Boxer Data`, with `Gamebox States/<identifier>/` per game.
   A gamebox's state is found by its identifier, so moving or renaming the
   gamebox keeps it. DOS writes go through a shadow filesystem into the data
-  folder, not into the gamebox.
+  folder, not into the gamebox. When the configured data folder is gone
+  (for example moved along with the games folder), BoxerUI proposes one in
+  the games folder only if its `Gamebox States` holds the state of a game
+  in that folder; otherwise it asks the user to point to it. It never
+  creates a new empty one in its place.
 
 ## Patches to Boxer
 

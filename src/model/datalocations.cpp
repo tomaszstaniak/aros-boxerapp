@@ -254,6 +254,123 @@ GamesFolderBrowse browseGamesFolder(const std::string &gamesFolder)
 	return fsutil::isDirectory(gamesFolder) ? GamesFolderBrowse::Open : GamesFolderBrowse::Missing;
 }
 
+static bool insideGamebox(const std::string &path)
+{
+	std::string p = fsutil::trimTrailingSlash(path);
+	while (!p.empty()) {
+		if (drivetypes::isGameboxName(fsutil::baseName(p)))
+			return true;
+		const std::string up = fsutil::parent(p);
+		if (up == p || up.empty())
+			break;
+		p = up;
+	}
+	return false;
+}
+
+static void collectStateNames(const std::string &dir, int depth, std::vector<std::string> &out)
+{
+	std::vector<std::string> names;
+	if (!fsutil::list(dir, names))
+		return;
+	for (const auto &n : names) {
+		const std::string p = fsutil::join(dir, n);
+		if (!fsutil::isDirectory(p))
+			continue;
+		if (drivetypes::isGameboxName(n)) {
+			Gamebox box;
+			if (box.open(p) && !box.identifier().empty())
+				out.push_back(fsutil::toLower(safeFolderName(box.identifier())));
+		} else if (depth > 1 && fsutil::toLower(n) != "boxer data") {
+			collectStateNames(p, depth - 1, out);
+		}
+	}
+}
+
+std::vector<std::string> gameboxStateNamesIn(const std::string &gamesFolder)
+{
+	std::vector<std::string> out;
+	collectStateNames(gamesFolder, 3, out);
+	return out;
+}
+
+std::vector<std::string> movedDataDirCandidates(const std::string &missingDataDir,
+                                                const std::string &oldGamesFolder,
+                                                const std::vector<std::string> &gamesFolders)
+{
+	const std::string missing = fsutil::trimTrailingSlash(missingDataDir);
+	std::vector<std::string> out;
+	auto add = [&](const std::string &c) {
+		if (c.empty() || fsutil::toLower(c) == fsutil::toLower(missing))
+			return;
+		for (const auto &o : out)
+			if (fsutil::toLower(o) == fsutil::toLower(c))
+				return;
+		out.push_back(c);
+	};
+	const bool wasInside = !oldGamesFolder.empty() && fsutil::isWithin(missing, oldGamesFolder) &&
+	                       !fsutil::relativeTo(missing, oldGamesFolder).empty();
+	for (const auto &g : gamesFolders) {
+		if (g.empty())
+			continue;
+		if (wasInside)
+			add(fsutil::join(g, fsutil::relativeTo(missing, oldGamesFolder)));
+		add(fsutil::join(g, fsutil::baseName(missing)));
+		add(DataLocations::defaultDataDir(g));
+	}
+	return out;
+}
+
+MovedDataDirSearch findMovedDataDir(const std::string &missingDataDir, const std::string &oldGamesFolder,
+                                    const std::vector<std::string> &gamesFolders)
+{
+	MovedDataDirSearch r;
+	std::string uncertain;
+	for (const auto &g : gamesFolders) {
+		if (g.empty() || !fsutil::isDirectory(g))
+			continue;
+		const std::vector<std::string> games = gameboxStateNamesIn(g);
+		for (const auto &c : movedDataDirCandidates(missingDataDir, oldGamesFolder, {g})) {
+			if (!fsutil::isDirectory(c) || insideGamebox(c))
+				continue;
+			bool known = false;
+			for (const auto &m : r.matching)
+				known = known || fsutil::toLower(m) == fsutil::toLower(c);
+			if (known)
+				continue;
+			std::vector<std::string> states;
+			fsutil::list(fsutil::join(c, "Gamebox States"), states);
+			size_t matched = 0, stateDirs = 0;
+			for (const auto &s : states) {
+				if (!fsutil::isDirectory(fsutil::join(fsutil::join(c, "Gamebox States"), s)))
+					continue;
+				++stateDirs;
+				for (const auto &id : games)
+					if (fsutil::toLower(s) == id) { ++matched; break; }
+			}
+			if (matched > 0) {
+				r.matching.push_back(c);
+				if (r.matching.size() == 1) r.matchedGames = matched;
+			} else if ((stateDirs == 0 || games.empty()) && uncertain.empty()) {
+				uncertain = c;
+			}
+			// State only of games that are not in this folder: some other
+			// data directory, not the one that moved.
+		}
+	}
+	if (r.matching.size() == 1) {
+		r.result = MovedDataDir::Found;
+		r.path = r.matching[0];
+	} else if (r.matching.size() > 1) {
+		r.result = MovedDataDir::Ambiguous;
+		r.matchedGames = 0;
+	} else if (!uncertain.empty()) {
+		r.result = MovedDataDir::Uncertain;
+		r.path = uncertain;
+	}
+	return r;
+}
+
 std::string safeFolderName(const std::string &identifier)
 {
 	std::string out;

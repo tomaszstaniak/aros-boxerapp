@@ -857,6 +857,137 @@ static void testShadowNested()
 }
 
 // --- user prefs, one data directory, state found by identifier ---
+// --- a data directory that moved with the games folder ---
+
+static void makeGameboxWithId(const std::string &folder, const std::string &name, const std::string &id)
+{
+	const std::string box = fu::join(folder, name + ".boxer");
+	fu::makeDirs(box);
+	PlistValue info = PlistValue::dict();
+	if (!id.empty()) info.set("BXGameIdentifier", PlistValue::string(id));
+	if (!writePlistFile(fu::join(box, "Game Info.plist"), info)) { fprintf(stderr, "cannot write fixture %s\n", box.c_str()); exit(2); }
+}
+
+static void makeState(const std::string &dataDir, const std::string &id)
+{
+	fu::makeDirs(fu::join(fu::join(fu::join(dataDir, "Gamebox States"), safeFolderName(id)), "Current.boxerstate"));
+}
+
+static void testMovedDataDir()
+{
+	const std::string base = fu::join(scratch, "moved data test");
+	const std::string oldGames = fu::join(base, "DOS Games");               // no longer exists
+	const std::string oldData = fu::join(oldGames, "Boxer Data");
+	using M = MovedDataDir;
+
+	// Candidates: same place relative to the old games folder, old name, default name.
+	{
+		const std::string g = fu::join(base, "Moved");
+		auto c = movedDataDirCandidates(fu::join(oldGames, "Saves/Boxer"), oldGames, {g});
+		CHECK_EQ(c, (std::vector<std::string>{g + "/Saves/Boxer", g + "/Boxer", g + "/Boxer Data"}));
+		c = movedDataDirCandidates(oldData, oldGames, {g, g});
+		CHECK_EQ(c, std::vector<std::string>{g + "/Boxer Data"});
+		// Old data directory outside the old games folder: no relative guess.
+		c = movedDataDirCandidates("DH1:Saves", "Work:DOS Games", {"Work:Games"});
+		CHECK_EQ(c, (std::vector<std::string>{"Work:Games/Saves", "Work:Games/Boxer Data"}));
+		// The missing directory itself is never a candidate.
+		c = movedDataDirCandidates("Work:Games/Boxer Data", "", {"Work:Games"});
+		CHECK(c.empty());
+	}
+
+	// Match: the moved folder's Boxer Data holds Tyrian's state (and one of a
+	// game deleted since).
+	const std::string moved = fu::join(base, "DOS Games Moved");
+	makeGameboxWithId(moved, "Tyrian", "6F1C-TYRIAN");
+	makeGameboxWithId(fu::join(moved, "Shooters"), "Raptor", "RAPTOR:ID");   // a drawer of games
+	makeGameboxWithId(moved, "No Id Yet", "");
+	makeState(fu::join(moved, "Boxer Data"), "6F1C-TYRIAN");
+	makeState(fu::join(moved, "Boxer Data"), "RAPTOR:ID");
+	makeState(fu::join(moved, "Boxer Data"), "DELETED-GAME");
+	fu::makeDirs(fu::join(moved, "Boxer Data/Screenshots"));
+	{
+		auto names = gameboxStateNamesIn(moved);
+		std::sort(names.begin(), names.end());
+		CHECK_EQ(names, (std::vector<std::string>{"6f1c-tyrian", "raptor_id"}));
+		std::map<std::string, std::string> before, after;
+		snapshot(base, "", before);
+		MovedDataDirSearch r = findMovedDataDir(oldData, oldGames, {moved});
+		snapshot(base, "", after);
+		CHECK(r.result == M::Found);
+		CHECK_EQ(r.path, moved + "/Boxer Data");
+		CHECK_EQ(r.matchedGames, (size_t)2);
+		CHECK(before == after);   // nothing created or changed
+		// Same without knowing the old games folder (moved in an earlier session).
+		r = findMovedDataDir(oldData, "", {moved});
+		CHECK(r.result == M::Found && r.path == moved + "/Boxer Data");
+		// Found through the second folder searched (the opened gamebox's drawer).
+		r = findMovedDataDir(oldData, oldGames, {fu::join(base, "Elsewhere"), moved});
+		CHECK(r.result == M::Found && r.path == moved + "/Boxer Data");
+	}
+
+	// No match: a "Boxer Data" with the state of other games only. Same name,
+	// different contents: not proposed.
+	const std::string other = fu::join(base, "Other Games");
+	makeGameboxWithId(other, "Dune", "DUNE-1");
+	makeState(fu::join(other, "Boxer Data"), "SOMEONE-ELSES");
+	{
+		MovedDataDirSearch r = findMovedDataDir(oldData, oldGames, {other});
+		CHECK(r.result == M::NotFound);
+		CHECK(r.path.empty() && r.matching.empty());
+	}
+	// No candidate at all; a file of that name is not a directory.
+	{
+		const std::string none = fu::join(base, "Plain Games");
+		makeGameboxWithId(none, "Dune", "DUNE-1");
+		CHECK(findMovedDataDir(oldData, oldGames, {none}).result == M::NotFound);
+		put(fu::join(none, "Boxer Data"), "not a drawer");
+		CHECK(findMovedDataDir(oldData, oldGames, {none}).result == M::NotFound);
+		CHECK(findMovedDataDir(oldData, oldGames, {fu::join(base, "Missing Too")}).result == M::NotFound);
+	}
+
+	// Uncertain: the name is there but the contents prove nothing.
+	{
+		const std::string fresh = fu::join(base, "Fresh Games");
+		makeGameboxWithId(fresh, "Tyrian", "6F1C-TYRIAN");
+		fu::makeDirs(fu::join(fresh, "Boxer Data/Screenshots"));     // no game played yet
+		MovedDataDirSearch r = findMovedDataDir(oldData, oldGames, {fresh});
+		CHECK(r.result == M::Uncertain);
+		CHECK_EQ(r.path, fresh + "/Boxer Data");
+		CHECK(r.matching.empty());
+		// State there, but no gamebox in the folder to compare it with.
+		const std::string bare = fu::join(base, "Bare Folder");
+		makeState(fu::join(bare, "Boxer Data"), "6F1C-TYRIAN");
+		r = findMovedDataDir(oldData, oldGames, {bare});
+		CHECK(r.result == M::Uncertain && r.path == bare + "/Boxer Data");
+	}
+
+	// Ambiguous: a custom-named data directory and a default one both hold
+	// state of the folder's games.
+	{
+		const std::string both = fu::join(base, "Both Games");
+		makeGameboxWithId(both, "Tyrian", "6F1C-TYRIAN");
+		makeState(fu::join(both, "My Saves"), "6F1C-TYRIAN");
+		makeState(fu::join(both, "Boxer Data"), "6F1C-TYRIAN");
+		MovedDataDirSearch r = findMovedDataDir(fu::join(oldGames, "My Saves"), oldGames, {both});
+		CHECK(r.result == M::Ambiguous);
+		CHECK(r.path.empty());
+		CHECK_EQ(r.matching, (std::vector<std::string>{both + "/My Saves", both + "/Boxer Data"}));
+		// With only the custom one holding state, that one is found.
+		fu::removeTree(fu::join(both, "Boxer Data/Gamebox States"));
+		r = findMovedDataDir(fu::join(oldGames, "My Saves"), oldGames, {both});
+		CHECK(r.result == M::Found && r.path == both + "/My Saves");
+	}
+
+	// The contents of a gamebox are not searched for games.
+	{
+		const std::string odd = fu::join(base, "Odd Games");
+		makeGameboxWithId(odd, "Tyrian", "6F1C-TYRIAN");
+		makeGameboxWithId(fu::join(odd, "Tyrian.boxer"), "Inner", "INNER");
+		auto names = gameboxStateNamesIn(odd);
+		CHECK_EQ(names, std::vector<std::string>{"6f1c-tyrian"});
+	}
+}
+
 static void testPrefsAndDataDir()
 {
 	UserPrefs p;
@@ -1408,6 +1539,7 @@ int main(int argc, char **argv)
 	testQuoting();
 	testDataLocations();
 	testPrefsAndDataDir();
+	testMovedDataDir();
 	testShadow();
 	testShadowNested();
 	testImportSource();

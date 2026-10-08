@@ -2204,6 +2204,73 @@ static boxer::DataLocations prefsLocations() {
     return where;
 }
 
+// While a stored path is checked, DOS must not put up "Please insert
+// volume": the missing-folder prompt itself tells the user to connect the
+// disk, and a system requester in front of it would ask the same thing twice.
+template <typename F> static auto withoutVolumeRequesters(F f) -> decltype(f()) {
+    struct Process *me = (struct Process *)FindTask(NULL);
+    APTR saved = me->pr_WindowPtr;
+    me->pr_WindowPtr = (APTR)-1;
+    auto r = f();
+    me->pr_WindowPtr = saved;
+    return r;
+}
+
+enum class MovedDataDirAnswer { Use, ChooseOther, Quit, NotOffered };
+
+// A configured data folder that is gone has most often moved along with the
+// games folder it was in. It is offered only when its contents show that it
+// holds this games folder's saved games (boxer::findMovedDataDir); when that
+// cannot be told, the user is asked to point to it, starting where it would
+// be. A folder is never made the data folder for its name alone, and no new
+// one is created here. atStart: BoxerUI cannot go on without a data folder,
+// so another folder can be chosen and Cancel ends the program; after Locate
+// the question can wait ("Not now") until the next start.
+static MovedDataDirAnswer offerMovedDataDir(const std::string &missing, const std::string &oldGames,
+                                            const std::vector<std::string> &folders, bool atStart,
+                                            std::string &out) {
+    using M = boxer::MovedDataDir;
+    const auto r = withoutVolumeRequesters([&] { return boxer::findMovedDataDir(missing, oldGames, folders); });
+    logf("datadir: \"%s\" missing, moved-folder search -> %s \"%s\" (%u matching, %u games)", missing.c_str(),
+         r.result == M::Found ? "found" : r.result == M::Ambiguous ? "ambiguous"
+         : r.result == M::Uncertain ? "uncertain" : "not found",
+         r.path.c_str(), (unsigned)r.matching.size(), (unsigned)r.matchedGames);
+    if (r.result == M::NotFound) return MovedDataDirAnswer::NotOffered;
+    std::string body = "Boxer's data folder is no longer at\n" + missing + "\n\n";
+    std::string gadgets;
+    if (r.result == M::Found) {
+        body += "Your games folder has a data folder with the saved games of\n" +
+                (r.matchedGames == 1 ? std::string("one") : std::to_string(r.matchedGames)) +
+                " of your games:\n" + r.path + "\n\nUse it?";
+        gadgets = atStart ? "Use this folder|Choose another...|Cancel" : "Use this folder|Not now";
+    } else {
+        if (r.result == M::Ambiguous) {
+            body += "Your games folder has more than one data folder with saved\ngames of your games:\n";
+            for (const auto &m : r.matching) body += m + "\n";
+            body += "\nChoose the one Boxer should use.";
+        } else {
+            body += "Your games folder contains\n" + r.path +
+                    "\nbut Boxer cannot tell whether your saved games are there.\n"
+                    "If you moved the data folder, choose where it is now.";
+        }
+        gadgets = atStart ? "Locate folder...|Choose another...|Cancel" : "Locate folder...|Not now";
+    }
+    // The body goes in as an argument: a '%' in a path is not a format.
+    const LONG b = ask("%s", gadgets.c_str(), body.c_str());
+    logf("datadir: moved-folder requester -> %d", (int)b);
+    if (b == 1) {
+        if (r.result == M::Found) { out = r.path; return MovedDataDirAnswer::Use; }
+        const std::string start = r.result == M::Ambiguous ? boxer::fsutil::parent(r.matching[0]) : r.path;
+        const std::string d = pickDrawer(start, "Select the folder that holds Boxer's saved games", false);
+        logf("datadir: moved-folder locate -> \"%s\"", d.c_str());
+        if (d.empty()) return MovedDataDirAnswer::NotOffered;
+        out = d;
+        return MovedDataDirAnswer::Use;
+    }
+    if (atStart && b == 2) return MovedDataDirAnswer::ChooseOther;
+    return atStart ? MovedDataDirAnswer::Quit : MovedDataDirAnswer::NotOffered;
+}
+
 // Fills g_args.data. Order (boxer::chooseDataDir): DATA (this session
 // only), DATADIR / BOXER_DATADIR (stored), the prefs' DataDir, and on the
 // very first run the proposal "<drawer holding the gamebox>/Boxer Data",
@@ -2228,6 +2295,7 @@ static bool resolveDataDir() {
     // The Welcome start is where a new user begins (scenario step 2), so it
     // settles the games folder first; the data directory proposal follows it.
     bool gamesChanged = false;
+    const std::string oldGames = prefs.gamesFolder;
     const bool welcomeStart = g_args.gamebox.empty() && g_args.kind.empty() && !g_args.prefsOnly;
     if (welcomeStart && !resolveGamesFolder(prefs, &gamesChanged)) return false;
     g_gamesFolder = prefs.gamesFolder;
@@ -2253,6 +2321,7 @@ static bool resolveDataDir() {
             choice.dataDir = d;
         }
     }
+    bool searched = false;
     for (;;) {
         std::string msg;
         const bool existed = boxer::fsutil::isDirectory(choice.dataDir);
@@ -2263,6 +2332,31 @@ static bool resolveDataDir() {
         if (st == boxer::DataDirStatus::Ready) {
             if (choice.save) choice.dataDir = canonicalDir(choice.dataDir);
             break;
+        }
+        if (st == boxer::DataDirStatus::Missing && choice.origin == boxer::DataDirOrigin::Configured &&
+            !searched && !g_args.prefsOnly) {
+            searched = true;
+            std::vector<std::string> folders{prefs.gamesFolder};
+            if (!g_args.gamebox.empty())
+                folders.push_back(boxer::fsutil::parent(boxer::fsutil::trimTrailingSlash(g_args.gamebox)));
+            std::string found;
+            const auto a = offerMovedDataDir(choice.dataDir, oldGames, folders, true, found);
+            if (a == MovedDataDirAnswer::Quit) return false;
+            if (a == MovedDataDirAnswer::Use) {
+                // An existing folder: if it is gone again it is reported, not created.
+                choice.dataDir = found;
+                choice.mayCreate = false;
+                choice.save = true;
+                continue;
+            }
+            if (a == MovedDataDirAnswer::ChooseOther) {
+                std::string d = pickDrawer(choice.dataDir);
+                if (d.empty()) return false;
+                choice.dataDir = d;
+                choice.mayCreate = true;
+                choice.save = d != prefs.dataDir;
+                continue;
+            }
         }
         // Shell/test starts with an explicit directory get an error, not a requester.
         if (choice.origin == boxer::DataDirOrigin::Override || g_args.prefsOnly) {
@@ -2308,18 +2402,6 @@ static bool resolveDataDir() {
     return true;
 }
 
-// While a stored path is checked, DOS must not put up "Please insert
-// volume": the missing-folder prompt itself tells the user to connect the
-// disk, and a system requester in front of it would ask the same thing twice.
-template <typename F> static auto withoutVolumeRequesters(F f) -> decltype(f()) {
-    struct Process *me = (struct Process *)FindTask(NULL);
-    APTR saved = me->pr_WindowPtr;
-    me->pr_WindowPtr = (APTR)-1;
-    auto r = f();
-    me->pr_WindowPtr = saved;
-    return r;
-}
-
 // Opens a drawer or an icon the way a double-click in Wanderer does.
 static bool openInWanderer(const std::string &path) {
     struct Library *wb = OpenLibrary((STRPTR)"workbench.library", 44);
@@ -2354,6 +2436,22 @@ static void locateGamesFolder() {
     boxer::UserPrefs prefs;
     std::string err, envErr;
     boxer::loadUserPrefs(where, prefs, &err);
+    // The data folder inside the old games folder went with it; settled
+    // now, the next start does not ask for it again.
+    const bool dataGone = !g_args.data.empty() &&
+        withoutVolumeRequesters([] { return !boxer::fsutil::isDirectory(g_args.data); });
+    if (dataGone) {
+        std::string found, msg;
+        if (offerMovedDataDir(g_args.data, g_gamesFolder, {folder}, false, found) == MovedDataDirAnswer::Use) {
+            if (boxer::prepareDataDir(found, &msg, false) == boxer::DataDirStatus::Ready) {
+                g_args.data = prefs.dataDir = canonicalDir(found);
+                logf("datadir: now \"%s\"", g_args.data.c_str());
+            } else {
+                logf("datadir: \"%s\" not usable: %s", found.c_str(), msg.c_str());
+                ask("The folder for saved games cannot be used:\n%s\n\nBoxer will ask for it at its next start.", "OK", msg.c_str());
+            }
+        }
+    }
     prefs.gamesFolder = folder;
     g_gamesFolder = folder;
     if (!boxer::saveUserPrefs(where, prefs, &err, &envErr)) {
