@@ -19,6 +19,8 @@
 #include <map>
 #include <string>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <unistd.h>
 #include <vector>
 
 using namespace boxer;
@@ -140,6 +142,136 @@ static void testPlist()
 
 // --- replace ---
 
+static void setMTime(const std::string &path, time_t t)
+{
+	struct timeval tv[2] = {{t, 0}, {t, 0}};
+	utimes(path.c_str(), tv);
+}
+
+// Makes a file undeletable the way a reader holding it does on AROS (DOS
+// refuses to delete an object in use). Returns false where the host cannot.
+static bool lockFile(const std::string &path, bool lock)
+{
+#ifdef UF_IMMUTABLE
+	return chflags(path.c_str(), lock ? UF_IMMUTABLE : 0) == 0;
+#else
+	(void)path; (void)lock;
+	return false;
+#endif
+}
+
+// The replace only ever deletes its own scratch files, and an old version
+// that cannot be deleted (a game icon Wanderer is still reading) neither
+// fails the save nor stays behind for good.
+static void testReplaceOwnership(const std::string &dir)
+{
+	using S = fu::ReplaceStep;
+	using A = fu::FaultAction;
+	const std::string icon = fu::join(dir, "The Long Named Game.info");
+	const std::string bak = fu::backupPathFor(icon), bak2 = bak + "-2", tmp = fu::tempPathFor(icon);
+	const std::string foreignBak = icon + ".bak", foreignTmp = icon + ".tmp";
+	CHECK(bak != foreignBak && tmp != foreignTmp);
+	put(foreignBak, "user's own copy");
+	put(foreignTmp, "another program's file");
+	put(icon, "icon 1");
+
+	// Saves, a cleanup failure and its recovery leave the foreign files alone.
+	CHECK(fu::replaceFile(icon, "icon 2"));
+	fu::setReplaceFaultHook([](S s) { return s == S::RemoveBackup ? A::Fail : A::Proceed; });
+	CHECK(fu::replaceFile(icon, "icon 3"));
+	fu::setReplaceFaultHook(nullptr);
+	CHECK(fu::recoverReplace(icon));
+	CHECK(fu::replaceFile(icon, "icon 4"));
+	CHECK_EQ(get(icon), std::string("icon 4"));
+	CHECK_EQ(get(foreignBak), std::string("user's own copy"));
+	CHECK_EQ(get(foreignTmp), std::string("another program's file"));
+	CHECK(!fu::exists(bak) && !fu::exists(tmp));
+
+	// A crash with no icon in place: the foreign ".bak" is not taken for
+	// ours and not restored; ours is.
+	fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
+	CHECK(!fu::replaceFile(icon, "icon 5"));
+	fu::setReplaceFaultHook(nullptr);
+	CHECK(!fu::exists(icon));
+	CHECK(fu::recoverReplace(icon));
+	CHECK_EQ(get(icon), std::string("icon 4"));
+	CHECK_EQ(get(foreignBak), std::string("user's own copy"));
+	CHECK_EQ(get(foreignTmp), std::string("another program's file"));
+
+	// A drawer carrying our backup name is someone else's: never deleted,
+	// the save uses the next name.
+	fu::makeDirs(bak);
+	CHECK(fu::replaceFile(icon, "icon 6"));
+	CHECK_EQ(get(icon), std::string("icon 6"));
+	CHECK(fu::isDirectory(bak) && !fu::exists(bak2));
+	::rmdir(bak.c_str());
+	// A drawer on the temp name blocks the save; the icon stays as it was.
+	fu::makeDirs(tmp);
+	std::string err;
+	CHECK(!fu::replaceFile(icon, "icon 7", &err));
+	CHECK(err.find("in use") != std::string::npos);
+	CHECK_EQ(get(icon), std::string("icon 6"));
+	CHECK(fu::isDirectory(tmp));
+	::rmdir(tmp.c_str());
+
+	// The old version is in use when it is to be deleted.
+	std::string lockedPath;
+	bool lockedOnce = false;
+	fu::setReplaceFaultHook([&](S s) {
+		if (s == S::RemoveBackup && !lockedOnce) {
+			lockedOnce = true;
+			if (lockFile(bak, true)) lockedPath = bak;
+			else return A::Fail;   // no file locking on this host: the hook stands in
+		}
+		return A::Proceed;
+	});
+	CHECK(fu::replaceFile(icon, "icon 8"));
+	CHECK_EQ(get(icon), std::string("icon 8"));
+	CHECK_EQ(get(bak), std::string("icon 6"));
+	CHECK_EQ(fu::pendingCleanup(), std::vector<std::string>{bak});
+	// Still in use at the next save: that one goes through on the next name
+	// and cleans up after itself.
+	CHECK(fu::replaceFile(icon, "icon 9"));
+	CHECK_EQ(get(icon), std::string("icon 9"));
+	CHECK(fu::exists(bak) && !fu::exists(bak2));
+	CHECK_EQ(fu::pendingCleanup(), std::vector<std::string>{bak});
+	fu::setReplaceFaultHook(nullptr);
+	if (!lockedPath.empty()) {
+		CHECK_EQ(fu::retryPendingCleanup(), std::vector<std::string>{bak});
+		CHECK(fu::exists(bak));
+		lockFile(bak, false);
+	}
+	// Released (or at the next chance, as before exit): removed.
+	CHECK(fu::retryPendingCleanup().empty());
+	CHECK(!fu::exists(bak));
+
+	// Interrupted save while an older backup was still in use: the newest
+	// backup is the version to restore, the older one is cleaned up.
+	put(bak, "icon 0");
+	setMTime(bak, 1000000000);
+	setMTime(icon, 1100000000);
+	if (lockFile(bak, true)) {
+		fu::setReplaceFaultHook([](S s) { return s == S::RenameTemp ? A::Crash : A::Proceed; });
+		CHECK(!fu::replaceFile(icon, "icon 10"));
+		fu::setReplaceFaultHook(nullptr);
+		CHECK(!fu::exists(icon) && fu::exists(bak2));
+		CHECK(fu::recoverReplace(icon));
+		CHECK_EQ(get(icon), std::string("icon 9"));
+		CHECK_EQ(get(bak), std::string("icon 0"));
+		CHECK_EQ(fu::pendingCleanup(), std::vector<std::string>{bak});
+		lockFile(bak, false);
+		CHECK(fu::retryPendingCleanup().empty());
+	} else {
+		fprintf(stderr, "note: no file locking on this host; interrupted save with a held backup not tested\n");
+		CHECK(fu::recoverReplace(icon));
+	}
+	CHECK(!fu::exists(bak) && !fu::exists(bak2) && !fu::exists(tmp));
+	CHECK_EQ(get(icon), std::string("icon 9"));
+	CHECK_EQ(get(foreignBak), std::string("user's own copy"));
+	CHECK_EQ(get(foreignTmp), std::string("another program's file"));
+	CHECK(fu::pendingCleanup().empty());
+}
+
 static void testReplace()
 {
 	std::string dir = fu::join(scratch, "replace test");
@@ -174,9 +306,11 @@ static void testReplace()
 	CHECK(fu::replaceFile(f, "v3"));
 	CHECK_EQ(get(f), std::string("v3"));
 	CHECK(fu::exists(bak));
+	CHECK_EQ(fu::pendingCleanup(), std::vector<std::string>{bak});
 	fu::setReplaceFaultHook(nullptr);
 	CHECK(fu::recoverReplace(f));
 	CHECK(!fu::exists(bak));
+	CHECK(fu::pendingCleanup().empty());
 
 	// Crash after the old file was moved aside: no final file at all.
 	failAt(S::RenameTemp, A::Crash);
@@ -214,6 +348,8 @@ static void testReplace()
 
 	// Real failure: target directory is missing.
 	CHECK(!fu::replaceFile(fu::join(dir, "no such dir/x"), "x"));
+
+	testReplaceOwnership(dir);
 
 	// Plist file round trip through replaceFile.
 	PlistValue p = PlistValue::dict();

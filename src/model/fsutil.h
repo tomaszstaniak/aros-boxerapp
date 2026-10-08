@@ -54,11 +54,22 @@ bool isWritableDirectory(const std::string &dir);
 // Replacement of a small state/prefs file without ever leaving no valid
 // version behind. rename() onto an existing file is not assumed to work
 // (AROS DOS Rename fails if the target exists), so the sequence is:
-//   write <path>.tmp; rename <path> -> <path>.bak; rename .tmp -> <path>;
-//   remove .bak.
+//   write <path>.bxnew; rename <path> -> <path>.bxold; rename .bxnew -> <path>;
+//   remove .bxold.
 // On a failed step the previous version is put back. After a crash,
-// recoverReplace() restores <path> from .bak and drops a stale .tmp; call it
-// before reading such a file.
+// recoverReplace() restores <path> from .bxold and drops a stale .bxnew; call
+// it before reading such a file.
+//
+// Only these two names, and the numbered alternatives "<path>.bxold-2" ..
+// "-9" used while an earlier one cannot be removed, are ever deleted: they
+// are this code's own. A "<path>.bak" or "<path>.tmp" belongs to someone
+// else (a user's own copy of an icon, another program) and is never touched.
+//
+// The old version can outlive a successful replace: a file manager that is
+// still reading it (Wanderer after a change notification) makes the delete
+// fail. The new version is in place by then, so the replace succeeds, and the
+// backup is remembered and removed by the next replaceFile() or by
+// retryPendingCleanup(), which a program calls before it exits.
 enum class ReplaceStep { WriteTemp, BackupOld, RenameTemp, RemoveBackup };
 enum class FaultAction { Proceed, Fail, Crash };
 // Test hook: consulted before each step. Crash returns immediately and leaves
@@ -69,8 +80,15 @@ void setReplaceFaultHook(ReplaceFaultHook hook);
 bool replaceFile(const std::string &path, const std::string &data, std::string *error = nullptr);
 // Returns false only if a needed restore failed.
 bool recoverReplace(const std::string &path);
+// The first-choice names; replaceFile() may use a numbered alternative.
 std::string tempPathFor(const std::string &path);
 std::string backupPathFor(const std::string &path);
+// Every scratch name of path that replaceFile() may use, first choice first.
+std::vector<std::string> ownedScratchPaths(const std::string &path);
+// Old versions whose removal failed and is still to be done.
+const std::vector<std::string> &pendingCleanup();
+// Tries to remove them again; returns those that still could not be removed.
+std::vector<std::string> retryPendingCleanup();
 
 } // namespace fsutil
 } // namespace boxer

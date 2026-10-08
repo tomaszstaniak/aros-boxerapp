@@ -2486,6 +2486,8 @@ static bool writeCoverIcon(const std::string &gameboxPath, const std::string &ic
     if (rendered) *rendered = icon;
     bool ok = boxer::writeSidecarIcon(iconStem, icon, id, boxer::fsutil::baseName(gameboxPath), replaceOwn, &err);
     logf("cover: icon %s.info %s%s", iconStem.c_str(), ok ? "written" : "NOT written: ", err.c_str());
+    for (const auto &p : boxer::fsutil::pendingCleanup())
+        logf("cover: old version \"%s\" in use, removed later", p.c_str());
     return ok;
 }
 
@@ -3576,6 +3578,10 @@ int main(int argc, char **argv) {
         bool ok = g_import.discardGamebox(&err);
         logf("import: unfinished at exit; gamebox %s%s", ok ? "deleted" : "NOT deleted: ", err.c_str());
     }
+    // An old icon or settings file that a reader (Wanderer) still held when
+    // it was replaced goes now; one still held is named, so it can be found.
+    for (const auto &p : boxer::fsutil::retryPendingCleanup())
+        logf("cleanup: old version \"%s\" still in use, NOT deleted", p.c_str());
     logf("exit");
     dumpGeometry("exit");
     if (g_laterArmed) DoMethod(ui.app, MUIM_Application_RemInputHandler, (IPTR)&g_laterIhn);

@@ -126,8 +126,8 @@ static bool readPrefsFile(const std::string &path, UserPrefs &out, std::string *
 
 PrefsSource loadUserPrefs(const DataLocations &where, UserPrefs &out, std::string *error)
 {
-	// Both copies are recovered, also the one not read, so no stale .bak or
-	// .tmp waits for a later save.
+	// Both copies are recovered, also the one not read, so no stale backup
+	// or temp file waits for a later save.
 	if (!where.envarcPrefsPath.empty())
 		fsutil::recoverReplace(where.envarcPrefsPath);
 	std::string why;
