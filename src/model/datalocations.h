@@ -127,6 +127,14 @@ std::string defaultGamesFolder(bool haveWork);
 bool acceptableGamesFolder(const std::string &path, const DataLocations &locations,
                            std::string *why = nullptr);
 
+// GF:778 revealGamesFolder and GF:732 promptForMissingGamesFolderInWindow:
+// Browse opens the games folder when it is a directory. A configured folder
+// that is gone (deleted, renamed, its disk not mounted, or a file in its
+// place) is Missing, and the user is asked to locate it; nothing is
+// recreated silently. NotSet when no games folder has been chosen yet.
+enum class GamesFolderBrowse { Open, Missing, NotSet };
+GamesFolderBrowse browseGamesFolder(const std::string &gamesFolder);
+
 // Characters that cannot appear in an AROS file name are replaced, so an
 // identifier (UUID, hex digest or reverse-DNS) is always a usable folder.
 std::string safeFolderName(const std::string &identifier);

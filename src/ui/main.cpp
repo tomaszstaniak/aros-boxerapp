@@ -2137,6 +2137,32 @@ static void addDrawerIcon(const std::string &dir, const char *templ) {
     CloseLibrary(base);
 }
 
+// Creates (when allowed) and probes the games folder; a folder that cannot
+// hold games is reported and the user picks another one, or cancels (false).
+// On success folder is in DOS's own form, ready to be stored.
+static bool settleGamesFolder(std::string &folder, bool mayCreate, const boxer::DataLocations &loc) {
+    for (;;) {
+        std::string msg;
+        bool ok = boxer::acceptableGamesFolder(folder, loc, &msg);
+        if (ok) {
+            const bool existed = boxer::fsutil::isDirectory(folder);
+            auto st = boxer::prepareDataDir(folder, &msg, mayCreate);
+            ok = st == boxer::DataDirStatus::Ready;
+            if (ok && !existed) addDrawerIcon(folder, "PROGDIR:conf/GamesFolder");
+        }
+        if (ok) folder = canonicalDir(folder);
+        logf("gamesfolder: \"%s\" -> %s", folder.c_str(), ok ? "ready" : msg.c_str());
+        if (ok) return true;
+        LONG r = ask("This folder cannot hold your games:\n%s\n\nChoose another folder?", "Choose...|Cancel", msg.c_str());
+        logf("gamesfolder: not usable requester -> %d", (int)r);
+        if (r != 1) return false;
+        std::string d = pickDrawer(folder, kGamesFolderTitle);
+        if (d.empty()) return false;
+        folder = d;
+        mayCreate = true;
+    }
+}
+
 // First run from the Welcome window (BXGamesFolderPanelController, GF:72-104):
 // the games folder is proposed, confirmed or replaced, created
 // and probed for write access. A configured folder that vanished is reported
@@ -2162,29 +2188,17 @@ static bool resolveGamesFolder(boxer::UserPrefs &prefs, bool *changed) {
         }
         mayCreate = true;
     }
-    for (;;) {
-        std::string msg;
-        bool ok = boxer::acceptableGamesFolder(folder, loc, &msg);
-        if (ok) {
-            const bool existed = boxer::fsutil::isDirectory(folder);
-            auto st = boxer::prepareDataDir(folder, &msg, mayCreate);
-            ok = st == boxer::DataDirStatus::Ready;
-            if (ok && !existed) addDrawerIcon(folder, "PROGDIR:conf/GamesFolder");
-        }
-        if (ok) folder = canonicalDir(folder);
-        logf("gamesfolder: \"%s\" -> %s", folder.c_str(), ok ? "ready" : msg.c_str());
-        if (ok) break;
-        LONG r = ask("This folder cannot hold your games:\n%s\n\nChoose another folder?", "Choose...|Cancel", msg.c_str());
-        logf("gamesfolder: not usable requester -> %d", (int)r);
-        if (r != 1) return false;
-        std::string d = pickDrawer(folder, kGamesFolderTitle);
-        if (d.empty()) return false;
-        folder = d;
-        mayCreate = true;
-    }
+    if (!settleGamesFolder(folder, mayCreate, loc)) return false;
     *changed = folder != prefs.gamesFolder;
     prefs.gamesFolder = folder;
     return true;
+}
+
+// Where the prefs live: ENVARC:/ENV: Boxer/Boxer.prefs, or the PREFS file of a test start.
+static boxer::DataLocations prefsLocations() {
+    boxer::DataLocations where;
+    if (!g_args.prefsPath.empty()) { where.envarcPrefsPath = g_args.prefsPath; where.envPrefsPath.clear(); }
+    return where;
 }
 
 // Fills g_args.data. Order (boxer::chooseDataDir): DATA (this session
@@ -2194,8 +2208,7 @@ static bool resolveGamesFolder(boxer::UserPrefs &prefs, bool *changed) {
 // never swapped for another one silently: the user chooses, or the start
 // ends with a readable error. Returns false to end the program.
 static bool resolveDataDir() {
-    boxer::DataLocations where;
-    if (!g_args.prefsPath.empty()) { where.envarcPrefsPath = g_args.prefsPath; where.envPrefsPath.clear(); }
+    boxer::DataLocations where = prefsLocations();
     if (g_args.dataDirChosen.empty()) {
         char var[512];
         if (GetVar((CONST_STRPTR)"BOXER_DATADIR", (STRPTR)var, sizeof var, GVF_GLOBAL_ONLY) > 0)
@@ -2290,6 +2303,86 @@ static bool resolveDataDir() {
     }
     g_args.data = choice.dataDir;
     return true;
+}
+
+// While a stored path is checked, DOS must not put up "Please insert
+// volume": the missing-folder prompt itself tells the user to connect the
+// disk, and a system requester in front of it would ask the same thing twice.
+template <typename F> static auto withoutVolumeRequesters(F f) -> decltype(f()) {
+    struct Process *me = (struct Process *)FindTask(NULL);
+    APTR saved = me->pr_WindowPtr;
+    me->pr_WindowPtr = (APTR)-1;
+    auto r = f();
+    me->pr_WindowPtr = saved;
+    return r;
+}
+
+// Opens a drawer or an icon the way a double-click in Wanderer does.
+static bool openInWanderer(const std::string &path) {
+    struct Library *wb = OpenLibrary((STRPTR)"workbench.library", 44);
+    if (!wb) return false;
+    struct Library *saved = WorkbenchBase;
+    WorkbenchBase = wb;
+    BOOL ok = OpenWorkbenchObject((STRPTR)path.c_str(), TAG_DONE);
+    WorkbenchBase = saved;
+    CloseLibrary(wb);
+    return ok;
+}
+
+// BXGamesFolderPanelController after the missing-folder prompt: an existing
+// folder is chosen and becomes the games folder. As in the original it is
+// stored, not opened; the next Browse opens it.
+static void locateGamesFolder() {
+    std::string start = withoutVolumeRequesters([] {
+        std::string p = g_gamesFolder;
+        while (!p.empty() && !exists(p)) {
+            std::string up = boxer::fsutil::parent(p);
+            if (up == p) { p.clear(); break; }
+            p = up;
+        }
+        return p.empty() ? std::string("SYS:") : p;
+    });
+    std::string folder = pickDrawer(start, kGamesFolderTitle, false);
+    if (folder.empty()) { logf("gamesfolder: locate cancelled"); return; }
+    boxer::DataLocations loc;
+    loc.dataDir = g_args.data;
+    if (!settleGamesFolder(folder, false, loc)) return;
+    boxer::DataLocations where = prefsLocations();
+    boxer::UserPrefs prefs;
+    std::string err, envErr;
+    boxer::loadUserPrefs(where, prefs, &err);
+    prefs.gamesFolder = folder;
+    g_gamesFolder = folder;
+    if (!boxer::saveUserPrefs(where, prefs, &err, &envErr)) {
+        logf("gamesfolder: prefs NOT saved: %s", err.c_str());
+        ask("Boxer could not save its settings:\n%s\n\nThe folder is used for this session only.", "OK", err.c_str());
+        return;
+    }
+    logf("gamesfolder: relocated to \"%s\", prefs saved to %s", folder.c_str(), where.envarcPrefsPath.c_str());
+}
+
+// GF:778 revealGamesFolder: open the games folder in Wanderer; a folder
+// that cannot be found (deleted, renamed, disk not mounted) brings up the
+// prompt of GF:732 with a way to locate it.
+static void browseGames() {
+    auto st = withoutVolumeRequesters([] { return boxer::browseGamesFolder(g_gamesFolder); });
+    if (st == boxer::GamesFolderBrowse::NotSet) return;   // the button is ghosted then
+    if (st == boxer::GamesFolderBrowse::Open) {
+        bool ok = openInWanderer(g_gamesFolder);
+        logf("browse: open \"%s\" -> %s", g_gamesFolder.c_str(), ok ? "ok" : "failed");
+        if (!ok)
+            MUI_Request(ui.app, ui.welcome, 0, (char *)"Boxer", (char *)"OK",
+                        (char *)"Wanderer could not open your games folder:\n%s", (IPTR)g_gamesFolder.c_str());
+        return;
+    }
+    // The path is added to the original's text: nothing else tells the
+    // user which folder Boxer was looking for.
+    LONG r = MUI_Request(ui.app, ui.welcome, 0, (char *)"Boxer", (char *)"Locate folder...|Cancel",
+        (char *)"Boxer can no longer find your games folder.\n\n"
+                "Make sure the disk containing your games folder is connected.\n\n%s",
+        (IPTR)g_gamesFolder.c_str());
+    logf("browse: \"%s\" missing, prompt -> %d", g_gamesFolder.c_str(), (int)r);
+    if (r == 1) locateGamesFolder();
 }
 
 // ----------------------------------------------------------------- main ---
@@ -2709,6 +2802,9 @@ static bool handleId(ULONG id) {
         logf("welcome: close");
         set(ui.welcome, MUIA_Window_Open, FALSE);
         break;
+    case ID_BROWSE:
+        browseGames();
+        break;
     case ID_IMPORT:
         // BXAppController orderFrontImportGamePanel: a fresh session at the dropzone.
         g_import = boxer::ImportSession();
@@ -2856,15 +2952,7 @@ static bool handleId(ULONG id) {
         // panel (launchGamebox: makeFirstResponder:nil fails on validation).
         if (!commitImportName()) break;
         const std::string icon = boxer::fsutil::join(g_import.gamesFolder, g_import.gameName());
-        struct Library *wb = OpenLibrary((STRPTR)"workbench.library", 44);
-        BOOL ok = FALSE;
-        if (wb) {
-            struct Library *saved = WorkbenchBase;
-            WorkbenchBase = wb;
-            ok = OpenWorkbenchObject((STRPTR)icon.c_str(), TAG_DONE);
-            WorkbenchBase = saved;
-            CloseLibrary(wb);
-        }
+        const bool ok = openInWanderer(icon);
         logf("import: launch game: open \"%s\" -> %s", icon.c_str(), ok ? "ok" : "failed");
         if (!ok) {
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
@@ -3309,14 +3397,17 @@ int main(int argc, char **argv) {
              MUIM_Application_ReturnID, ID_WELCOME_CLOSE);
     notifyId(ui.closeBtn, MUIA_Pressed, FALSE, ID_WELCOME_CLOSE);
     notifyId(ui.wb[2], MUIA_Pressed, FALSE, ID_PROMPT);
-    // Rule for 3.0: a control is either working or ghosted, never a stub
-    // that only logs. Browse (3.1), Import (3.4) and Open recent (3.2) are
-    // enabled by the increments that implement them.
-    set(ui.wb[0], MUIA_Disabled, TRUE);
+    // A control is either working or ghosted, never a stub that only logs.
+    // Open recent has no history behind it yet.
     set(ui.recentBtn, MUIA_Disabled, TRUE);
-    // Import works from the Welcome window once a games folder is known.
-    if (g_gamesFolder.empty()) set(ui.wb[1], MUIA_Disabled, TRUE);
-    else notifyId(ui.wb[1], MUIA_Pressed, FALSE, ID_IMPORT);
+    // Browse and Import work from the Welcome window once a games folder is known.
+    if (g_gamesFolder.empty()) {
+        set(ui.wb[0], MUIA_Disabled, TRUE);
+        set(ui.wb[1], MUIA_Disabled, TRUE);
+    } else {
+        notifyId(ui.wb[0], MUIA_Pressed, FALSE, ID_BROWSE);
+        notifyId(ui.wb[1], MUIA_Pressed, FALSE, ID_IMPORT);
+    }
     notifyId(ui.impChoose, MUIA_Pressed, FALSE, ID_IMPORT_CHOOSE);
     notifyId(ui.impBack, MUIA_Pressed, FALSE, ID_IMPORT_BACK);
     notifyId(ui.imp, MUIA_Window_CloseRequest, TRUE, ID_IMPORT_CLOSE);

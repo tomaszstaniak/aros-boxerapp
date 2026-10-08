@@ -247,6 +247,13 @@ bool acceptableGamesFolder(const std::string &path, const DataLocations &locatio
 	return true;
 }
 
+GamesFolderBrowse browseGamesFolder(const std::string &gamesFolder)
+{
+	if (gamesFolder.empty())
+		return GamesFolderBrowse::NotSet;
+	return fsutil::isDirectory(gamesFolder) ? GamesFolderBrowse::Open : GamesFolderBrowse::Missing;
+}
+
 std::string safeFolderName(const std::string &identifier)
 {
 	std::string out;

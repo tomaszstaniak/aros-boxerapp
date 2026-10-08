@@ -845,6 +845,19 @@ static void testPrefsAndDataDir()
 	CHECK(!acceptableGamesFolder("Work:Games/Dune.BOXER/C.harddisk", gl));
 	CHECK(acceptableGamesFolder("Work:Games/boxer stuff", gl));
 
+	// Browse your games (GF:778, GF:732): open, or ask to locate a lost folder.
+	std::string shelf = fu::join(scratch, "DOS Games");
+	CHECK(browseGamesFolder("") == GamesFolderBrowse::NotSet);
+	CHECK(browseGamesFolder(shelf) == GamesFolderBrowse::Missing);
+	CHECK(!fu::exists(shelf)); // a lost folder is not recreated
+	CHECK(fu::makeDirs(shelf));
+	CHECK(browseGamesFolder(shelf) == GamesFolderBrowse::Open);
+	CHECK(browseGamesFolder(shelf + "/") == GamesFolderBrowse::Open);
+	CHECK(::rename(shelf.c_str(), (shelf + " old").c_str()) == 0);
+	CHECK(browseGamesFolder(shelf) == GamesFolderBrowse::Missing);
+	put(shelf, "not a folder");
+	CHECK(browseGamesFolder(shelf) == GamesFolderBrowse::Missing);
+
 	// Move + rename of a gamebox under one configuration: same state path.
 	std::string games1 = fu::join(scratch, "My Games"), games2 = fu::join(scratch, "Other Drawer");
 	std::string box1 = fu::join(games1, "BoxTest Game.boxer"), box2 = fu::join(games2, "Moved Game.boxer");
