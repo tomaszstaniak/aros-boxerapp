@@ -23,7 +23,8 @@
 #   source-root defaults to work/boxer, which must equal the upstream pin plus
 #   the patch series (checked with scripts/reproduce --source-only before any
 #   compile; a mismatch exits 2). The library's BUILDINFO.txt records
-#   the upstream pin and the patch series (scripts/core-provenance.sh). Compile errors stop the build (exit 1);
+#   the upstream pin and the patch series (scripts/core-provenance.sh) and
+#   whether the source was checked against them. Compile errors stop the build (exit 1);
 #   configuration faults exit 2.
 set -euo pipefail
 die() { echo "build-core: $*" >&2; exit 2; }
@@ -39,12 +40,16 @@ src=${2:-$WORK_DIR}
 # pin + series in a temporary clone and compares; any difference, unsaved
 # or staged change refuses the build. Another source root cannot be checked
 # this way and needs BOXER_CORE_UNCHECKED_SOURCE=1, said in the output.
+# The result goes into BUILDINFO.txt as its "source check:" line;
+# make-package.sh refuses an unchecked core unless told otherwise on record.
 if [ "$(cd "$src" && pwd -P)" = "$(cd "$WORK_DIR" && pwd -P)" ]; then
   check=$("$here/reproduce" --source-only 2>&1) \
     || { printf '%s\n' "$check" >&2; die "work/boxer differs from pin + series; save or discard the change first"; }
   echo "build-core: $(grep '^source check:' <<< "$check")"
+  source_check="source check: work/boxer equals pin + series (scripts/reproduce --source-only)"
 elif [ "${BOXER_CORE_UNCHECKED_SOURCE:-}" = 1 ]; then
   echo "build-core: source root $src is not work/boxer; NOT checked against pin + series" >&2
+  source_check="source check: UNCHECKED source root $(cd "$src" && pwd -P) (BOXER_CORE_UNCHECKED_SOURCE=1); the pin and series above do not describe it"
 else
   die "source root $src is not work/boxer and cannot be checked against pin + series (BOXER_CORE_UNCHECKED_SOURCE=1 builds it anyway)"
 fi
@@ -115,6 +120,7 @@ rm -f "$out/libboxer-dosbox.a" "$out/BUILDINFO.txt"
 # patch series no longer matches it.
 {
   "$here/core-provenance.sh" "$PROJECT_ROOT"
+  echo "$source_check"
   echo "library: $(shasum -a 256 "$out/libboxer-dosbox.a" | cut -d' ' -f1)"
 } > "$out/BUILDINFO.txt"
 echo "built $out/libboxer-dosbox.a (host $BOXER_HOST, ${#objs[@]} objects, $("$AROS_CXX" --version | head -1))"

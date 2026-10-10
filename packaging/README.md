@@ -56,6 +56,14 @@ WAV, TTF, EXE, `.boxer` or Dune file ends up in the drawer.
    `BoxerUI`, and the changed files and the note are recorded in
    `BUILDINFO.txt`. The script cannot verify the note; check it first, for
    example with a rebuild that differs only in the embedded build time.
+   The core library's `BUILDINFO.txt` must record that it was built from
+   `work/boxer` checked against the pin and series
+   (`scripts/check-core-provenance.sh`). A core built from another tree
+   with `BOXER_CORE_UNCHECKED_SOURCE=1` is refused unless
+   `BOXER_PKG_UNCHECKED_CORE_NOTE=<text>` says how that tree was checked;
+   the note and the unchecked root are then written to `BUILDINFO.txt`. A
+   core record without the source-check line (built before it existed) is
+   refused: rebuild the core.
 3. `work/boxer` conf files equal the upstream pin; `upstream/boxer` is at the
    commit in `upstreams.json`.
 4. `scripts/check-package-notices.sh` on the drawer must pass.

@@ -8,7 +8,8 @@
   `build-model.sh`, `build-unwind-fix.sh`: builds, see
   [development](../documentation/development.md).
 - `check-undefined.sh` (with `ui-undefined-allowlist.txt`),
-  `check-package-notices.sh`, `check-sources.sh`: checks used by the build
+  `check-package-notices.sh`, `check-sources.sh`,
+  `check-core-provenance.sh`: checks used by the build
   and packaging.
 - `make-package.sh`: binary package, see [packaging](../packaging/README.md).
 - `boxer-assets.py`: regenerates `assets/source/boxer` and `assets/runtime/boxer`

@@ -91,25 +91,43 @@ coreinfo="$BUILD_DIR/core$HOST_SUFFIX/BUILDINFO.txt"
 [ -f "$coreinfo" ] || die "no $coreinfo: rebuild the core (build-core.sh $BOXER_ABI) to record its patch series"
 [ "$(sed -n 's/^library: //p' "$coreinfo")" = "$(shasum -a 256 "$lib" | cut -d' ' -f1)" ] \
   || die "$coreinfo does not describe $lib"
-coredelta=$(diff <(sed '/^library: /d' "$coreinfo") <("$here/core-provenance.sh" "$P") || true)
-if [ -n "$coredelta" ]; then
-  if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
-    [ "$BOXER_PKG_ACCEPTED_BINARY" = "$got" ] \
-      || die "BOXER_PKG_ACCEPTED_BINARY ($BOXER_PKG_ACCEPTED_BINARY) is not this BoxerUI ($got)"
-    [ -n "${BOXER_PKG_SOURCE_NOTE:-}" ] || die "BOXER_PKG_ACCEPTED_BINARY needs BOXER_PKG_SOURCE_NOTE"
-    srcnote="${srcnote:+$srcnote
+# BOXER_PKG_UNCHECKED_CORE_NOTE=<text>: package a core built from an
+# unchecked source tree (build-core.sh with BOXER_CORE_UNCHECKED_SOURCE=1).
+# Its pin and series do not describe the tree it was built from, so the
+# source archive may not correspond; the note, written to BUILDINFO.txt,
+# must say how that tree was checked. Without it such a core is refused.
+uncheckednote=""
+set +e
+coredelta=$("$here/check-core-provenance.sh" "$P" "$coreinfo")
+corerc=$?
+set -e
+case $corerc in
+  0) ;;
+  3)
+    [ -n "${BOXER_PKG_UNCHECKED_CORE_NOTE:-}" ] \
+      || die "the core was built from a source tree not checked against pin + series ($coredelta); rebuild it from work/boxer, or set BOXER_PKG_UNCHECKED_CORE_NOTE"
+    uncheckednote="$coredelta"
+    echo "make-package: WARNING packaging a core built from an unchecked source tree:" >&2
+    echo "  $coredelta" >&2 ;;
+  1)
+    if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
+      [ "$BOXER_PKG_ACCEPTED_BINARY" = "$got" ] \
+        || die "BOXER_PKG_ACCEPTED_BINARY ($BOXER_PKG_ACCEPTED_BINARY) is not this BoxerUI ($got)"
+      [ -n "${BOXER_PKG_SOURCE_NOTE:-}" ] || die "BOXER_PKG_ACCEPTED_BINARY needs BOXER_PKG_SOURCE_NOTE"
+      srcnote="${srcnote:+$srcnote
 }core pin/series changed since the build (< built, > now):
 $coredelta"
-    echo "make-package: packaging accepted binary $got; core patch series changed since the build:" >&2
-    echo "$coredelta" | sed 's/^/  /' >&2
-  elif [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ]; then
-    [ $stale = 1 ] || { stale=1; ver="$ver-STALE"; }
-    echo "make-package: WARNING core patch series changed since the build; dry run, not distributable" >&2
-  else
-    echo "$coredelta" | sed 's/^/  /' >&2
-    die "upstream pin or patch series differs from the one the core was built from; rebuild (build-core.sh, build-ui.sh)"
-  fi
-fi
+      echo "make-package: packaging accepted binary $got; core patch series changed since the build:" >&2
+      echo "$coredelta" | sed 's/^/  /' >&2
+    elif [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ]; then
+      [ $stale = 1 ] || { stale=1; ver="$ver-STALE"; }
+      echo "make-package: WARNING core patch series changed since the build; dry run, not distributable" >&2
+    else
+      echo "$coredelta" | sed 's/^/  /' >&2
+      die "upstream pin or patch series differs from the one the core was built from; rebuild (build-core.sh, build-ui.sh)"
+    fi ;;
+  *) die "cannot check the core's provenance in $coreinfo (exit $corerc)" ;;
+esac
 
 out="${BOXER_PKG_OUT:-$BUILD_DIR/package$HOST_SUFFIX}"; pkg="$out/Boxer"
 [ -d "$out" ] && chmod -R u+w "$out"; rm -rf "$out"; mkdir -p "$pkg/conf" "$pkg/LICENSES"
@@ -194,6 +212,11 @@ sdkbr=$(git -C "${sdkrepo:-/nonexistent}" rev-parse --abbrev-ref HEAD 2>/dev/nul
   echo
   echo "package: boxer $ver $target"
   [ $stale = 1 ] && echo "WARNING: NOT CORRESPONDING SOURCE - src/ changed after this binary was built; dry run only, do not distribute"
+  if [ -n "$uncheckednote" ]; then
+    echo "WARNING: core library built from a source tree not checked against the pin and series:"
+    echo "  $uncheckednote"
+    echo "  note: $BOXER_PKG_UNCHECKED_CORE_NOTE"
+  fi
   if [ -n "$srcnote" ]; then
     echo "source changed after the build (accepted binary $got):"
     echo "$srcnote" | sed 's/^/  /'
