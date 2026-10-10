@@ -71,6 +71,9 @@ public:
 
 	// The running Emulator, or null outside run().
 	static Emulator *current();
+	// True once a run() has started the core in this process; from then on
+	// no other run() can.
+	static bool coreHasStarted();
 
 	// Blocks until the DOS session ends. Configuration files are parsed in
 	// order, later files overriding earlier ones. A missing or unparsable

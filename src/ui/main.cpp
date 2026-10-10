@@ -1705,18 +1705,29 @@ static IPTR coreEntry(CoreCall *call) {
     return 0;
 }
 
-static bool runSession() {
-    if (g_ss.ran) {
-        logf("session: the core already ran in this process and keeps global state, so it cannot run again; start a new BoxerUI");
-        return false;
-    }
-    g_ss.ran = true;
+struct SessionResult {
+    SessionOutcome outcome;
+    std::string error;
+};
+
+static SessionResult runSession() {
+    auto setupFailed = [](const std::string &why) {
+        logf("session: %s", why.c_str());
+        return SessionResult{SessionOutcome::SetupFailed, why};
+    };
+    if (g_ss.ran)
+        return setupFailed("the core already ran in this process and keeps global state, so it cannot run again; start a new BoxerUI");
     std::vector<boxer::ConfigFile> confs;
     boxer::FileSystem plainFiles;
     boxer::ShadowFileSystem shadowFiles;
     boxer::FileSystem *files = &plainFiles;
     SessionHost host;
     g_host = &host;
+    // Whatever way this returns, no global keeps pointing at the locals
+    // above once they are gone.
+    struct Unpublish {
+        ~Unpublish() { g_host = nullptr; g_ss.emu = nullptr; g_lp.active = false; g_lp.fs = nullptr; }
+    } unpublish;
     std::vector<std::string> preflight = g_args.pre, launch = g_args.cmd;
     std::vector<boxer::ConfigFile> extra;
     for (const auto &c : g_args.confs) (c.required ? confs : extra).push_back(c);
@@ -1727,15 +1738,11 @@ static bool runSession() {
         std::string error, name;
         auto setupLog = [](const std::string &l) { logf("setup: %s", l.c_str()); };
         std::vector<boxer::ConfigFile> layered = extra;
-        if (!boxer::installerSessionCommands(g_import.sourcePath, g_import.installerPath, preflight, launch)) {
-            logf("session: source path cannot be mounted: %s", g_import.sourcePath.c_str());
-            return false;
-        }
+        if (!boxer::installerSessionCommands(g_import.sourcePath, g_import.installerPath, preflight, launch))
+            return setupFailed("source path cannot be mounted: " + g_import.sourcePath);
         if (!boxer::openGamebox(setupLog, g_import.createdGamebox, g_args.data, g_args.confDir, layered,
-                                preflight, launch, shadowFiles, error, &name, false)) {
-            logf("session: new gamebox not opened: %s", error.c_str());
-            return false;
-        }
+                                preflight, launch, shadowFiles, error, &name, false))
+            return setupFailed("new gamebox not opened: " + error);
         confs = layered;
         files = &plainFiles;
         g_ss.title = name;
@@ -1760,10 +1767,8 @@ static bool runSession() {
         const bool once = g_lp.settings.flag(boxer::kShowLaunchPanelKey);
         const size_t launchBefore = launch.size();
         if (!boxer::openGamebox(setupLog, g_args.gamebox, g_args.data, g_args.confDir, layered,
-                                preflight, launch, shadowFiles, error, &name)) {
-            logf("session: gamebox not opened: %s", error.c_str());
-            return false;
-        }
+                                preflight, launch, shadowFiles, error, &name))
+            return setupFailed("gamebox not opened: " + error);
         confs = layered;
         files = &shadowFiles;
         g_ss.title = name;
@@ -1796,12 +1801,12 @@ static bool runSession() {
         }
     } else if (!g_args.confDir.empty()) {
         confs = boxer::sessionConfigFiles(g_args.confDir, nullptr);
-        if (confs.empty()) { logf("session: no configuration files in %s", g_args.confDir.c_str()); return false; }
+        if (confs.empty()) return setupFailed("no configuration files in " + g_args.confDir);
         confs.insert(confs.end() - 1, extra.begin(), extra.end());
     } else {
         confs.insert(confs.end(), extra.begin(), extra.end());
     }
-    if (confs.empty()) { logf("session: no configuration"); return false; }
+    if (confs.empty()) return setupFailed("no configuration");
     launch.insert(launch.end(), g_args.then.begin(), g_args.then.end());
     host.preflight = preflight;
     host.launch = launch;
@@ -1809,7 +1814,7 @@ static bool runSession() {
     boxer::Emulator emu(host, *files);
     if (!g_args.msg.empty()) {
         try { emu.loadMessages(g_args.msg); }
-        catch (const std::exception &e) { logf("session: %s", e.what()); return false; }
+        catch (const std::exception &e) { return setupFailed(e.what()); }
     }
     // The master volume is set before the core starts, so the mixer
     // channels created during start-up (MIXER_AddChannel -> SetVolume ->
@@ -1858,6 +1863,10 @@ static bool runSession() {
     } else {
         logf("session: no memory for the core's stack");
     }
+    // Only a core that really started uses up this process's one session.
+    g_ss.ran = boxer::Emulator::coreHasStarted();
+    const SessionResult result = {sessionOutcome(true, stack != nullptr, g_ss.ran, call.result),
+                                  stack ? emu.lastError() : std::string("no memory for the core's stack")};
     releaseInput("session end");
     if (st.paused) setPaused(false, "session end");
     if (st.launchPanel) lpShow(false, "session end");
@@ -1890,7 +1899,19 @@ static bool runSession() {
     set(ui.dos, MUIA_Window_DisableKeys, 0);
     set(ui.fs, MUIA_Window_DisableKeys, 0);
     set(ui.dos, MUIA_Window_Open, FALSE);
-    return true;
+    return result;
+}
+
+// BXSession's error alerts: a session that could not start or ended with
+// an error says so instead of just closing.
+static void reportSession(const SessionResult &r, const std::string &what) {
+    if (r.outcome == SessionOutcome::Ended) return;
+    logf("session: %s (%s)", r.outcome == SessionOutcome::CoreFailed ? "ended with an error" : "did not start",
+         r.error.c_str());
+    const std::string text = (r.outcome == SessionOutcome::CoreFailed ? what + " ended with an error:\n"
+                                                                     : what + " could not be started:\n") +
+                             (r.error.empty() ? std::string("(no details)") : r.error);
+    MUI_Request(ui.app, NULL, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
 }
 
 // ---- arguments ------------------------------------------------------------
@@ -3646,14 +3667,18 @@ int main(int argc, char **argv) {
         if (g_args.kind == "dos-pending") { g_args.kind = "dos"; sessionWanted = true; }
         if (sessionWanted && g_sigMask && !g_ss.ran) {
             sessionWanted = false;
-            runSession();
+            reportSession(runSession(), "The DOS session");
             if (g_ss.quitApp) break;
             sigs = 0;
         }
         if (g_inst.pending && g_sigMask && !g_ss.ran) {
             set(ui.imp, MUIA_Window_Open, FALSE);
-            if (!runSession()) {
-                logf("import: installer session did not start");
+            const SessionResult r = runSession();
+            if (!importContinuesAfterInstaller(r.outcome, g_inst.stop)) {
+                if (r.outcome != SessionOutcome::Ended) {
+                    logf("import: installer session failed; the import stops");
+                    reportSession(r, "The installer of " + g_import.gameName());
+                }
                 g_inst.stop = true;
             }
             importAfterInstaller();

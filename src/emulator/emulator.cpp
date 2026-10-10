@@ -42,6 +42,8 @@ Emulator::Emulator(EmulatorDelegate &delegate, FileSystem &files)
 
 Emulator *Emulator::current() { return running; }
 
+bool Emulator::coreHasStarted() { return coreStarted; }
+
 int Emulator::run(const std::vector<ConfigFile> &configFiles)
 {
 	if (coreStarted) {

@@ -90,5 +90,21 @@ unsigned welcomeGradient(double x, double y, double W, double H);
 // BXDOSWindowBackgroundView.m:28-131 (solid fill, vignette, top shadow).
 unsigned dosBackground(double x, double y, double W, double H);
 
+// How a DOS session ended, as its caller must see it.
+// SetupFailed: the core's global state was never touched (gamebox not
+//   opened, no configuration, no memory for its stack, or the core refused
+//   before starting, e.g. a missing required .conf); another session can
+//   still run in this process.
+// CoreFailed: the core started and ended with an error (lastError()).
+// Ended: a normal end, including the user closing the session.
+enum class SessionOutcome { SetupFailed, CoreFailed, Ended };
+SessionOutcome sessionOutcome(bool setupOk, bool coreEntered, bool coreStarted, int coreResult);
+
+// BXImportSession emulatorDidFinish: (IS:1095-1130) moves on to the import
+// only when the installer's session ended normally and the user did not
+// stop the import; a session that failed stops it, so nothing that may be
+// half-installed is imported as a finished game.
+bool importContinuesAfterInstaller(SessionOutcome outcome, bool userStopped);
+
 }  // namespace boxer_ui
 #endif

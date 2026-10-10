@@ -203,4 +203,14 @@ unsigned dosBackground(double x, double y, double W, double H) {
     return rgb(r, g, b);
 }
 
+SessionOutcome sessionOutcome(bool setupOk, bool coreEntered, bool coreStarted, int coreResult) {
+    if (!setupOk || !coreEntered) return SessionOutcome::SetupFailed;
+    if (coreResult == 0) return SessionOutcome::Ended;
+    return coreStarted ? SessionOutcome::CoreFailed : SessionOutcome::SetupFailed;
+}
+
+bool importContinuesAfterInstaller(SessionOutcome outcome, bool userStopped) {
+    return outcome == SessionOutcome::Ended && !userStopped;
+}
+
 }  // namespace boxer_ui
