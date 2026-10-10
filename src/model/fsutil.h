@@ -52,7 +52,8 @@ bool createNewFile(const std::string &path, const std::string &data, bool *exist
 bool copyFile(const std::string &from, const std::string &to);
 bool copyTree(const std::string &from, const std::string &to);
 bool removeTree(const std::string &path);
-// Creates and removes a probe file inside dir.
+// Creates a new probe file inside dir and removes it again. A file already
+// on a probe name is never opened or removed.
 bool isWritableDirectory(const std::string &dir);
 
 // Replacement of a small state/prefs file without ever leaving no valid

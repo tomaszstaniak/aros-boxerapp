@@ -1699,6 +1699,28 @@ static void testSourceCopy()
 	CHECK(tt.size() == 2 && tt[0] == "BOXERID=ABC-1" && tt[1] == "GAMEBOX=Dune.boxer");
 }
 
+// The writability probe creates its own file and removes only that one:
+// a file or drawer already on the probe's name is someone else's.
+static void testWritableProbe()
+{
+	const std::string dir = fu::join(scratch, "Probe Dir");
+	const std::string sentinel = fu::join(dir, ".boxer-write-probe");
+	put(sentinel, "USER DATA");
+	CHECK(fu::isWritableDirectory(dir));
+	CHECK_EQ(get(sentinel), std::string("USER DATA"));
+	std::vector<std::string> names;
+	fu::list(dir, names);
+	CHECK_EQ(names, std::vector<std::string>{".boxer-write-probe"});
+
+	const std::string other = fu::join(scratch, "Probe Dir 2");
+	fu::makeDirs(fu::join(other, ".boxer-write-probe"));
+	put(fu::join(other, ".boxer-write-probe/inside"), "x");
+	CHECK(fu::isWritableDirectory(other));
+	CHECK_EQ(get(fu::join(other, ".boxer-write-probe/inside")), std::string("x"));
+	fu::list(other, names);
+	CHECK_EQ(names.size(), size_t(1));
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 2) { fprintf(stderr, "usage: model_test <scratch dir>\n"); return 2; }
@@ -1722,6 +1744,7 @@ int main(int argc, char **argv)
 	testGameboxCreation();
 	testGameboxNameCollisions();
 	testSourceCopy();
+	testWritableProbe();
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;
 }

@@ -276,14 +276,19 @@ bool isWritableDirectory(const std::string &dir)
 {
 	if (!isDirectory(dir))
 		return false;
-	std::string probe = join(dir, ".boxer-write-probe");
-	FILE *f = fopen(probe.c_str(), "wb");
-	if (!f)
-		return false;
-	bool ok = fputc('x', f) != EOF;
-	ok = (fclose(f) == 0) && ok;
-	ok = (::unlink(probe.c_str()) == 0) && ok;
-	return ok;
+	// The probe is created exclusively, so the file removed afterwards is
+	// the one made here; a file or drawer already on a probe name is
+	// someone else's and is skipped, never opened or deleted.
+	for (int n = 1; n <= 9; n++) {
+		const std::string name = n == 1 ? std::string(".boxer-write-probe") : ".boxer-write-probe-" + std::to_string(n);
+		const std::string probe = join(dir, name);
+		bool existed = false;
+		if (createNewFile(probe, "x", &existed))
+			return ::unlink(probe.c_str()) == 0;
+		if (!existed)
+			return false;
+	}
+	return false;
 }
 
 // --- replacement ---
