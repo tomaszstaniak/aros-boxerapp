@@ -105,16 +105,16 @@ rc=0
 for f in "${core14[@]}"; do
   o="$out/obj/$(basename "$f").o"; objs+=("$o")
   "$AROS_CXX" "${pmap[@]}" -std=gnu++14 -O2 -Wall -Wno-deprecated -Wno-unknown-pragmas -fno-strict-aliasing \
-    "${core_flags[@]}" -I"$AROS_SDK/include" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
+    "${core_flags[@]}" -I"$AROS_SDK/include" -MMD -MF "$o.d" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 for f in "${model17[@]}"; do
   o="$out/obj/$(basename "$f").o"; objs+=("$o")
-  "$AROS_CXX" "${pmap[@]}" -std=gnu++17 -O2 -Wall -I"$AROS_SDK/include" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
+  "$AROS_CXX" "${pmap[@]}" -std=gnu++17 -O2 -Wall -I"$AROS_SDK/include" -MMD -MF "$o.d" -c "$PROJECT_ROOT/$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 for f in "${sources[@]}"; do
   o="$out/obj/ui-$(basename "$f").o"; objs+=("$o")
   "$AROS_CXX" "${pmap[@]}" -std=c++17 -O2 -Wall -Wno-narrowing -I"$AROS_SDK/include" -I"$out/gen" \
-    -DBOXER_ABI="\"$BOXER_ABI\"" ${BOXER_UI_DEFS:-} -c "$f" -o "$o" >> "$log" 2>&1 || rc=1
+    -DBOXER_ABI="\"$BOXER_ABI\"" ${BOXER_UI_DEFS:-} -MMD -MF "$o.d" -c "$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 # Mainline's libgcc never fills dwarf_reg_size_table, so every C++ throw
 # aborts (scripts/build-unwind-fix.sh). Link a rebuilt unwind-dw2.o first,
@@ -160,6 +160,11 @@ if [ $rc -ne 0 ]; then
   echo "build-ui: artifact rejected by the undefined-symbol check (exit $rc); nothing staged" >&2
   exit 1
 fi
+# The source manifest is every project file the compiles read, from their
+# dependency files, so no header can change unnoticed between build and
+# package. Generated files under build/ are recorded by their own lines.
+manifest=$(python3 "$PROJECT_ROOT/tools/depmanifest.py" "$PROJECT_ROOT" --exclude "$PROJECT_ROOT/build" \
+  --exclude "$out" "${objs[@]}") || { rm -f "$out/BoxerUI"; die "could not list the sources from the dependency files"; }
 cp "$out/BoxerUI" "$out/stage/BoxerUI"
 {
   echo "date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -174,14 +179,8 @@ cp "$out/BoxerUI" "$out/stage/BoxerUI"
   echo "file: $(file -b "$out/BoxerUI")"
   echo "sha256: $(shasum -a 256 "$out/BoxerUI" | cut -d' ' -f1)"
   echo "size: $(stat -f %z "$out/BoxerUI")"
-  echo "sources:"
-  for f in "${sources[@]}" "$src/classes.h" "$src/gfx.h" "$src/ui_logic.h" "$src/launchpanel_logic.h" "$src/coverassets.h"; do
-    echo "  $(shasum -a 256 "$f" | cut -d' ' -f1)  ${f#$PROJECT_ROOT/}"
-  done
-  for f in "${core14[@]}" "${model17[@]}" src/platform/aros/coreinput.h src/platform/aros/corecontrol.h src/platform/aros/session_setup.h src/platform/aros/wbopen.h \
-    src/model/coverart.h src/model/coverfont.h src/model/gameboxrename.h src/platform/aros/coverio.h third_party/stb/stb_truetype.h; do
-    echo "  $(shasum -a 256 "$PROJECT_ROOT/$f" | cut -d' ' -f1)  $f"
-  done
+  echo "sources: (every project file the compiles read; tools/depmanifest.py)"
+  printf '%s\n' "$manifest" | sed 's/^/  /'
   echo "core library: $(shasum -a 256 "$lib" | cut -d' ' -f1)  ${lib#$PROJECT_ROOT/}"
   echo "embedded art: $(shasum -a 256 "$out/gen/boxer_assets.inc" | cut -d' ' -f1)  (tools/png2inc.py, assets/runtime/boxer)"
   echo "cover templates: $(shasum -a 256 "$out/gen/cover_assets.inc" | cut -d' ' -f1)  (tools/png2inc.py, assets/runtime/boxer)"

@@ -42,7 +42,11 @@ WAV, TTF, EXE, `.boxer` or Dune file ends up in the drawer.
 1. `BoxerUI` sha256 equals `BUILDINFO.txt`; `scripts/check-undefined.sh`
    passes with the empty allowlist.
 2. Every source file hash in `BUILDINFO.txt` matches the tree, and the core
-   library matches. Otherwise the source archive would not correspond to the
+   library matches. `build-ui.sh` lists there every project file its
+   compiles read, headers included, taken from the compiler's dependency
+   files (`tools/depmanifest.py`); `scripts/check-sources.sh` refuses an
+   empty or malformed list. `work/boxer` must still equal the upstream pin
+   plus the patch series (`scripts/reproduce --source-only`). Otherwise the source archive would not correspond to the
    binary and the script stops. `BOXER_PKG_ALLOW_STALE=1` builds a dry-run
    package anyway, versioned `-STALE` and marked NOT CORRESPONDING in
    `BUILDINFO.txt`; never distribute one.

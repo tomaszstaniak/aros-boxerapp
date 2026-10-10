@@ -46,17 +46,21 @@ def prerequisites(text):
         if token:
             yield token
 
-if len(sys.argv) != 2:
-    sys.exit(__doc__)
-obj = sys.argv[1]
-dep = obj + ".d"
-if not (os.path.isfile(obj) and os.path.isfile(dep)):
-    sys.exit(1)
-stamp = os.stat(obj).st_mtime_ns
-for path in prerequisites(open(dep, encoding="utf-8", errors="surrogateescape").read()):
-    try:
-        if os.stat(path).st_mtime_ns > stamp:
-            sys.exit(1)
-    except FileNotFoundError:
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    obj = sys.argv[1]
+    dep = obj + ".d"
+    if not (os.path.isfile(obj) and os.path.isfile(dep)):
         sys.exit(1)
-sys.exit(0)
+    stamp = os.stat(obj).st_mtime_ns
+    for path in prerequisites(open(dep, encoding="utf-8", errors="surrogateescape").read()):
+        try:
+            if os.stat(path).st_mtime_ns > stamp:
+                sys.exit(1)
+        except FileNotFoundError:
+            sys.exit(1)
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()

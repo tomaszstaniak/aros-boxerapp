@@ -41,7 +41,11 @@ got=$(shasum -a 256 "$bin" | cut -d' ' -f1)
 "$here/check-undefined.sh" "$AROS_TOOLCHAIN/x86_64-aros-nm" "$bin" "$here/ui-undefined-allowlist.txt" \
   || die "undefined-symbol check failed"
 # 2. The tree still holds the sources that binary was built from.
-awk '/^sources:/{f=1;next} /^core library/{f=0} f{print $1"  "$2}' "$info" > "$BUILD_DIR/.pkg-src.sha256"
+awk '/^sources:/{f=1;next} /^core library/{f=0} f{sub(/^  /,""); print}' "$info" > "$BUILD_DIR/.pkg-src.sha256"
+# Those include the core's headers from work/boxer; that tree must still be
+# the upstream pin plus the patch series, which the source archive ships.
+srccheck=$("$here/reproduce" --source-only 2>&1) \
+  || { printf '%s\n' "$srccheck" >&2; die "work/boxer differs from pin + series"; }
 # BOXER_PKG_ALLOW_STALE=1 packages anyway for a dry run of the recipe; the
 # result is marked NOT CORRESPONDING and must never be distributed.
 #
