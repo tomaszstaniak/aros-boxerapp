@@ -14,6 +14,11 @@
 ;     missing, existing lines are kept, and a second run finds the block
 ;     and adds nothing. The block only reads S:Boxer-Assign, so moving the
 ;     drawer needs a new run, not an edit.
+; Nothing is changed when files from an earlier run that stopped half-way
+; are found (S:Boxer-Assign.new/.old, <startup>.boxer-new/.boxer-old), or
+; when the startup file has a ";BEGIN Boxer" line without the rest of the
+; block: those may hold the user's own commands, so the script names them
+; and leaves them to the user instead of using, replacing or deleting them.
 ; When Boxer: already points somewhere else nothing is overwritten: KEEP
 ; leaves it, REPLACE changes it, and with neither a requester asks.
 ; REMOVE undoes it: deletes S:Boxer-Assign and the Boxer: assign. The
@@ -65,6 +70,61 @@ If NOT EXISTS "${BxDir}/BoxerUI"
   Echo "Run it from the Boxer drawer, or give DIR=<drawer with BoxerUI>."
   Quit 20
 EndIf
+; Before anything is changed. The scratch names below are used only when
+; free: a file already on one is someone else's or left by a run that was
+; stopped (a reset between moving the startup file aside and renaming the
+; new one in leaves the user's commands only in .boxer-old), and the two
+; cannot be told apart.
+Set BxBad 0
+If EXISTS "S:Boxer-Assign.new"
+  Echo "Install-Assign: found S:Boxer-Assign.new"
+  Set BxBad 1
+EndIf
+If EXISTS "S:Boxer-Assign.old"
+  Echo "Install-Assign: found S:Boxer-Assign.old"
+  Set BxBad 1
+EndIf
+If EXISTS "${BxSU}.boxer-new"
+  Echo "Install-Assign: found ${BxSU}.boxer-new"
+  Set BxBad 1
+EndIf
+If EXISTS "${BxSU}.boxer-old"
+  Echo "Install-Assign: found ${BxSU}.boxer-old"
+  Set BxBad 1
+EndIf
+If NOT "x$BxBad" EQ "x0"
+  Echo "Install-Assign: these look like files of an earlier run that stopped half-way"
+  Echo "Install-Assign: (or someone else's). Nothing was changed; they were not used or deleted."
+  Echo "Install-Assign: if $BxSU is missing, rename its .boxer-old back to it (its .boxer-new"
+  Echo "Install-Assign: has the same lines plus the Boxer block); then remove the others and run again."
+  Quit 20
+EndIf
+; The block counts as installed only when complete. A ";BEGIN Boxer" line
+; alone is not added to: a block cut short could leave an If without its
+; EndIf, which no appended block repairs.
+Set BxHave 0
+If EXISTS "$BxSU"
+  ; Search is never run on an empty file (it damaged memory on AROS).
+  Set BxSz `List "$BxSU" LFORMAT "%L"`
+  If NOT "x$BxSz" EQ "x0"
+    Search >NIL: "$BxSU" ";BEGIN Boxer" QUIET
+    If NOT WARN
+      Set BxHave 1
+      Search >NIL: "$BxSU" ";END Boxer" QUIET
+      If NOT WARN
+        Search >NIL: "$BxSU" "Execute S:Boxer-Assign" QUIET
+        If NOT WARN
+          Set BxHave 2
+        EndIf
+      EndIf
+    EndIf
+  EndIf
+EndIf
+If "x$BxHave" EQ "x1"
+  Echo "Install-Assign: $BxSU has a ;BEGIN Boxer line but not the whole Boxer block."
+  Echo "Install-Assign: nothing was changed. Remove the incomplete block by hand, then run again."
+  Quit 20
+EndIf
 Assign >NIL: Boxer: EXISTS
 If WARN
   Assign Boxer: "$BxDir"
@@ -103,11 +163,12 @@ EndIf
 Set BxNew "S:Boxer-Assign.new"
 Set BxBak "S:Boxer-Assign.old"
 Set BxBad 0
+; Checked free above; never written over if it appeared since.
 If EXISTS "$BxNew"
-  Delete >NIL: "$BxNew" QUIET
-  If EXISTS "$BxNew"
-    Set BxBad 1
-  EndIf
+  Set BxBad 2
+EndIf
+If EXISTS "$BxBak"
+  Set BxBad 2
 EndIf
 If "x$BxBad" EQ "x0"
   Echo "; Written by Boxer's Install-Assign. Execute Install-Assign REMOVE undoes it." >"$BxNew"
@@ -160,12 +221,7 @@ EndIf
 If "x$BxBad" EQ "x0"
   ; Checked by what exists afterwards, not by RC (see above).
   If EXISTS S:Boxer-Assign
-    If EXISTS "$BxBak"
-      Delete >NIL: "$BxBak" QUIET
-    EndIf
-    If NOT EXISTS "$BxBak"
-      Rename >NIL: S:Boxer-Assign "$BxBak" QUIET
-    EndIf
+    Rename >NIL: S:Boxer-Assign "$BxBak" QUIET
     If EXISTS S:Boxer-Assign
       Set BxBad 1
     Else
@@ -185,24 +241,16 @@ If "x$BxBad" EQ "x0"
   EndIf
 EndIf
 If NOT "x$BxBad" EQ "x0"
-  Delete >NIL: "$BxNew" QUIET
+  ; Only a scratch file this run made is removed.
+  If "x$BxBad" EQ "x1"
+    Delete >NIL: "$BxNew" QUIET
+  EndIf
   Echo "Install-Assign: FAILED to write S:Boxer-Assign (write-protected or full S:?)."
   Echo "Install-Assign: the previous S:Boxer-Assign, if any, is unchanged; nothing else was changed."
   Quit 20
 EndIf
 Echo "Install-Assign: wrote S:Boxer-Assign."
-Set BxHave 0
-If EXISTS "$BxSU"
-  ; Search is never run on an empty file (it damaged memory on AROS).
-  Set BxSz `List "$BxSU" LFORMAT "%L"`
-  If NOT "x$BxSz" EQ "x0"
-    Search >NIL: "$BxSU" ";BEGIN Boxer" QUIET
-    If NOT WARN
-      Set BxHave 1
-    EndIf
-  EndIf
-EndIf
-If "x$BxHave" EQ "x1"
+If "x$BxHave" EQ "x2"
   Echo "Install-Assign: $BxSU already has the Boxer block - not added again."
 Else
   ; The same for the startup file: a copy with the block appended replaces
@@ -210,10 +258,10 @@ Else
   Set BxNew "${BxSU}.boxer-new"
   Set BxBak "${BxSU}.boxer-old"
   If EXISTS "$BxNew"
-    Delete >NIL: "$BxNew" QUIET
-    If EXISTS "$BxNew"
-      Set BxBad 1
-    EndIf
+    Set BxBad 2
+  EndIf
+  If EXISTS "$BxBak"
+    Set BxBad 2
   EndIf
   If "x$BxBad" EQ "x0"
     If EXISTS "$BxSU"
@@ -280,12 +328,7 @@ Else
   If "x$BxBad" EQ "x0"
     ; Checked by what exists afterwards, not by RC (see above).
     If EXISTS "$BxSU"
-      If EXISTS "$BxBak"
-        Delete >NIL: "$BxBak" QUIET
-      EndIf
-      If NOT EXISTS "$BxBak"
-        Rename >NIL: "$BxSU" "$BxBak" QUIET
-      EndIf
+      Rename >NIL: "$BxSU" "$BxBak" QUIET
       If EXISTS "$BxSU"
         Set BxBad 1
       Else
@@ -305,7 +348,9 @@ Else
     EndIf
   EndIf
   If NOT "x$BxBad" EQ "x0"
-    Delete >NIL: "$BxNew" QUIET
+    If "x$BxBad" EQ "x1"
+      Delete >NIL: "$BxNew" QUIET
+    EndIf
     Echo "Install-Assign: FAILED to add the Boxer block to $BxSU; it is unchanged."
     Echo "Install-Assign: Boxer: is set for this session only. S:Boxer-Assign was written;"
     Echo "Install-Assign: to run it at startup, add the line Execute S:Boxer-Assign to $BxSU."
