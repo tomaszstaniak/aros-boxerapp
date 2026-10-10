@@ -45,6 +45,10 @@ bool makeNewDir(const std::string &path, bool *existed = nullptr);
 bool list(const std::string &dir, std::vector<std::string> &names);
 bool readFile(const std::string &path, std::string &data);
 bool writeFile(const std::string &path, const std::string &data);
+// Creates path only if nothing has that name yet (O_EXCL) and writes data.
+// False with *existed set when the name is taken; that file is not touched.
+// A file this call created but could not fill is removed again.
+bool createNewFile(const std::string &path, const std::string &data, bool *existed = nullptr);
 bool copyFile(const std::string &from, const std::string &to);
 bool copyTree(const std::string &from, const std::string &to);
 bool removeTree(const std::string &path);

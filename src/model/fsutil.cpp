@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cstdio>
 #include <dirent.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -196,6 +197,28 @@ bool writeFile(const std::string &path, const std::string &data)
 	bool ok = fwrite(data.data(), 1, data.size(), f) == data.size();
 	ok = (fflush(f) == 0) && ok;
 	ok = (fclose(f) == 0) && ok;
+	return ok;
+}
+
+bool createNewFile(const std::string &path, const std::string &data, bool *existed)
+{
+	if (existed) *existed = false;
+	const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+	if (fd < 0) {
+		// As with mkdir, EEXIST is not trusted across C libraries.
+		if (existed) *existed = exists(path);
+		return false;
+	}
+	bool ok = true;
+	size_t done = 0;
+	while (ok && done < data.size()) {
+		const ssize_t n = ::write(fd, data.data() + done, data.size() - done);
+		ok = n > 0;
+		if (ok) done += (size_t)n;
+	}
+	ok = (::close(fd) == 0) && ok;
+	if (!ok)
+		::unlink(path.c_str());
 	return ok;
 }
 

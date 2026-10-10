@@ -120,9 +120,12 @@ void setCoverChoice(Gamebox &box, const CoverChoice &choice);   // caller saves
 // source's extension, lower case; none when it has none).
 std::string coverPictureName(const std::string &sourcePath);
 
-// Copies the picture into the gamebox and records it. An earlier picture
-// of another name is removed only after the new one and the record are
-// written. On failure the gamebox keeps its previous cover record.
+// Copies the picture into the gamebox and records it. The copy takes the
+// first of coverPictureName(), "Cover Art (2).<ext>", ... that does not
+// exist yet; an existing file is never written over. The picture the record
+// named before is removed only after the new one and the record are
+// written. On failure the gamebox keeps its previous cover record and only
+// the copy this call made is removed.
 bool storeCoverPicture(Gamebox &box, const std::string &sourcePath, std::string *error = nullptr);
 
 } // namespace boxer

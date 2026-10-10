@@ -387,7 +387,7 @@ static void testCoverChoice()
 	// the new copy is removed.
 	int calls = 0;
 	fu::setReplaceFaultHook([&](fu::ReplaceStep s) {
-		if (s == fu::ReplaceStep::WriteTemp && ++calls == 2) return fu::FaultAction::Fail;
+		if (s == fu::ReplaceStep::WriteTemp && ++calls == 1) return fu::FaultAction::Fail;
 		return fu::FaultAction::Proceed;
 	});
 	CHECK(!storeCoverPicture(box, pic1, &err));
@@ -404,6 +404,43 @@ static void testCoverChoice()
 	d.set("Picture", PlistValue::string("../elsewhere.png"));
 	box.gameInfo().set("AROSCoverArt", d);
 	CHECK(readCoverChoice(box).style == CoverStyle::Automatic);
+}
+
+// A file already in the gamebox under a cover name that the record does not
+// name is not the operation's: storing a picture never writes over it, and
+// a failed metadata save does not delete it.
+static void testCoverForeignFile()
+{
+	const std::string games = fu::join(scratch, "Foreign Cover Games");
+	const std::string boxPath = makeGamebox(games, "Keen", "ID-KEEN", false);
+	const std::string foreign = fu::join(boxPath, "Cover Art.png");
+	put(foreign, "USER FILE");
+	const std::string pic = fu::join(scratch, "Pictures/keen.png");
+	put(pic, "PNG keen");
+	Gamebox box;
+	CHECK(box.open(boxPath));
+
+	// The metadata save fails: every scratch name of Game Info.plist is taken.
+	const std::string plist = fu::join(boxPath, "Game Info.plist");
+	std::vector<std::string> blockers;
+	for (const auto &n : fu::ownedScratchPaths(plist))
+		if (n.find(".bxnew") != std::string::npos) { blockers.push_back(n); fu::makeDirs(n); }
+	std::string err;
+	CHECK(!storeCoverPicture(box, pic, &err));
+	CHECK_EQ(get(foreign), std::string("USER FILE"));
+	std::vector<std::string> names;
+	fu::list(boxPath, names);
+	for (const auto &n : names) CHECK(n.compare(0, 9, "Cover Art") != 0 || n == "Cover Art.png");
+	for (const auto &b : blockers) fu::removeTree(b);
+
+	// Saved: the picture takes a free name and the foreign file stays.
+	Gamebox again;
+	CHECK(again.open(boxPath));
+	CHECK(storeCoverPicture(again, pic, &err));
+	CHECK_EQ(get(foreign), std::string("USER FILE"));
+	const std::string stored = readCoverChoice(again).picture;
+	CHECK(stored != "Cover Art.png");
+	CHECK_EQ(get(fu::join(boxPath, stored)), std::string("PNG keen"));
 }
 
 // --- rename (IS:457-571), roll-back, finding a gamebox from its icon ---
@@ -607,6 +644,7 @@ int main(int argc, char **argv)
 	testTitles();
 	testCoverArt();
 	testCoverChoice();
+	testCoverForeignFile();
 	testRenameChecks();
 	testRenamePair();
 	testSidecarLookup();

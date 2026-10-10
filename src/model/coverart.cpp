@@ -480,16 +480,27 @@ bool storeCoverPicture(Gamebox &box, const std::string &sourcePath, std::string 
 	if (bytes.size() > 16u * 1024 * 1024) return fail(sourcePath + " is larger than 16 MB");
 	CoverChoice c = readCoverChoice(box);
 	const std::string old = c.style == CoverStyle::Picture ? c.picture : std::string();
-	// Never write over the picture the record still names: until the record
-	// is saved, that one is the gamebox's cover.
-	std::string name = coverPictureName(sourcePath);
-	if (fsutil::toLower(name) == fsutil::toLower(old)) {
-		const std::string ext = fsutil::extension(name);
-		name = ext.empty() ? std::string("Cover Art (2)") : "Cover Art (2)." + ext;
+	// The picture goes to a name that is free now and is created exclusively:
+	// a file already there (the cover the record still names, or anyone
+	// else's) is never written over, and a rollback deletes only this copy.
+	const std::string first = coverPictureName(sourcePath);
+	const std::string ext = fsutil::extension(first);
+	std::string name, dest;
+	for (int n = 1; n <= 99 && dest.empty(); ++n) {
+		const std::string stem = n == 1 ? std::string("Cover Art") : "Cover Art (" + std::to_string(n) + ")";
+		const std::string candidate = ext.empty() ? stem : stem + "." + ext;
+		if (fsutil::toLower(candidate) == fsutil::toLower(old)) continue;
+		const std::string path = fsutil::join(box.path(), candidate);
+		bool existed = false;
+		if (fsutil::createNewFile(path, bytes, &existed)) {
+			name = candidate;
+			dest = path;
+		} else if (!existed) {
+			return fail("could not write " + path);
+		}
 	}
-	const std::string dest = fsutil::join(box.path(), name);
+	if (dest.empty()) return fail("no free name for the cover picture in " + box.path());
 	std::string err;
-	if (!fsutil::replaceFile(dest, bytes, &err)) return fail("could not write " + dest + ": " + err);
 	const PlistValue before = box.gameInfo();
 	c.style = CoverStyle::Picture;
 	c.picture = name;
