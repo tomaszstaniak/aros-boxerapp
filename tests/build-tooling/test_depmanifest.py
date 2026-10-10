@@ -5,6 +5,21 @@ which make-package.sh uses to compare it with the tree:
 python3 tests/build-tooling/test_depmanifest.py"""
 import os, shutil, subprocess, sys, tempfile, unittest
 
+
+def write_text(path, data):
+    with open(path, "w") as f:
+        f.write(data)
+
+
+def append_text(path, data):
+    with open(path, "a") as f:
+        f.write(data)
+
+
+def read_text(path):
+    with open(path) as f:
+        return f.read()
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOL = os.path.join(HERE, "..", "..", "tools", "depmanifest.py")
 CHECK = os.path.join(HERE, "..", "..", "scripts", "check-sources.sh")
@@ -27,14 +42,14 @@ class DepManifest(unittest.TestCase):
                 ("src/ui/main.cpp", "src/model/gamebox.h", "src/model/fs util.h",
                  "src/model/../model/gamebox.h", "work/boxer/DOSBox/include/dosbox.h",
                  "build/abiv11/gen/art.inc")] + [os.path.join(self.sdk, "include/exec/types.h")]
-        open(self.obj + ".d", "w").write(esc(self.obj) + ": " + " \\\n ".join(esc(d) for d in deps) + "\n")
+        write_text(self.obj + ".d", esc(self.obj) + ": " + " \\\n ".join(esc(d) for d in deps) + "\n")
 
     def tearDown(self):
         shutil.rmtree(self.top)
 
     def put(self, p, data):
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        open(p, "w").write(data)
+        write_text(p, data)
 
     def manifest(self, *objs):
         r = subprocess.run([sys.executable, TOOL, self.root, "--exclude", os.path.join(self.root, "build")]
@@ -51,9 +66,9 @@ class DepManifest(unittest.TestCase):
     def test_changed_header_is_refused_by_the_package_check(self):
         rc, out = self.manifest()
         m = os.path.join(self.top, "sources.sha256")
-        open(m, "w").write(out)
+        write_text(m, out)
         self.assertEqual(subprocess.run(["bash", CHECK, self.root, m]).returncode, 0)
-        open(os.path.join(self.root, "src/model/gamebox.h"), "a").write("// changed\n")
+        append_text(os.path.join(self.root, "src/model/gamebox.h"), "// changed\n")
         r = subprocess.run(["bash", CHECK, self.root, m], capture_output=True, text=True)
         self.assertEqual(r.returncode, 1)
         self.assertIn("src/model/gamebox.h", r.stdout)
@@ -67,7 +82,7 @@ class DepManifest(unittest.TestCase):
         self.assertEqual(self.manifest(), (2, ""))
 
     def test_nothing_in_the_project_fails(self):
-        open(self.obj + ".d", "w").write(esc(self.obj) + ": " + esc(os.path.join(self.sdk, "include/exec/types.h")) + "\n")
+        write_text(self.obj + ".d", esc(self.obj) + ": " + esc(os.path.join(self.sdk, "include/exec/types.h")) + "\n")
         self.assertEqual(self.manifest(), (2, ""))
 
 if __name__ == "__main__":

@@ -11,6 +11,21 @@ stopped after any number of commands, as a reset would. Runs on AROS are
 still needed for the real Shell's behaviour."""
 import os, re, shutil, sys, tempfile, unittest
 
+
+def write_text(path, data):
+    with open(path, "w") as f:
+        f.write(data)
+
+
+def append_text(path, data):
+    with open(path, "a") as f:
+        f.write(data)
+
+
+def read_text(path):
+    with open(path) as f:
+        return f.read()
+
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "packaging", "Install-Assign")
 SCRIPT = os.environ.get("INSTALL_ASSIGN_SCRIPT", SCRIPT)
 
@@ -211,7 +226,7 @@ class Shell:
 
     # --- script -------------------------------------------------------
     def execute(self, path, argline, stop_after=None):
-        text = open(path).read()
+        text = read_text(path)
         lines = text.split("\n")
         template = next(l for l in lines if l.startswith(".key")).split(None, 1)[1]
         params = self.bind(template, argline)
@@ -286,7 +301,7 @@ class InstallAssign(unittest.TestCase):
         self.root = tempfile.mkdtemp(prefix="install assign ")
         for d in ("S", "Work/Boxer", "RAM"):
             os.makedirs(os.path.join(self.root, d))
-        open(os.path.join(self.root, "Work/Boxer/BoxerUI"), "w").write("binary")
+        write_text(os.path.join(self.root, "Work/Boxer/BoxerUI"), "binary")
 
     def tearDown(self):
         shutil.rmtree(self.root)
@@ -296,10 +311,10 @@ class InstallAssign(unittest.TestCase):
 
     def read(self, rel):
         p = self.path(rel)
-        return open(p).read() if os.path.exists(p) else None
+        return read_text(p) if os.path.exists(p) else None
 
     def write(self, rel, data):
-        open(self.path(rel), "w").write(data)
+        write_text(self.path(rel), data)
 
     def install(self, stop_after=None):
         sh = Shell(self.root)

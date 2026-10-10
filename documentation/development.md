@@ -110,6 +110,8 @@ tests/patch-tooling/run.sh                 # bootstrap/save-patch/reproduce scen
 python3 tests/build-tooling/test_depcheck.py
 python3 tests/build-tooling/test_check_sources.py   # the source check make-package.sh runs
 python3 tests/build-tooling/test_depmanifest.py     # the source list build-ui.sh writes
+python3 tests/build-tooling/test_core_provenance.py # the core record and its packaging check
+python3 tests/build-tooling/test_install_assign.py  # packaging/Install-Assign in a Shell model
 ```
 
 `build-ui.sh` also runs `src/ui/tests/ui_logic_test.cpp` and

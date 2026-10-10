@@ -4,6 +4,21 @@ before packaging: python3 tests/build-tooling/test_check_sources.py
 CHECK_SOURCES=<script> runs the same cases against another implementation."""
 import hashlib, os, shutil, subprocess, tempfile, unittest
 
+
+def write_text(path, data):
+    with open(path, "w") as f:
+        f.write(data)
+
+
+def append_text(path, data):
+    with open(path, "a") as f:
+        f.write(data)
+
+
+def read_text(path):
+    with open(path) as f:
+        return f.read()
+
 TOOL = os.environ.get("CHECK_SOURCES") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts", "check-sources.sh")
 
@@ -18,14 +33,14 @@ class CheckSources(unittest.TestCase):
         for rel, data in self.files.items():
             p = os.path.join(self.root, rel)
             os.makedirs(os.path.dirname(p), exist_ok=True)
-            open(p, "w").write(data)
+            write_text(p, data)
         self.manifest = os.path.join(self.root, "manifest.sha256")
 
     def tearDown(self):
         shutil.rmtree(self.root)
 
     def write_manifest(self, text):
-        open(self.manifest, "w").write(text)
+        write_text(self.manifest, text)
 
     def good(self):
         return "".join("%s  %s\n" % (sha(d), r) for r, d in sorted(self.files.items()))
@@ -40,7 +55,7 @@ class CheckSources(unittest.TestCase):
 
     def test_changed_header_is_reported(self):
         self.write_manifest(self.good())
-        open(os.path.join(self.root, "src/model/gamebox.h"), "a").write("// changed\n")
+        append_text(os.path.join(self.root, "src/model/gamebox.h"), "// changed\n")
         rc, out = self.run_check()
         self.assertEqual(rc, 1)
         self.assertIn("src/model/gamebox.h", out)
