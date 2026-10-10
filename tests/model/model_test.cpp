@@ -936,6 +936,64 @@ static void testShadow()
 
 // Legacy gamebox: the root is drive C and a CD folder inside it is mapped
 // separately (longest root wins).
+// A rename either completes or leaves both names as they were. Staging
+// space is the operation's own; a file already on a staging-like name is
+// not touched.
+static void testShadowMoveFaults()
+{
+	std::string box = fu::join(scratch, "Move Fault Games/Keen.boxer");
+	std::string c = fu::join(box, "C.harddisk");
+	put(fu::join(c, "ORIG/ORIG.SAV"), "original");
+	put(fu::join(c, "KEEN.EXE"), "exe");
+	std::string shadow = fu::join(scratch, "Move Fault Games/State/C.harddisk");
+	ShadowFileSystem fs;
+	fs.addMapping(c, shadow);
+	auto P = [&](const std::string &rel) { return fu::join(c, rel); };
+
+	// Foreign files on staging-like names survive a rename.
+	put(fu::join(shadow, "B.TXT.boxer-move"), "foreign 1");
+	put(fu::join(shadow, ".boxer-move"), "foreign 2");
+	CHECK(writeVia(fs, P("A.TXT"), "wb", "alpha"));
+	CHECK(fs.move(P("A.TXT").c_str(), P("B.TXT").c_str(), nullptr));
+	CHECK_EQ(readVia(fs, P("B.TXT")), std::string("alpha"));
+	CHECK(!fs.fileExists(P("A.TXT").c_str(), nullptr));
+	CHECK_EQ(get(fu::join(shadow, "B.TXT.boxer-move")), std::string("foreign 1"));
+	CHECK_EQ(get(fu::join(shadow, ".boxer-move")), std::string("foreign 2"));
+
+	// The source's shadow cannot be removed (its folder is read-only): the
+	// rename fails and the destination is as before.
+	CHECK(fs.makeDir(P("SUB").c_str(), nullptr));
+	CHECK(writeVia(fs, P("SUB/S.TXT"), "wb", "shadow only"));
+	CHECK(writeVia(fs, P("DEST.TXT"), "wb", "old dest"));
+	const std::string sub = fu::join(shadow, "SUB");
+	if (::chmod(sub.c_str(), 0555) == 0 && ::access(sub.c_str(), W_OK) != 0) {
+		CHECK(!fs.move(P("SUB/S.TXT").c_str(), P("DEST.TXT").c_str(), nullptr));
+		CHECK_EQ(readVia(fs, P("SUB/S.TXT")), std::string("shadow only"));
+		CHECK_EQ(readVia(fs, P("DEST.TXT")), std::string("old dest"));
+		::chmod(sub.c_str(), 0755);
+
+		// An original whose deletion marker cannot be written: the same.
+		const std::string orig = fu::join(shadow, "ORIG");
+		fu::makeDirs(orig);
+		::chmod(orig.c_str(), 0555);
+		CHECK(!fs.move(P("ORIG/ORIG.SAV").c_str(), P("MOVED.SAV").c_str(), nullptr));
+		CHECK_EQ(readVia(fs, P("ORIG/ORIG.SAV")), std::string("original"));
+		CHECK(!fs.fileExists(P("MOVED.SAV").c_str(), nullptr));
+		::chmod(orig.c_str(), 0755);
+	} else {
+		::chmod(sub.c_str(), 0755);
+		printf("note: read-only shadow checks skipped (running with full access)\n");
+	}
+	// With nothing in the way the same renames work.
+	CHECK(fs.move(P("SUB/S.TXT").c_str(), P("DEST.TXT").c_str(), nullptr));
+	CHECK_EQ(readVia(fs, P("DEST.TXT")), std::string("shadow only"));
+	CHECK(!fs.fileExists(P("SUB/S.TXT").c_str(), nullptr));
+	CHECK(fs.move(P("ORIG/ORIG.SAV").c_str(), P("MOVED.SAV").c_str(), nullptr));
+	CHECK_EQ(readVia(fs, P("MOVED.SAV")), std::string("original"));
+	CHECK(!fs.fileExists(P("ORIG/ORIG.SAV").c_str(), nullptr));
+	CHECK_EQ(get(fu::join(c, "ORIG/ORIG.SAV")), std::string("original"));
+}
+
 static void testShadowNested()
 {
 	std::string box = fu::join(scratch, "Nested Games/Old One.boxer");
@@ -1779,6 +1837,7 @@ int main(int argc, char **argv)
 	testMovedDataDir();
 	testShadow();
 	testShadowNested();
+	testShadowMoveFaults();
 	testImportSource();
 	testInstallerScan();
 	testReadyText();

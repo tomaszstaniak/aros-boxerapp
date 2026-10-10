@@ -306,43 +306,89 @@ bool ShadowFileSystem::move(const char *fromPath, const char *toPath, DOS_Drive 
 		return false;
 
 	fsutil::makeDirs(fsutil::parent(to.sh));
-	std::string staging = to.sh + ".boxer-move";
-	fsutil::removeTree(staging);
-	bool ok;
-	if (from.m)
-		ok = copyLogicalTree(from, staging);
-	else
-		ok = fsutil::copyTree(fromPath, staging);
+	// The staging drawer is created exclusively next to the destination (a
+	// rename needs the same volume) and is hidden as a dot name; everything
+	// in it is this operation's. A name that is taken is skipped.
+	std::string staging;
+	for (int n = 1; n <= 9 && staging.empty(); ++n) {
+		const std::string cand = fsutil::join(fsutil::parent(to.sh), n == 1 ? std::string(".boxer-move")
+		                                                                     : ".boxer-move-" + std::to_string(n));
+		bool existed = false;
+		if (fsutil::makeNewDir(cand, &existed))
+			staging = cand;
+		else if (!existed)
+			return false;
+	}
+	if (staging.empty())
+		return false;
+	const std::string item = fsutil::join(staging, "item");
+	const std::string previous = fsutil::join(staging, "previous");
+	const std::string oldSource = fsutil::join(staging, "source");
+
+	bool ok = from.m ? copyLogicalTree(from, item) : fsutil::copyTree(fromPath, item);
 	if (!ok) {
 		fsutil::removeTree(staging);
 		return false;
 	}
-	if (fsutil::exists(to.sh))
-		fsutil::removeTree(to.sh);
-	if (::rename(staging.c_str(), to.sh.c_str()) != 0) {
-		fsutil::removeTree(staging);
+
+	// Commit step by step; each step that fails puts back what the earlier
+	// ones changed. The destination's previous shadow and the source's
+	// shadow are moved into staging, not deleted, until all steps are done.
+	const bool hadPrevious = fsutil::exists(to.sh);
+	const bool hadToMarker = !to.marker.empty() && fsutil::exists(to.marker);
+	bool installed = false, toMarkerRemoved = false, sourceMoved = false;
+	auto rollback = [&]() {
+		bool back = true;
+		if (sourceMoved)
+			back = ::rename(oldSource.c_str(), from.sh.c_str()) == 0 && back;
+		if (toMarkerRemoved)
+			back = createMarker(to.marker) && back;
+		if (installed)
+			back = ::rename(to.sh.c_str(), fsutil::join(staging, "failed").c_str()) == 0 && back;
+		if (back && hadPrevious && fsutil::exists(previous))
+			back = ::rename(previous.c_str(), to.sh.c_str()) == 0;
+		// When something could not be put back, staging still holds it.
+		if (back)
+			fsutil::removeTree(staging);
 		return false;
-	}
-	if (from.m) {
-		if (!from.sh.empty() && fsutil::exists(from.sh))
-			fsutil::removeTree(from.sh);
-		if (fsutil::exists(from.src))
-			createMarker(from.marker);
-	} else {
-		fsutil::removeTree(fromPath);
-	}
-	::unlink(to.marker.c_str());
+	};
+
+	if (hadPrevious && ::rename(to.sh.c_str(), previous.c_str()) != 0)
+		return rollback();
+	if (::rename(item.c_str(), to.sh.c_str()) != 0)
+		return rollback();
+	installed = true;
 	// The destination replaces whatever original was at that name; its
 	// original children must not show through a moved-in directory.
 	if (fsutil::isDirectory(to.src) && fsutil::isDirectory(to.sh)) {
 		std::vector<std::string> names;
-		fsutil::list(to.src, names);
-		for (const auto &n : names) {
-			bool present = fsutil::exists(fsutil::join(to.sh, n));
-			if (!present)
-				createMarker(fsutil::join(to.sh, n) + "." + deletionMarkerExtension);
-		}
+		if (!fsutil::list(to.src, names))
+			return rollback();
+		for (const auto &n : names)
+			if (!fsutil::exists(fsutil::join(to.sh, n)) &&
+			    !createMarker(fsutil::join(to.sh, n) + "." + deletionMarkerExtension))
+				return rollback();
 	}
+	if (hadToMarker) {
+		if (::unlink(to.marker.c_str()) != 0)
+			return rollback();
+		toMarkerRemoved = true;
+	}
+	if (from.m) {
+		if (!from.sh.empty() && fsutil::exists(from.sh)) {
+			if (::rename(from.sh.c_str(), oldSource.c_str()) != 0)
+				return rollback();
+			sourceMoved = true;
+		}
+		if (fsutil::exists(from.src) && !createMarker(from.marker))
+			return rollback();
+	} else if (!fsutil::removeTree(fromPath)) {
+		// Outside the mapping there is no way back for a partly removed
+		// tree; the moved copy stays, and the caller learns it failed.
+		fsutil::removeTree(staging);
+		return false;
+	}
+	fsutil::removeTree(staging);
 	return true;
 }
 
