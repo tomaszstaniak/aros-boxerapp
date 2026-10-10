@@ -106,5 +106,20 @@ SessionOutcome sessionOutcome(bool setupOk, bool coreEntered, bool coreStarted, 
 // half-installed is imported as a finished game.
 bool importContinuesAfterInstaller(SessionOutcome outcome, bool userStopped);
 
+// A key in the DOS view of a running session.
+// BXInputController+BXKeyboardInput.m:69-138 keyDown: "Unpause the
+// emulation whenever a key is sent to DOS", then the key goes to DOS. While
+// paused, nothing else is queued for after the resume: auto-repeats and
+// Amiga-qualified keys (the original never sends Cmd keys to DOS) are
+// dropped. Modifier keys and releases still pass, so DOS knows which
+// qualifiers are held (didBecomeKey syncs the modifier flags).
+enum class KeyRoute { ToDOS, ResumeThenToDOS, Drop };
+KeyRoute routeSessionKey(unsigned rawCode, bool down, bool repeat, bool amigaQualified, bool paused);
+
+// windowDidResignKey: fast forward held by its key ends with the focus,
+// because the key's release goes to another window; fast forward switched
+// on with the toolbar stays on until switched off.
+bool endTurboOnFocusLoss(bool turboOn, bool heldByKey);
+
 }  // namespace boxer_ui
 #endif

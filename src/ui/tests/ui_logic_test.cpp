@@ -124,6 +124,21 @@ int main() {
     CHECK(!importContinuesAfterInstaller(SessionOutcome::Ended, true));
     CHECK(importContinuesAfterInstaller(SessionOutcome::Ended, false));
 
+    // Keys while paused: a plain key resumes and goes to DOS; repeats and
+    // Amiga-qualified keys are not queued; releases and modifiers pass.
+    CHECK(routeSessionKey(0x20, true, false, false, false) == KeyRoute::ToDOS);
+    CHECK(routeSessionKey(0x20, true, true, false, false) == KeyRoute::ToDOS);
+    CHECK(routeSessionKey(0x20, true, false, false, true) == KeyRoute::ResumeThenToDOS);
+    CHECK(routeSessionKey(0x20, true, true, false, true) == KeyRoute::Drop);
+    CHECK(routeSessionKey(0x20, true, false, true, true) == KeyRoute::Drop);
+    CHECK(routeSessionKey(0x20, false, false, false, true) == KeyRoute::ToDOS);
+    CHECK(routeSessionKey(0x60, true, false, false, true) == KeyRoute::ToDOS);   // Shift
+    CHECK(routeSessionKey(0x67, true, false, true, true) == KeyRoute::ToDOS);    // RAmiga itself
+    // Focus loss ends only fast forward held by its key.
+    CHECK(endTurboOnFocusLoss(true, true));
+    CHECK(!endTurboOnFocusLoss(true, false));
+    CHECK(!endTurboOnFocusLoss(false, false));
+
     if (failures) { std::printf("%d failure(s)\n", failures); return 1; }
     std::printf("ui_logic_test: all checks passed\n");
     return 0;

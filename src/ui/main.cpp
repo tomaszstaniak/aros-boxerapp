@@ -1548,6 +1548,17 @@ static bool sessionKey(Object *, unsigned code, bool up, unsigned qual) {
         setTurbo(false, "key released");
         return true;
     }
+    switch (routeSessionKey(code, !up, qual & IEQUALIFIER_REPEAT, qual & (IEQUALIFIER_LCOMMAND | IEQUALIFIER_RCOMMAND),
+                            st.paused)) {
+    case KeyRoute::Drop:
+        logf("key: raw %02x %s qual %04x dropped (paused)", code, up ? "up" : "down", qual);
+        return true;
+    case KeyRoute::ResumeThenToDOS:
+        setPaused(false, "key pressed");
+        break;
+    case KeyRoute::ToDOS:
+        break;
+    }
     int key = boxer::coreKey(code, !up, qual);
     logf("key: raw %02x %s qual %04x -> dos %d", code, up ? "up" : "down", qual, key);
     return true;
@@ -3347,6 +3358,7 @@ static bool handleId(ULONG id) {
             if (g_ss.running && !a2 && !a4) {
                 setLocked(false, "window inactive");
                 releaseInput("window inactive");
+                if (endTurboOnFocusLoss(boxer::coreTurbo(), g_ss.ffKeyHeld)) setTurbo(false, "window inactive");
             }
         }
         break;
