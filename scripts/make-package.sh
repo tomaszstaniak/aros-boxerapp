@@ -53,9 +53,15 @@ awk '/^sources:/{f=1;next} /^core library/{f=0} f{print $1"  "$2}' "$info" > "$B
 # note must have checked it (for example by a rebuild that differs only in
 # the embedded build time).
 stale=0; srcnote=""
-# shasum exits 1 on a mismatch and grep 1 on none; only the text counts.
-changed=$( (cd "$P" && shasum -a 256 -c "$BUILD_DIR/.pkg-src.sha256" 2>/dev/null) | grep -v ': OK$' || true)
-if [ -n "$changed" ]; then
+# Exit 1 lists changed files; anything else but 0 means the check could not
+# be made (empty or malformed manifest, shasum failure) and is never taken
+# for "unchanged".
+set +e
+changed=$("$here/check-sources.sh" "$P" "$BUILD_DIR/.pkg-src.sha256")
+srcrc=$?
+set -e
+[ $srcrc -eq 0 ] || [ $srcrc -eq 1 ] || die "could not check the sources listed in $info (exit $srcrc)"
+if [ $srcrc -eq 1 ]; then
   if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
     [ "$BOXER_PKG_ACCEPTED_BINARY" = "$got" ] \
       || die "BOXER_PKG_ACCEPTED_BINARY ($BOXER_PKG_ACCEPTED_BINARY) is not this BoxerUI ($got)"

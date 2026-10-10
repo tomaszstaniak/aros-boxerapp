@@ -108,6 +108,7 @@ bytes.
 tests/model/run.sh                         # gamebox, plist, data locations, shadow filesystem
 tests/patch-tooling/run.sh                 # bootstrap/save-patch/reproduce scenarios
 python3 tests/build-tooling/test_depcheck.py
+python3 tests/build-tooling/test_check_sources.py   # the source check make-package.sh runs
 ```
 
 `build-ui.sh` also runs `src/ui/tests/ui_logic_test.cpp` and
