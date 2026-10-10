@@ -1699,6 +1699,47 @@ static void testSourceCopy()
 	CHECK(tt.size() == 2 && tt[0] == "BOXERID=ABC-1" && tt[1] == "GAMEBOX=Dune.boxer");
 }
 
+// A source that cannot be listed completely is not a smaller game: prepare
+// fails and names the folder instead of copying what it could see.
+static void testSourceCopyIncomplete()
+{
+	const std::string base = fu::join(scratch, "Incomplete Source");
+	const std::string src = fu::join(base, "Game");
+	const std::string dest = fu::join(base, "Dest");
+	put(fu::join(src, "GAME.EXE"), "MZ");
+	put(fu::join(src, "LOCKED/DATA.DAT"), "data");
+	fu::makeDirs(dest);
+	const std::string locked = fu::join(src, "LOCKED");
+	std::string err;
+	std::vector<std::string> probe;
+	if (::chmod(locked.c_str(), 0) == 0 && !fu::list(locked, probe)) {
+		SourceCopy c;
+		CHECK(!c.prepare(src, dest, &err));
+		CHECK(err.find("LOCKED") != std::string::npos);
+	} else {
+		printf("note: unreadable-folder check skipped (running with full access)\n");
+	}
+	::chmod(locked.c_str(), 0755);
+
+	// Deeper than the copy goes: refused, not cut off.
+	const std::string deep = fu::join(base, "Deep");
+	std::string rel;
+	for (int i = 0; i < 40; ++i) rel += (rel.empty() ? "" : "/") + std::string("D");
+	put(fu::join(deep, rel + "/BOTTOM.DAT"), "x");
+	put(fu::join(deep, "GAME.EXE"), "MZ");
+	SourceCopy d;
+	err.clear();
+	CHECK(!d.prepare(deep, dest, &err));
+	CHECK(!err.empty());
+
+	// A normal tree still prepares.
+	SourceCopy ok;
+	CHECK(ok.prepare(fu::join(deep, "D"), dest, &err) == false); // still deeper than the limit
+	put(fu::join(base, "Flat/A/B/C.DAT"), "c");
+	CHECK(ok.prepare(fu::join(base, "Flat"), dest, &err));
+	CHECK_EQ(ok.fileCount(), size_t(1));
+}
+
 // The writability probe creates its own file and removes only that one:
 // a file or drawer already on the probe's name is someone else's.
 static void testWritableProbe()
@@ -1744,6 +1785,7 @@ int main(int argc, char **argv)
 	testGameboxCreation();
 	testGameboxNameCollisions();
 	testSourceCopy();
+	testSourceCopyIncomplete();
 	testWritableProbe();
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;

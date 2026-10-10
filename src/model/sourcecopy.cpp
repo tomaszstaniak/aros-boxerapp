@@ -48,13 +48,18 @@ std::string validDOSName(const std::string &name)
 	return ext.empty() ? base : base + "." + ext;
 }
 
-void SourceCopy::collect(const std::string &rel, int depth)
+bool SourceCopy::collect(const std::string &rel, int depth, std::string *error)
 {
-	if (depth > 32)
-		return;
+	const std::string here = rel.empty() ? src_ : fsutil::join(src_, rel);
+	if (depth > 32) {
+		if (error) *error = here + " is nested more than 32 folders deep; Boxer does not import such a folder";
+		return false;
+	}
 	std::vector<std::string> names;
-	if (!fsutil::list(rel.empty() ? src_ : fsutil::join(src_, rel), names))
-		return;
+	if (!fsutil::list(here, names)) {
+		if (error) *error = "Could not read the folder " + here + ": " + std::strerror(errno);
+		return false;
+	}
 	for (const auto &n : names) {
 		if (n.empty() || n[0] == '.')
 			continue;
@@ -64,7 +69,8 @@ void SourceCopy::collect(const std::string &rel, int depth)
 			continue;
 		if (fsutil::isDirectory(full)) {
 			entries_.push_back({r, true, 0});
-			collect(r, depth + 1);
+			if (!collect(r, depth + 1, error))
+				return false;
 		} else {
 			struct stat st;
 			const uint64_t size = ::stat(full.c_str(), &st) == 0 ? (uint64_t)st.st_size : 0;
@@ -73,6 +79,7 @@ void SourceCopy::collect(const std::string &rel, int depth)
 			++files_;
 		}
 	}
+	return true;
 }
 
 bool SourceCopy::prepare(const std::string &source, const std::string &destination, std::string *error)
@@ -91,7 +98,12 @@ bool SourceCopy::prepare(const std::string &source, const std::string &destinati
 		if (error) *error = destination + " does not exist";
 		return false;
 	}
-	collect("", 0);
+	if (!collect("", 0, error)) {
+		entries_.clear();
+		next_ = files_ = 0;
+		total_ = 0;
+		return false;
+	}
 	return true;
 }
 

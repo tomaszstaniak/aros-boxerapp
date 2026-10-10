@@ -36,7 +36,8 @@ class SourceCopy {
 public:
 	// Lists everything to copy below source (hidden and junk entries left
 	// out) into destination, which must exist. False with a message when the
-	// source cannot be read.
+	// source or any folder below it cannot be listed, or is nested deeper
+	// than the copy goes: an import never leaves part of a game out silently.
 	bool prepare(const std::string &source, const std::string &destination, std::string *error = nullptr);
 	// Copies up to about `budget` bytes (at least one entry). False on a
 	// failure; error then names the file and the reason.
@@ -62,7 +63,7 @@ private:
 	uint64_t total_ = 0, done_ = 0, written_ = 0;
 	FILE *in_ = nullptr, *out_ = nullptr;
 	bool open_ = false;
-	void collect(const std::string &rel, int depth);
+	bool collect(const std::string &rel, int depth, std::string *error);
 };
 
 // Sidecar icon ToolTypes BOXERID/GAMEBOX: they find a separated gamebox.
