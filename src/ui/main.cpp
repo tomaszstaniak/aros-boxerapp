@@ -19,12 +19,13 @@
 // for one session. PREFSONLY=1 stores DATADIR and exits; PREFS=<file> and
 // PREFSFAULT=<step>:fail|crash (with HARNESS=1) are for the data-directory tests.
 // GAMEBOX opens a gamebox session (writes shadowed into DATA), SESSION=dos a
-// plain DOS prompt; without either the windows show the slice-A test pattern
-// and the title BOXTEST (the harness view), and "Open a DOS prompt" starts a
-// session when CONFDIR is known. A window opened for a session shows only
-// its background and "Boxer" while the session is prepared. When a
-// GAMEBOX or SESSION=dos session cannot be prepared, its window closes and
-// the error requester follows (no empty window left open). The core
+// plain DOS prompt. Only SCREEN=dos|inspector|all without either shows the
+// slice-A test pattern and the title BOXTEST (the harness view). "Open a DOS
+// prompt" starts a session; without CONFDIR that session cannot be prepared
+// and says so. A window opened for a session shows only its background and
+// "Boxer" while the session is prepared. When a session cannot be prepared,
+// its window closes and the error requester follows (no empty window left
+// open). The core
 // keeps global state, so one session per process (a new
 // process per session).
 //
@@ -305,10 +306,10 @@ static void updateTitle() {
 }
 
 // The DOS window before a session's first frame (dosIdleView): the harness
-// view keeps the slice-A test pattern and BOXTEST; a window opened for a
-// session shows only its background and "Boxer" while it is prepared.
-static void setDosIdleView(bool forSession) {
-    const DosIdleView v = dosIdleView(forSession);
+// view (explicit test start only, harnessView) keeps the slice-A test pattern
+// and BOXTEST; otherwise the window shows only its background and "Boxer".
+static void setDosIdleView(bool harness) {
+    const DosIdleView v = dosIdleView(harness);
     g_sessionTitle = v.title;
     renderShowTestPattern(ui.render, v.testPattern);
     renderShowTestPattern(ui.fsRender, v.testPattern);
@@ -1853,7 +1854,7 @@ static SessionResult prepareAndRunSession() {
     } else {
         confs.insert(confs.end(), extra.begin(), extra.end());
     }
-    if (confs.empty()) return setupFailed("no configuration");
+    if (confs.empty()) return setupFailed("no configuration: neither a conf drawer next to BoxerUI nor CONFDIR");
     launch.insert(launch.end(), g_args.then.begin(), g_args.then.end());
     host.preflight = preflight;
     host.launch = launch;
@@ -3269,8 +3270,8 @@ static bool handleId(ULONG id) {
         break;
     case ID_PROMPT: {
         logf("welcome: Open a DOS prompt -> DOS window");
-        const bool start = !g_args.confDir.empty() && !sessionRunning() && !g_app.ran;
-        if (start) setDosIdleView(true);
+        const bool start = openPromptAction(sessionRunning(), g_app.ran) == PromptAction::StartSession;
+        if (start) setDosIdleView(false);
         set(ui.dos, MUIA_Window_Open, TRUE);
         if (start) g_args.kind = "dos-pending";
         break;
@@ -3740,12 +3741,11 @@ int main(int argc, char **argv) {
     set(ui.pages, MUIA_Group_ActivePage, 1);
     if (g_args.volume >= 0) nnset(ui.volSlider, MUIA_Numeric_Value, g_args.volume);
     updateSpeedText();
-    // The harness view only without a session to run (SCREEN=dos|inspector|all
-    // with neither GAMEBOX nor SESSION=dos).
-    setDosIdleView(!g_args.gamebox.empty() || g_args.kind == "dos");
-
     bool openWelcome = !std::strcmp(screen, "welcome") || !std::strcmp(screen, "all");
     bool openDos = !std::strcmp(screen, "dos") || !std::strcmp(screen, "inspector") || !std::strcmp(screen, "all");
+    // The harness view only for an explicit test start (SCREEN=dos|inspector|all
+    // with neither GAMEBOX nor SESSION=dos), never for missing configuration.
+    setDosIdleView(harnessView(openDos, !g_args.gamebox.empty() || g_args.kind == "dos"));
     bool openInsp = !std::strcmp(screen, "inspector") || !std::strcmp(screen, "all");
     if (openDos) set(ui.dos, MUIA_Window_Open, TRUE);
     if (openInsp) set(ui.insp, MUIA_Window_Open, TRUE);
@@ -3770,7 +3770,9 @@ int main(int argc, char **argv) {
         if (sigs) g_sigMask |= sigs;
         running = handleId(id);
         if (!running) break;
-        if (g_args.kind == "dos-pending") { g_args.kind = "dos"; sessionWanted = true; }
+        // "Open a DOS prompt" opened the window for this session: it closes
+        // too if the session cannot be prepared (for example without CONFDIR).
+        if (g_args.kind == "dos-pending") { g_args.kind = "dos"; sessionWanted = true; dosWindowForSession = true; }
         if (sessionWanted && g_sigMask && !g_app.ran) {
             sessionWanted = false;
             const SessionResult r = runSession();

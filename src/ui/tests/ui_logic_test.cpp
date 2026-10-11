@@ -127,13 +127,23 @@ int main() {
     CHECK(!endTurboOnFocusLoss(true, false));
     CHECK(!endTurboOnFocusLoss(false, false));
     // The DOS window without a frame: the test pattern and BOXTEST only in
-    // the harness view; a window opened for a session stays plain.
-    DosIdleView idle = dosIdleView(true);
+    // the harness view, which only an explicit test start selects.
+    DosIdleView idle = dosIdleView(false);
     CHECK(!idle.testPattern);
     CHECK(std::strcmp(idle.title, "Boxer") == 0);
-    idle = dosIdleView(false);
+    idle = dosIdleView(true);
     CHECK(idle.testPattern);
     CHECK(std::strcmp(idle.title, "BOXTEST") == 0);
+    CHECK(harnessView(true, false));     // SCREEN=dos|inspector|all, no session
+    CHECK(!harnessView(true, true));     // GAMEBOX= or SESSION=dos
+    CHECK(!harnessView(false, false));   // normal start (Welcome), CONFDIR or not
+    CHECK(!harnessView(false, true));
+    // "Open a DOS prompt" starts a session whenever none has run, so a missing
+    // CONFDIR becomes that session's preparation error, not a harness window.
+    CHECK(openPromptAction(false, false) == PromptAction::StartSession);
+    CHECK(!dosIdleView(harnessView(false, false)).testPattern);
+    CHECK(openPromptAction(true, false) == PromptAction::ShowWindow);
+    CHECK(openPromptAction(false, true) == PromptAction::ShowWindow);
 
     if (failures) { std::printf("%d failure(s)\n", failures); return 1; }
     std::printf("ui_logic_test: all checks passed\n");

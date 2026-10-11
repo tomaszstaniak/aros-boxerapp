@@ -216,9 +216,17 @@ bool endTurboOnFocusLoss(bool turboOn, bool heldByKey) {
     return turboOn && heldByKey;
 }
 
-DosIdleView dosIdleView(bool forSession) {
-    if (forSession) return {false, "Boxer"};
+bool harnessView(bool screenOpensDos, bool sessionRequested) {
+    return screenOpensDos && !sessionRequested;
+}
+
+DosIdleView dosIdleView(bool harness) {
+    if (!harness) return {false, "Boxer"};
     return {true, "BOXTEST"};
+}
+
+PromptAction openPromptAction(bool sessionRunning, bool coreRan) {
+    return sessionRunning || coreRan ? PromptAction::ShowWindow : PromptAction::StartSession;
 }
 
 }  // namespace boxer_ui
