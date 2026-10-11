@@ -1719,13 +1719,25 @@ struct CoreCall {
     boxer::Emulator *emu;
     const std::vector<boxer::ConfigFile> *confs;
     int result;
+    std::string error;   // an exception that reached coreEntry
 };
 
 // The core needs far more stack than a default Shell or Workbench start
 // gives (40960 bytes on ABIv11 AROS One); NewStackSwap runs it on its own.
 // NewStackSwap calls the entry as a plain C function with Args[0..7].
+// No exception may unwind through NewStackSwap (no unwind information
+// there, and the stack would not be switched back): one that reaches this
+// point becomes the session's error, reported like the core's own.
 static IPTR coreEntry(CoreCall *call) {
-    call->result = call->emu->run(*call->confs);
+    try {
+        call->result = call->emu->run(*call->confs);
+    } catch (const std::exception &e) {
+        call->result = 1;
+        call->error = std::string("exception in the core: ") + e.what();
+    } catch (...) {
+        call->result = 1;
+        call->error = "unknown exception in the core";
+    }
     return 0;
 }
 
@@ -1843,33 +1855,45 @@ static SessionResult runSession() {
         emu.setMasterVolume((LONG)v / 100.0f);
         logf("session: master volume %d%% before start", (int)(LONG)v);
     }
-    g_session->emu = &emu;
-    g_session->smooth = g_args.style == "smoothed";
-    g_session->running = true;
-    st.mouseActive = false;   // until the DOS program installs a driver
-    st.locked = false;
-    st.emulating = true;
-    g_session->statT0 = 0;
-    g_sessionTitle = g_session->title;
-    updateTitle();
-    // Zune turns Esc, Tab and the cursor keys into window actions (close
-    // request, cycle chain) before any event handler sees them
-    // (window.c HandleRawkey); while DOS owns the keyboard they are off.
-    set(ui.dos, MUIA_Window_DisableKeys, 0xFFFFFFFF);
-    set(ui.fs, MUIA_Window_DisableKeys, 0xFFFFFFFF);
-    if (!windowOpen(ui.dos)) set(ui.dos, MUIA_Window_Open, TRUE);
-    set(ui.dos, MUIA_Window_Activate, TRUE);
-    updateStatus();
-    lpSyncToolbar();
-    logf("session: start \"%s\", %u config files, %u preflight, %u launch commands, style %s",
-         g_session->title.c_str(), unsigned(confs.size()), unsigned(preflight.size()),
-         unsigned(launch.size()), g_session->smooth ? "smoothed" : "normal");
-    for (const auto &c : confs) logf("session: conf %s%s", c.path.c_str(), c.required ? "" : " (optional)");
-
-    CoreCall call = {&emu, &confs, -1};
+    CoreCall call = {&emu, &confs, -1, {}};
+    // From here on every change outside the session state has an undo
+    // step in the session teardown (session.h, TeardownStep), which runs on
+    // every way out: normal end, no stack, an exception. It runs inside
+    // runStartedSession(), so it is over before emu (the frame buffers'
+    // owner) and host are destroyed at this function's end.
+    SessionSteps steps;
+    steps.begin = [&] {
+        g_session->emu = &emu;
+        g_session->smooth = g_args.style == "smoothed";
+        g_session->running = true;
+        st.mouseActive = false;   // until the DOS program installs a driver
+        st.locked = false;
+        st.emulating = true;
+        g_session->statT0 = 0;
+        g_sessionTitle = g_session->title;
+        updateTitle();
+        // Zune turns Esc, Tab and the cursor keys into window actions (close
+        // request, cycle chain) before any event handler sees them
+        // (window.c HandleRawkey); while DOS owns the keyboard they are off.
+        set(ui.dos, MUIA_Window_DisableKeys, 0xFFFFFFFF);
+        set(ui.fs, MUIA_Window_DisableKeys, 0xFFFFFFFF);
+        if (!windowOpen(ui.dos)) set(ui.dos, MUIA_Window_Open, TRUE);
+        set(ui.dos, MUIA_Window_Activate, TRUE);
+        updateStatus();
+        lpSyncToolbar();
+        logf("session: start \"%s\", %u config files, %u preflight, %u launch commands, style %s",
+             g_session->title.c_str(), unsigned(confs.size()), unsigned(preflight.size()),
+             unsigned(launch.size()), g_session->smooth ? "smoothed" : "normal");
+        for (const auto &c : confs) logf("session: conf %s%s", c.path.c_str(), c.required ? "" : " (optional)");
+    };
     const ULONG stackSize = 2 * 1024 * 1024;
-    APTR stack = AllocVec(stackSize, MEMF_ANY);
-    if (stack) {
+    steps.allocStack = [&]() -> void * {
+        APTR stack = AllocVec(stackSize, MEMF_ANY);
+        if (!stack) logf("session: no memory for the core's stack");
+        return stack;
+    };
+    steps.freeStack = [](void *stack) { FreeVec(stack); };
+    steps.runCore = [&](void *stack) {
         struct StackSwapStruct sss;
         sss.stk_Lower = stack;
         sss.stk_Upper = (decltype(sss.stk_Upper))((IPTR)stack + stackSize);
@@ -1877,19 +1901,17 @@ static SessionResult runSession() {
         struct StackSwapArgs ssa = {};
         ssa.Args[0] = (IPTR)&call;
         NewStackSwap(&sss, (APTR)coreEntry, &ssa);
-        FreeVec(stack);
-    } else {
-        logf("session: no memory for the core's stack");
-    }
-    // Only a core that really started uses up this process's one session.
-    g_app.ran = boxer::Emulator::coreHasStarted();
-    const SessionEnd end = classifySessionEnd(true, stack != nullptr, g_app.ran, call.result, emu.cancelled());
-    const SessionResult result = {end, !sessionEndIsError(end) ? std::string()
-                                       : stack ? emu.lastError() : std::string("no memory for the core's stack")};
-    releaseInput("session end");
-    if (st.paused) setPaused(false, "session end");
-    if (st.launchPanel) lpShow(false, "session end");
-    if (g_lp.active) {
+        CoreRun r;
+        r.result = call.result;
+        r.started = boxer::Emulator::coreHasStarted();
+        // Only a core that really started uses up this process's one session.
+        g_app.ran = r.started;
+        r.cancelled = emu.cancelled();
+        r.error = !call.error.empty() ? call.error : emu.lastError();
+        return r;
+    };
+    steps.closing = [](const SessionResult &) {
+        if (!g_lp.active) return;
         // _saveGameSettings at session close: recent programs (gamebox-
         // relative where possible) and the cleared one-shot flag.
         g_lp.settings.setRecentPrograms(g_lp.recents);
@@ -1898,27 +1920,46 @@ static SessionResult runSession() {
         logf("launch panel: game settings %s: %u recent programs%s%s", ok ? "saved" : "NOT saved",
              unsigned(g_lp.recents.size()), ok ? "" : ", ", ok ? "" : (g_lp.settingsOk ? err.c_str() : "unreadable at start, not overwritten"));
         for (const auto &r : g_lp.recents) logf("launch panel:   recent %s %s", r.path.c_str(), r.arguments.c_str());
-    }
-    g_lp.active = false;
-    g_lp.fs = nullptr;
-    g_session->running = false;
-    g_session->haveFrame = false;
-    renderSetFrame(ui.render, nullptr);
-    renderSetFrame(ui.fsRender, nullptr);
-    if (g_session->pointerHidden) setPointerHidden(false);
-    st.locked = false;
-    st.mouseActive = true;
-    logf("session: end result=%d frames=%lu error=%s -> %s", call.result, g_session->frames, emu.lastError().c_str(),
-         sessionEndName(result.end));
-    logf("session: audio %s", boxer::coreAudioStats().c_str());
-    logLibraries("after session");
-    g_session->emu = nullptr;
-    g_host = nullptr;
+    };
+    steps.ended = [&](const SessionResult &r) {
+        logf("session: end result=%d frames=%lu error=%s -> %s", call.result, g_session->frames,
+             emu.lastError().c_str(), sessionEndName(r.end));
+        logf("session: audio %s", boxer::coreAudioStats().c_str());
+        logLibraries("after session");
+    };
+    steps.releaseInput = [] { releaseInput("session end"); };
+    steps.unpause = [] { if (st.paused) setPaused(false, "session end"); };
+    steps.hideLaunchPanel = [] { if (st.launchPanel) lpShow(false, "session end"); };
+    steps.stopSession = [] {
+        g_lp.active = false;
+        g_lp.fs = nullptr;
+        g_session->running = false;
+        g_session->haveFrame = false;
+    };
+    steps.detachViews = [] {
+        renderSetFrame(ui.render, nullptr);
+        renderSetFrame(ui.fsRender, nullptr);
+    };
+    steps.restorePointer = [] { if (g_session->pointerHidden) setPointerHidden(false); };
+    steps.resetMouse = [] {
+        st.locked = false;
+        st.mouseActive = true;
+    };
+    steps.unpublishCore = [] {
+        g_session->emu = nullptr;
+        g_host = nullptr;
+    };
     // The session window closes with its emulator (BXSession emulatorDidFinish).
-    if (st.fullscreen) setFullscreen(false);
-    set(ui.dos, MUIA_Window_DisableKeys, 0);
-    set(ui.fs, MUIA_Window_DisableKeys, 0);
-    set(ui.dos, MUIA_Window_Open, FALSE);
+    steps.leaveFullscreen = [] { if (st.fullscreen) setFullscreen(false); };
+    steps.enableWindowKeys = [] {
+        set(ui.dos, MUIA_Window_DisableKeys, 0);
+        set(ui.fs, MUIA_Window_DisableKeys, 0);
+    };
+    steps.closeWindow = [] { set(ui.dos, MUIA_Window_Open, FALSE); };
+    steps.report = [](const std::string &l) { logf("%s", l.c_str()); };
+    const SessionResult result = runStartedSession(steps);
+    // Again here: also when the session ended by an exception.
+    g_app.ran = boxer::Emulator::coreHasStarted();
     return result;
 }
 

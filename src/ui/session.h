@@ -13,6 +13,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace boxer_ui {
@@ -73,6 +74,86 @@ private:
     State *previous_;
     std::vector<std::function<void()>> cleanups_;
 };
+
+// Everything a started session changes outside its own state, undone in
+// this order (the enum order is the run order, wherever a step was
+// registered). Why this order:
+// - FreeStack first: the core has returned from its stack, nothing points
+//   into it, and 2 MB go back before the window work below.
+// - ReleaseInput, Unpause and HideLaunchPanel need the session still marked
+//   running (they release keys and buttons in DOS, resume its audio).
+// - StopSession marks it stopped, so no handler run by the window changes
+//   below reaches the core any more.
+// - DetachViews: the views hold pointers into frame buffers the emulator
+//   owns; they let go before the emulator is destroyed.
+// - RestorePointer while the window that has the blank pointer is still
+//   open (the full-screen one in full screen).
+// - UnpublishCore clears the emulator and host pointers before they end.
+// - LeaveFullscreen, EnableWindowKeys, CloseWindow last: the window state
+//   the session started with (window keys back to Zune, window closed).
+enum class TeardownStep {
+    FreeStack, ReleaseInput, Unpause, HideLaunchPanel, StopSession, DetachViews, RestorePointer,
+    ResetMouse, UnpublishCore, LeaveFullscreen, EnableWindowKeys, CloseWindow
+};
+constexpr int kTeardownSteps = 12;
+const char *teardownStepName(TeardownStep step);
+
+// Runs the registered steps once, in TeardownStep order, at run() or at the
+// latest when it is destroyed (an early return or an exception). Never
+// throws: a step that throws is reported through `report` and the steps
+// after it still run.
+class SessionTeardown {
+public:
+    using Report = std::function<void(const std::string &)>;
+    explicit SessionTeardown(Report report) : report_(std::move(report)) {}
+    ~SessionTeardown() { run(); }
+    SessionTeardown(const SessionTeardown &) = delete;
+    SessionTeardown &operator=(const SessionTeardown &) = delete;
+
+    void set(TeardownStep step, std::function<void()> undo) { steps_[int(step)] = std::move(undo); }
+    bool has(TeardownStep step) const { return bool(steps_[int(step)]); }
+    void run() noexcept;
+
+private:
+    void reportNoThrow(const std::string &text) noexcept;
+    Report report_;
+    std::function<void()> steps_[kTeardownSteps];
+};
+
+// What the core run returned (CoreCall in main.cpp).
+struct CoreRun {
+    int result = -1;
+    bool started = false;     // Emulator::coreHasStarted() afterwards
+    bool cancelled = false;   // the user asked the core to stop
+    std::string error;
+};
+
+// The front end's part of a session from the start of the core on; main.cpp
+// fills it with the Zune and exec calls, the host test with recorders.
+// Every undo action must be harmless when its change was not made (begin()
+// may fail half way).
+struct SessionSteps {
+    std::function<void()> begin;   // publish the core, take window keys, open the window
+    std::function<void *()> allocStack;   // null: no memory
+    std::function<void(void *)> freeStack;
+    std::function<CoreRun(void *stack)> runCore;
+    std::function<void(const SessionResult &)> closing;   // before the teardown (game settings)
+    std::function<void(const SessionResult &)> ended;     // after it (end log)
+    std::function<void()> releaseInput, unpause, hideLaunchPanel, stopSession, detachViews,
+        restorePointer, resetMouse, unpublishCore, leaveFullscreen, enableWindowKeys, closeWindow;
+    std::function<void(const std::string &)> report;   // log line
+};
+
+// Registers every undo action of `s` (all but FreeStack) with `t`. When one
+// is empty it registers none, names the missing ones through s.report and
+// returns false.
+bool registerSessionTeardown(SessionTeardown &t, const SessionSteps &s);
+
+// The started session: registers the teardown before begin() changes
+// anything, runs the core on its own stack and undoes everything on every
+// way out. An exception is reported as an error, never swallowed: before
+// the core was entered PreparationFailed, from then on CoreFailed.
+SessionResult runStartedSession(const SessionSteps &s);
 
 }  // namespace boxer_ui
 #endif
