@@ -93,10 +93,11 @@ If EXISTS "${BxSU}.boxer-old"
   Set BxBad 1
 EndIf
 If NOT "x$BxBad" EQ "x0"
-  Echo "Install-Assign: these look like files of an earlier run that stopped half-way"
-  Echo "Install-Assign: (or someone else's). Nothing was changed; they were not used or deleted."
-  Echo "Install-Assign: if $BxSU is missing, rename its .boxer-old back to it (its .boxer-new"
-  Echo "Install-Assign: has the same lines plus the Boxer block); then remove the others and run again."
+  Echo "Install-Assign: FAILED - nothing was changed. These files may be left by an"
+  Echo "Install-Assign: interrupted run and may hold the only copy of your startup commands."
+  Echo "Install-Assign: Keep a copy of them, look at what is in them, compare them with"
+  Echo "Install-Assign: $BxSU, and put the right version back as $BxSU yourself."
+  Echo "Install-Assign: Only then move the leftover files away and run Install-Assign again."
   Quit 20
 EndIf
 ; The block counts as installed only when complete. A ";BEGIN Boxer" line

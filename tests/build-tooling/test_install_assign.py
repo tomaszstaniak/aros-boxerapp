@@ -354,6 +354,10 @@ class InstallAssign(unittest.TestCase):
         self.assertIsNone(self.read("S/User-Startup"))
         self.assertEqual(self.read("S/User-Startup.boxer-old"), USER)
         self.assertIn("User-Startup.boxer-old", out)
+        # The user is told to keep and compare the files, not to delete them.
+        self.assertIn("Keep a copy", out)
+        self.assertIn("compare them with", out)
+        self.assertNotIn("remove the others", out)
 
     def test_foreign_scratch_names_are_not_deleted(self):
         self.write("S/User-Startup", USER)

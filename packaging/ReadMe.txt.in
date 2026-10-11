@@ -34,6 +34,11 @@ Installing
      CD SYS:Boxer
      Execute Install-Assign
    (add KEEP or REPLACE to answer the question in advance).
+   If Install-Assign stops and lists files such as S:User-Startup.boxer-old
+   or .boxer-new, an earlier run was interrupted. Do not just delete them:
+   they may hold the only copy of your S:User-Startup. Keep a copy, look
+   at what is in them, compare them with S:User-Startup, put the right
+   version back yourself, and only then run Install-Assign again.
 
 4. Double-click BoxerUI. On the first start Boxer proposes a folder for
    your DOS games and one for their saved games; confirm or choose your
