@@ -92,10 +92,13 @@ coreinfo="$BUILD_DIR/core$HOST_SUFFIX/BUILDINFO.txt"
 [ "$(sed -n 's/^library: //p' "$coreinfo")" = "$(shasum -a 256 "$lib" | cut -d' ' -f1)" ] \
   || die "$coreinfo does not describe $lib"
 # BOXER_PKG_UNCHECKED_CORE_NOTE=<text>: package a core built from an
-# unchecked source tree (build-core.sh with BOXER_CORE_UNCHECKED_SOURCE=1).
-# Its pin and series do not describe the tree it was built from, so the
-# source archive may not correspond; the note, written to BUILDINFO.txt,
-# must say how that tree was checked. Without it such a core is refused.
+# unchecked source tree (build-core.sh with BOXER_CORE_UNCHECKED_SOURCE=1)
+# for diagnosis only. Its pin and series do not describe that tree, and the
+# tree's contents were not recorded, so the shipped source cannot be shown
+# to correspond; a note does not change that. Such a package is versioned
+# "-diagnostic", says "not for distribution" at the top of ReadMe.txt and
+# BUILDINFO.txt, and check-package-notices.sh refuses it as a release.
+# Without the note such a core is refused.
 uncheckednote=""
 set +e
 coredelta=$("$here/check-core-provenance.sh" "$P" "$coreinfo")
@@ -107,7 +110,8 @@ case $corerc in
     [ -n "${BOXER_PKG_UNCHECKED_CORE_NOTE:-}" ] \
       || die "the core was built from a source tree not checked against pin + series ($coredelta); rebuild it from work/boxer, or set BOXER_PKG_UNCHECKED_CORE_NOTE"
     uncheckednote="$coredelta"
-    echo "make-package: WARNING packaging a core built from an unchecked source tree:" >&2
+    ver="$ver-diagnostic"
+    echo "make-package: WARNING diagnostic package, not for distribution: core built from an unchecked source tree:" >&2
     echo "  $coredelta" >&2 ;;
   1)
     if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
@@ -207,7 +211,9 @@ chmod -R u+w "$out/.src"; rm -rf "$out/.src"
 # from (optional); its revision is recorded in BUILDINFO.txt.
 sdkrev=$(git -C "${sdkrepo:-/nonexistent}" rev-parse --short=10 HEAD 2>/dev/null || echo "unknown (${sdkrepo:-AROS source not set})")
 sdkbr=$(git -C "${sdkrepo:-/nonexistent}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+diagline="DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION: core built from an unverified source tree"
 {
+  [ -z "$uncheckednote" ] || { echo "$diagline"; echo; }
   pubinfo "$info"
   echo
   echo "package: boxer $ver $target"
@@ -234,8 +240,12 @@ sdkbr=$(git -C "${sdkrepo:-/nonexistent}" rev-parse --abbrev-ref HEAD 2>/dev/nul
   echo "Install-Assign.info: tools/mkicon.py project, default tool C:IconX, image assets/runtime/boxer/boxer-32.png"
   echo "source archive: $(shasum -a 256 "$pkg/$srcarc" | cut -d' ' -f1)  $srcarc"
 } > "$pkg/BUILDINFO.txt"
-sed -e "s|@VERSION@|$ver|g" -e "s|@ABI_NAME@|$abiname|g" -e "s|@SOURCE_ARCHIVE@|$srcarc|g" \
-  "$P/packaging/ReadMe.txt.in" > "$pkg/ReadMe.txt"
+{
+  [ -z "$uncheckednote" ] || printf '%s\n%s\n\n' "$diagline" \
+    "It is for diagnosing a problem only. Do not pass it on or publish it."
+  sed -e "s|@VERSION@|$ver|g" -e "s|@ABI_NAME@|$abiname|g" -e "s|@SOURCE_ARCHIVE@|$srcarc|g" \
+    "$P/packaging/ReadMe.txt.in"
+} > "$pkg/ReadMe.txt"
 # Visible in Wanderer's default view, opens in MultiView (both ABIs ship it there).
 python3 "$P/tools/mkicon.py" "$pkg/ReadMe.txt.info" project --image builtin:page \
   --default-tool SYS:Utilities/MultiView >/dev/null
@@ -263,5 +273,9 @@ else
 fi
 (cd "$out" && { { (cd Boxer && find . -type f | sed 's|^\./|Boxer/|'); echo Boxer.info; } | LC_ALL=C sort | xargs -I{} shasum -a 256 "{}"; \
   shasum -a 256 "$arc"; }) > "$out/MANIFEST-$BOXER_ABI.sha256"
-"$here/check-package-notices.sh" "$BOXER_ABI" "$pkg"
+# A dry-run or diagnostic package passes the notice check only as such;
+# without --diagnostic the same check refuses it as a release.
+notices=()
+[ $stale = 0 ] && [ -z "$uncheckednote" ] || notices=(--diagnostic)
+"$here/check-package-notices.sh" "${notices[@]+"${notices[@]}"}" "$BOXER_ABI" "$pkg"
 echo "make-package: ok -> $out/$arc ($(wc -l < "$out/MANIFEST-$BOXER_ABI.sha256" | tr -d ' ') entries in MANIFEST-$BOXER_ABI.sha256)"

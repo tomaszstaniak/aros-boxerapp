@@ -59,9 +59,15 @@ WAV, TTF, EXE, `.boxer` or Dune file ends up in the drawer.
    The core library's `BUILDINFO.txt` must record that it was built from
    `work/boxer` checked against the pin and series
    (`scripts/check-core-provenance.sh`). A core built from another tree
-   with `BOXER_CORE_UNCHECKED_SOURCE=1` is refused unless
-   `BOXER_PKG_UNCHECKED_CORE_NOTE=<text>` says how that tree was checked;
-   the note and the unchecked root are then written to `BUILDINFO.txt`. A
+   with `BOXER_CORE_UNCHECKED_SOURCE=1` is refused. With
+   `BOXER_PKG_UNCHECKED_CORE_NOTE=<text>` it is packaged for diagnosis
+   only: the archive is versioned `-diagnostic`, `ReadMe.txt` and
+   `BUILDINFO.txt` start with "DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION",
+   the note and the unchecked root are recorded, and
+   `scripts/check-package-notices.sh` refuses the package as a release
+   (it accepts it only with `--diagnostic`, as make-package.sh calls it;
+   the same holds for a `-STALE` dry run). The note does not make the
+   source correspond: the tree's contents are not recorded. A
    core record without the source-check line (built before it existed) is
    refused: rebuild the core.
 3. `work/boxer` conf files equal the upstream pin; `upstream/boxer` is at the

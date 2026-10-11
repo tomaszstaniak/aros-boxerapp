@@ -4,10 +4,15 @@
 #
 # Checks that a staged BoxerUI package directory carries the licence notices
 # that documentation/licenses.md ("Distribution checklist") requires.
-# Usage: scripts/check-package-notices.sh <abiv11|mainline-v1> <package dir>
+# Usage: scripts/check-package-notices.sh [--diagnostic] <abiv11|mainline-v1> <package dir>
 # Exit 0 when nothing is missing, 1 otherwise. Content of the notices is
 # compared with this repository's copies so that a stale copy is caught too.
+# A package marked not for distribution (diagnostic build from an unverified
+# core source tree, or a dry run whose source does not correspond) fails as
+# a release package; --diagnostic accepts it as what it is.
 set -u
+diagnostic=0
+[ "${1:-}" = --diagnostic ] && { diagnostic=1; shift; }
 abi=${1:-}; pkg=${2:-}
 case "$abi" in abiv11|mainline-v1) ;; *) echo "usage: $0 <abiv11|mainline-v1> <package dir>" >&2; exit 2;; esac
 [ -d "$pkg" ] || { echo "not a directory: $pkg" >&2; exit 2; }
@@ -47,6 +52,13 @@ fi
 for bad in Brand.png BrandWatermark.png '*.ttf'; do
     found=$(find "$pkg" -name "$bad" | head -3)
     [ -z "$found" ] || { echo "FORBIDDEN $found"; missing=1; }
+done
+for f in BUILDINFO.txt ReadMe.txt; do
+    [ -f "$pkg/$f" ] || continue
+    if grep -q -e '^DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION' -e 'NOT CORRESPONDING SOURCE' "$pkg/$f"; then
+        if [ $diagnostic = 1 ]; then echo "note     $f: marked not for distribution (accepted with --diagnostic)"
+        else echo "NOTFORRELEASE $f: package is marked not for distribution"; missing=1; fi
+    fi
 done
 [ -f "$pkg/BUILDINFO.txt" ] || echo "note     no BUILDINFO.txt (toolchain/SDK identification for the source offer)"
 echo "abi=$abi result=$([ $missing = 0 ] && echo complete || echo incomplete)"
