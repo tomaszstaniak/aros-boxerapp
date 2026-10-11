@@ -920,8 +920,19 @@ struct SessionArgs {
 };
 static SessionArgs g_args;
 
+// Process-wide: the core runs once per process, and the view preferences
+// outlive a session.
 static struct {
-    bool running = false, ran = false, quitApp = false;
+    bool ran = false;             // the core started in this process
+    bool quitApp = false;         // the session ended because the app quits
+    bool aspect = true;           // aspectCorrected (UserDefaults.plist default YES)
+} g_app;
+
+// One session's state. runSession() owns it (SessionScope) and publishes it
+// in g_session for exactly as long as it runs; outside a session g_session
+// is null.
+struct SessionState {
+    bool running = false;         // the core is running (set after preparation)
     boxer::Emulator *emu = nullptr;
     boxer::FrameInfo frame;
     Size scaled = {0, 0};
@@ -931,7 +942,6 @@ static struct {
     int lastX = 0, lastY = 0;     // view coordinates of the last pointer event
     double lastFx = 0, lastFy = 0; // clamped viewport fraction of the last event
     bool haveFracLast = false;
-    bool aspect = true;           // aspectCorrected (UserDefaults.plist default YES)
     unsigned statT0 = 0;          // host ms at the start of the stats window
     unsigned long statF0 = 0;     // frames delivered at that time
     bool pointerHidden = false;
@@ -940,7 +950,9 @@ static struct {
     bool buttonsToDOS[3] = {};
     bool ffKeyHeld = false;   // fast forward held with RAmiga+Alt+F
     std::string title = "DOS Prompt";
-} g_ss;
+};
+static SessionState *g_session;
+static bool sessionRunning() { return g_session && g_session->running; }
 
 static ULONG g_sigMask;
 static bool handleId(ULONG id);
@@ -1023,10 +1035,10 @@ static std::string lpRecentHost(const boxer::RecentProgram &r) {
 }
 
 // canOpenURLs = !isRunningActiveProcess.
-static bool lpCanOpen() { return g_ss.running && g_lp.depth == 0; }
+static bool lpCanOpen() { return sessionRunning() && g_lp.depth == 0; }
 // canToggleLaunchPanel: allowsLauncherPanel and not on the loading panel.
 // Not in the fullscreen window: the panel lives in the DOS window only (gap).
-static bool lpCanToggle() { return g_ss.running && g_lp.active && !g_lp.loading && !st.fullscreen; }
+static bool lpCanToggle() { return sessionRunning() && g_lp.active && !g_lp.loading && !st.fullscreen; }
 
 static void lpSyncToolbar() {
     // Toolbar "Programs": enabled = canToggleLaunchPanel, value = launchPanelShown.
@@ -1106,7 +1118,7 @@ static void lpRebuild(const char *why, bool rescan) {
 
 // switchToPanel: (no animation, as in 2.0-alpha where it is disabled).
 static void lpShow(bool show, const char *why) {
-    if (show && !(g_ss.running && g_lp.active)) return;
+    if (show && !(sessionRunning() && g_lp.active)) return;
     if (show == st.launchPanel) { lpSyncToolbar(); return; }
     if (show) {
         // Leaving the DOS view: the input view resigns (keys and buttons
@@ -1125,7 +1137,7 @@ static void lpShow(bool show, const char *why) {
 static void lpToggle(const char *why) {
     if (!lpCanToggle()) {
         logf("launch panel: toggle refused (%s): gamebox=%d loading=%d running=%d", why, g_lp.active,
-             g_lp.loading, g_ss.running);
+             g_lp.loading, sessionRunning());
         lpSyncToolbar();
         return;
     }
@@ -1138,7 +1150,7 @@ static void lpToggle(const char *why) {
 static void lpOpen(int index) {
     if (index < 0 || index >= (int)g_lp.rows.size()) return;
     const LPRow &row = g_lp.rows[index];
-    if (!lpCanOpen() || !g_ss.emu) { logf("launch panel: open refused, session busy (row %d)", index); return; }
+    if (!lpCanOpen() || !g_session->emu) { logf("launch panel: open refused, session busy (row %d)", index); return; }
     if (row.dosPath.empty() && row.kind != LPRow::DriveHeading) {
         logf("launch panel: open refused, %s is not reachable in DOS", row.hostPath.c_str());
         return;
@@ -1147,8 +1159,8 @@ static void lpOpen(int index) {
     if (row.kind == LPRow::DriveHeading) {
         // A drive: switch to it and stay at the DOS prompt.
         g_lp.completion = Completion::ShowPrompt;
-        g_ss.emu->queueCommand(std::string(1, row.drive) + ":");
-        g_ss.emu->queueCommand("cd \\");
+        g_session->emu->queueCommand(std::string(1, row.drive) + ":");
+        g_session->emu->queueCommand("cd \\");
         logf("launch panel: switch to drive %c:", row.drive);
         lpShow(false, "drive opened");
         return;
@@ -1158,9 +1170,9 @@ static void lpOpen(int index) {
     size_t slash = dp.rfind('\\');
     std::string dir = slash > 2 ? dp.substr(2, slash - 2) : "\\";
     std::string prog = dp.substr(slash + 1) + (row.arguments.empty() ? "" : " " + row.arguments);
-    g_ss.emu->queueCommand(dp.substr(0, 2));
-    g_ss.emu->queueCommand("cd " + dir);
-    g_ss.emu->queueCommand(prog);
+    g_session->emu->queueCommand(dp.substr(0, 2));
+    g_session->emu->queueCommand("cd " + dir);
+    g_session->emu->queueCommand(prog);
     logf("launch panel: open row %d \"%s\" -> %s, cd %s, %s", index, row.title.c_str(), dp.substr(0, 2).c_str(),
          dir.c_str(), prog.c_str());
     lpShow(false, "program opened");
@@ -1261,15 +1273,15 @@ static void setPointerHidden(bool hidden) {
     } else {
         ClearPointer(w);
     }
-    g_ss.pointerHidden = hidden;
+    if (g_session) g_session->pointerHidden = hidden;
 }
 
 // BXInputController didResignKey (BXInputController.m:403-416) clears the
 // emulated keyboard and mouse; this port also unlocks the mouse.
 static void releaseInput(const char *why) {
-    if (!g_ss.running) return;
+    if (!sessionRunning()) return;
     int k = boxer::coreReleaseAllKeys(), b = boxer::coreReleaseAllButtons();
-    for (bool &d : g_ss.buttonsToDOS) d = false;
+    for (bool &d : g_session->buttonsToDOS) d = false;
     logf("input: released %d keys, %d buttons (%s)", k, b, why);
 }
 
@@ -1278,7 +1290,7 @@ static void setLocked(bool locked, const char *why) {
     if (locked == st.locked) return;
     st.locked = locked;
     logf("mouse lock -> %d (%s)", locked, why);
-    if (g_ss.running) {
+    if (sessionRunning()) {
         setPointerHidden(locked);
         if (!locked) releaseInput("mouse unlocked");
         if (locked) {
@@ -1289,7 +1301,7 @@ static void setLocked(bool locked, const char *why) {
             if (w) {
                 int cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2;
                 warpPointer(w, _mleft(rv) + cx, _mtop(rv) + cy);
-                g_ss.lastX = cx; g_ss.lastY = cy; g_ss.haveLast = true;
+                g_session->lastX = cx; g_session->lastY = cy; g_session->haveLast = true;
             }
         }
     }
@@ -1302,24 +1314,24 @@ static void applyVolume();
 class SessionHost : public boxer::EmulatorDelegate {
 public:
     void frameSizeChanged(const boxer::FrameInfo &info) override {
-        g_ss.frame = info;
-        Size before = g_ss.scaled;
-        g_ss.scaled = aspectCorrectedSize({(int)info.width, (int)info.height}, g_ss.aspect);
+        g_session->frame = info;
+        Size before = g_session->scaled;
+        g_session->scaled = aspectCorrectedSize({(int)info.width, (int)info.height}, g_app.aspect);
         logf("video: frame %ux%u dosbox scale %.3f,%.3f -> shown at %dx%d (4:3 rule %s)", info.width,
-             info.height, info.scaleX, info.scaleY, g_ss.scaled.w, g_ss.scaled.h, g_ss.aspect ? "on" : "off");
+             info.height, info.scaleX, info.scaleY, g_session->scaled.w, g_session->scaled.h, g_app.aspect ? "on" : "off");
         // The core has just reallocated frameBuffer (coalface.cpp
         // boxer_prepareForFrameSize): the views must not keep the old
         // pointer, since the window change below can redraw before the
         // next frame. The new buffer is valid (black) at the new size.
-        showFrame(g_ss.emu->frameBuffer.data(), info.width * 4);
-        if (before.w != g_ss.scaled.w || before.h != g_ss.scaled.h) accommodate();
+        showFrame(g_session->emu->frameBuffer.data(), info.width * 4);
+        if (before.w != g_session->scaled.w || before.h != g_session->scaled.h) accommodate();
     }
 
     void showFrame(const uint32_t *pixels, unsigned pitch) {
-        RenderFrame f = {pixels, (int)g_ss.frame.width, (int)g_ss.frame.height, (int)pitch,
-                         g_ss.scaled.w, g_ss.scaled.h, g_ss.smooth};
-        g_ss.last = f;
-        g_ss.haveFrame = true;
+        RenderFrame f = {pixels, (int)g_session->frame.width, (int)g_session->frame.height, (int)pitch,
+                         g_session->scaled.w, g_session->scaled.h, g_session->smooth};
+        g_session->last = f;
+        g_session->haveFrame = true;
         // Only the shown view holds the pointer; the other one is cleared.
         Object *other = st.fullscreen ? ui.render : ui.fsRender;
         renderSetFrame(other, nullptr);
@@ -1329,7 +1341,7 @@ public:
     }
 
     void frameFinished(const uint32_t *pixels, unsigned pitch, const boxer::FrameInfo &info) override {
-        ++g_ss.frames;
+        ++g_session->frames;
         showFrame(pixels, pitch);
     }
 
@@ -1359,11 +1371,11 @@ public:
     }
     void runPreflightCommands() override {
         logf("core: preflight, queueing %u commands", unsigned(preflight.size()));
-        for (const auto &c : preflight) g_ss.emu->queueCommand(c);
+        for (const auto &c : preflight) g_session->emu->queueCommand(c);
     }
     void runLaunchCommands() override {
         logf("core: launch, queueing %u commands", unsigned(launch.size()));
-        for (const auto &c : launch) g_ss.emu->queueCommand(c);
+        for (const auto &c : launch) g_session->emu->queueCommand(c);
     }
     void returnedToShell() override { logf("core: returned to shell"); lpReturnedToShell(); }
     void programWillStart(const std::string &p, const std::string &a) override {
@@ -1396,12 +1408,12 @@ private:
         if (!w || st.fullscreen) return;
         Size cur = {_mwidth(ui.render), _mheight(ui.render)};
         Size want = cur;
-        double a = (double)g_ss.scaled.w / g_ss.scaled.h, ca = (double)cur.w / cur.h;
+        double a = (double)g_session->scaled.w / g_session->scaled.h, ca = (double)cur.w / cur.h;
         if (std::fabs(a - ca) < 0.025) {
-            if (cur.w < g_ss.scaled.w || cur.h < g_ss.scaled.h) want = g_ss.scaled;
+            if (cur.w < g_session->scaled.w || cur.h < g_session->scaled.h) want = g_session->scaled;
         } else {
             want = {cur.w, (int)std::lround(cur.w / a)};
-            if (want.w < g_ss.scaled.w) want = g_ss.scaled;
+            if (want.w < g_session->scaled.w) want = g_session->scaled;
         }
         int chromeW = w->Width - cur.w, chromeH = w->Height - cur.h;
         struct Screen *scr = w->WScreen;
@@ -1413,14 +1425,14 @@ private:
         if (want.w == cur.w && want.h == cur.h) return;
         int left = std::min<int>(w->LeftEdge, scr->Width - (want.w + chromeW));
         logf("video: render area %dx%d -> %dx%d to accommodate %dx%d", cur.w, cur.h, want.w, want.h,
-             g_ss.scaled.w, g_ss.scaled.h);
+             g_session->scaled.w, g_session->scaled.h);
         ChangeWindowBox(w, std::max(0, left), w->TopEdge, want.w + chromeW, want.h + chromeH);
     }
 };
 static SessionHost *g_host;
 
 static void syncInspectorFromCore() {
-    if (!g_ss.running) return;
+    if (!sessionRunning()) return;
     bool autoSpeed = false;
     int cycles = boxer::coreCycles(&autoSpeed);
     st.speed = autoSpeed ? kAutoSpeed : cycles;
@@ -1431,7 +1443,7 @@ static void syncInspectorFromCore() {
 }
 
 static void applyVolume() {
-    if (!g_ss.running) return;
+    if (!sessionRunning()) return;
     IPTR v = 0;
     get(ui.volSlider, MUIA_Numeric_Value, &v);
     boxer::coreSetMasterVolume((LONG)v / 100.0f);
@@ -1442,15 +1454,15 @@ static void applyVolume() {
 // 2 s of host time (measurement for the Inspector controls).
 static void logStats(bool force = false) {
     unsigned now = boxer::coreHostMillis();
-    unsigned dt = now - g_ss.statT0;
+    unsigned dt = now - g_session->statT0;
     if (!force && dt < 2000) return;
     bool autoSpeed = false;
     int cycles = boxer::coreCycles(&autoSpeed);
-    unsigned long df = g_ss.frames - g_ss.statF0;
+    unsigned long df = g_session->frames - g_session->statF0;
     logf("stats: ms=%u frames=%lu fps=%.2f cycles=%d auto=%d frameskip=%d paused=%d", dt, df,
          dt ? df * 1000.0 / dt : 0.0, cycles, autoSpeed, boxer::coreFrameskip(), st.paused);
-    g_ss.statT0 = now;
-    g_ss.statF0 = g_ss.frames;
+    g_session->statT0 = now;
+    g_session->statF0 = g_session->frames;
 }
 
 // BXEmulator pause/resume. Pausing also counts as resigning key status
@@ -1458,7 +1470,7 @@ static void logStats(bool force = false) {
 static void setTurbo(bool on, const char *why);
 static void setPaused(bool paused, const char *why) {
     // BXSession pause:/resume: both turn fast forward off.
-    if (g_ss.running && boxer::coreTurbo()) setTurbo(false, why);
+    if (sessionRunning() && boxer::coreTurbo()) setTurbo(false, why);
     if (paused == st.paused) return;
     st.paused = paused;
     st.playback = paused ? 0 : 1;
@@ -1468,7 +1480,7 @@ static void setPaused(bool paused, const char *why) {
     }
     updateTitle();
     logf("pause -> %d (%s)", paused, why);
-    if (!g_ss.running) return;
+    if (!sessionRunning()) return;
     logStats(true);
     boxer::corePauseAudio(paused);
     if (paused) { setLocked(false, "paused"); releaseInput("paused"); }
@@ -1479,12 +1491,12 @@ static void setPaused(bool paused, const char *why) {
 // change end it. The toolbar segment makes it stick until toggled again;
 // Amiga+Alt+Cursor Right (or the provisional F) holds it while down.
 static void setTurbo(bool on, const char *why) {
-    if (!g_ss.running) return;
+    if (!sessionRunning()) return;
     if (on && st.paused) setPaused(false, why);
     if (on == boxer::coreTurbo()) return;
     logStats(true);
     boxer::coreSetTurbo(on);
-    if (!on) g_ss.ffKeyHeld = false;
+    if (!on) g_session->ffKeyHeld = false;
     bool autoSpeed = false;
     int cycles = boxer::coreCycles(&autoSpeed);
     logf("turbo -> %d (%s): cycles=%d auto=%d frameskip=%d", on, why, cycles, autoSpeed,
@@ -1506,7 +1518,7 @@ void SessionHost::processEvents() {
     // Paused: the core stays here, the UI keeps running (the original's
     // concurrent run loop waits with distantFuture while paused,
     // BXEmulator.mm:872-883). Close and Ctrl-C end the wait.
-    while (st.paused && !g_ss.emu->cancelled())
+    while (st.paused && !g_session->emu->cancelled())
         serviceSignals(Wait(g_sigMask | SIGBREAKF_CTRL_C) & (g_sigMask | SIGBREAKF_CTRL_C));
     logStats();
 }
@@ -1514,8 +1526,8 @@ void SessionHost::processEvents() {
 static void serviceSignals(ULONG got) {
     if (got & SIGBREAKF_CTRL_C) {
         logf("session: Ctrl-C, ending the session");
-        g_ss.emu->requestQuit();
-        g_ss.quitApp = true;
+        g_session->emu->requestQuit();
+        g_app.quitApp = true;
     }
     got &= g_sigMask;
     if (!got) return;
@@ -1525,8 +1537,8 @@ static void serviceSignals(ULONG got) {
         if (sigs) g_sigMask |= sigs;
         if (!id) break;
         if (!handleId(id)) {
-            g_ss.quitApp = true;
-            g_ss.emu->requestQuit();
+            g_app.quitApp = true;
+            g_session->emu->requestQuit();
         }
     }
     if (g_renderResized) {
@@ -1541,11 +1553,11 @@ static void serviceSignals(ULONG got) {
 // never reach a window on either ABI (only the release arrives).
 static const unsigned kRawF = 0x23, kRawP = 0x19, kRawG = 0x24, kRawA = 0x20;
 static bool sessionKey(Object *, unsigned code, bool up, unsigned qual) {
-    if (!g_ss.running) return false;
+    if (!sessionRunning()) return false;
     if (st.launchPanel) return false;   // keys belong to the launch panel (search field)
     // The hold key released after RAmiga+Alt+F: the hold ends, whichever
     // qualifier was let go first.
-    if (up && code == kRawF && g_ss.ffKeyHeld) {
+    if (up && code == kRawF && g_session->ffKeyHeld) {
         setTurbo(false, "key released");
         return true;
     }
@@ -1573,24 +1585,24 @@ static bool sessionCommandKey(Object *, unsigned code, bool up, unsigned qual) {
     const bool ramiga = qual & IEQUALIFIER_RCOMMAND;
     const bool shift = qual & (IEQUALIFIER_LSHIFT | IEQUALIFIER_RSHIFT);
     const bool alt = qual & (IEQUALIFIER_LALT | IEQUALIFIER_RALT);
-    if (code == kRawF && up && g_ss.ffKeyHeld) {
+    if (code == kRawF && up && g_session && g_session->ffKeyHeld) {
         setTurbo(false, "key released");
         return true;
     }
     if (up || !ramiga) return false;
     if (code == kRawF && alt) {
         // RAmiga+Alt+F: fast forward while held (BXSession+BXUIControls.m:306-353).
-        if (!g_ss.running) return true;
+        if (!sessionRunning()) return true;
         if (qual & IEQUALIFIER_REPEAT) return true;
         logf("key: raw %02x down qual %04x -> fast forward held", code, qual);
         setTurbo(true, "key held");
-        g_ss.ffKeyHeld = boxer::coreTurbo();
+        g_session->ffKeyHeld = boxer::coreTurbo();
         return true;
     }
     if (qual & IEQUALIFIER_REPEAT) return code == kRawP || code == kRawG || (code == kRawA && shift);
     if (code == kRawP && !shift && !alt) {
         logf("shortcut: RAmiga+P");
-        if (g_ss.running) setPaused(!st.paused, "RAmiga+P");
+        if (sessionRunning()) setPaused(!st.paused, "RAmiga+P");
         return true;
     }
     if (code == kRawG && !shift && !alt) {
@@ -1613,13 +1625,13 @@ static bool sessionCommandKey(Object *, unsigned code, bool up, unsigned qual) {
 // whileLocked:. Moves reach DOS while locked, or while the pointer is over
 // the view with "track mouse while unlocked" on (_controlsCursorWhileMouseInside).
 static void sessionMouseMove(Object *view, int x, int y, unsigned) {
-    if (!g_ss.running || !st.mouseActive || view != activeRender() || st.launchPanel) return;
+    if (!sessionRunning() || !st.mouseActive || view != activeRender() || st.launchPanel) return;
     Rect vp = renderViewport(view);
     bool insideView = x >= 0 && y >= 0 && x < _mwidth(view) && y < _mheight(view);
-    if (!st.locked && !(st.track && insideView)) { g_ss.haveLast = false; g_ss.haveFracLast = false; return; }
+    if (!st.locked && !(st.track && insideView)) { g_session->haveLast = false; g_session->haveFracLast = false; return; }
     if (st.paused) return;
-    int dx = g_ss.haveLast ? x - g_ss.lastX : 0, dy = g_ss.haveLast ? y - g_ss.lastY : 0;
-    g_ss.lastX = x; g_ss.lastY = y; g_ss.haveLast = true;
+    int dx = g_session->haveLast ? x - g_session->lastX : 0, dy = g_session->haveLast ? y - g_session->lastY : 0;
+    g_session->lastX = x; g_session->lastY = y; g_session->haveLast = true;
     if (st.locked) {
         // Locked: relative motion only (emulate); the pointer is warped back
         // to the viewport centre so it never stops at a screen edge.
@@ -1627,7 +1639,7 @@ static void sessionMouseMove(Object *view, int x, int y, unsigned) {
         int cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2;
         if (x != cx || y != cy) {
             warpPointer(_window(view), _mleft(view) + cx, _mtop(view) + cy);
-            g_ss.lastX = cx; g_ss.lastY = cy;
+            g_session->lastX = cx; g_session->lastY = cy;
         }
         logf("mouse: locked delta %+d,%+d", dx, dy);
         return;
@@ -1639,9 +1651,9 @@ static void sessionMouseMove(Object *view, int x, int y, unsigned) {
     // position nor mickeys beyond the edge.
     Fraction f = canvasFraction(x, y, vp);
     bool outside = x < vp.x || y < vp.y || x >= vp.x + vp.w || y >= vp.y + vp.h;
-    double cdx = (dx || dy) && g_ss.haveFracLast ? (f.x - g_ss.lastFx) * vp.w : 0;
-    double cdy = (dx || dy) && g_ss.haveFracLast ? (f.y - g_ss.lastFy) * vp.h : 0;
-    g_ss.lastFx = f.x; g_ss.lastFy = f.y; g_ss.haveFracLast = true;
+    double cdx = (dx || dy) && g_session->haveFracLast ? (f.x - g_session->lastFx) * vp.w : 0;
+    double cdy = (dx || dy) && g_session->haveFracLast ? (f.y - g_session->lastFy) * vp.h : 0;
+    g_session->lastFx = f.x; g_session->lastFy = f.y; g_session->haveFracLast = true;
     if (!cdx && !cdy && outside && (dx || dy)) {
         logf("mouse: view %d,%d outside image %d,%d %dx%d, clamped fraction %.5f,%.5f unchanged", x, y,
              vp.x, vp.y, vp.w, vp.h, f.x, f.y);
@@ -1658,12 +1670,12 @@ static void sessionMouseMove(Object *view, int x, int y, unsigned) {
 // toggles the lock; an unlocked click locks when "track while unlocked" is
 // off; otherwise the button goes to DOS.
 static bool sessionButton(Object *view, int button, bool down, unsigned qual, int x, int y, bool inside) {
-    if (!g_ss.running) return false;
+    if (!sessionRunning()) return false;
     if (st.launchPanel && !st.fullscreen) return false;
     logf("input: button %d %s qual %04x inside=%d", button, down ? "down" : "up", qual, inside);
     if (!down) {
-        if (g_ss.buttonsToDOS[button]) {
-            g_ss.buttonsToDOS[button] = false;
+        if (g_session->buttonsToDOS[button]) {
+            g_session->buttonsToDOS[button] = false;
             boxer::coreMouseButton(button, false);
             logf("mouse: button %d up -> dos", button);
             return true;
@@ -1684,7 +1696,7 @@ static bool sessionButton(Object *view, int button, bool down, unsigned qual, in
         return true;
     }
     sessionMouseMove(view, x, y, qual);   // the position travels with the click
-    g_ss.buttonsToDOS[button] = true;
+    g_session->buttonsToDOS[button] = true;
     boxer::coreMouseButton(button, true);
     logf("mouse: button %d down -> dos at view %d,%d", button, x, y);
     return true;
@@ -1694,13 +1706,13 @@ static bool sessionButton(Object *view, int button, bool down, unsigned qual, in
 // may be paused, so no new frame would come), and a locked pointer stays
 // hidden in the new window.
 static void fullscreenChanged() {
-    if (!g_ss.running) return;
+    if (!sessionRunning()) return;
     if (st.fullscreen && st.launchPanel) lpShow(false, "fullscreen window has no launch panel");
     lpSyncToolbar();
-    if (g_ss.haveFrame && g_host) g_host->showFrame(g_ss.last.pixels, g_ss.last.pitch);
+    if (g_session->haveFrame && g_host) g_host->showFrame(g_session->last.pixels, g_session->last.pitch);
     if (st.locked) setPointerHidden(true);
-    g_ss.haveLast = false;
-    g_ss.haveFracLast = false;
+    g_session->haveLast = false;
+    g_session->haveFracLast = false;
 }
 
 struct CoreCall {
@@ -1722,19 +1734,18 @@ static SessionResult runSession() {
         logf("session: %s", why.c_str());
         return SessionResult{SessionEnd::PreparationFailed, why};
     };
-    if (g_ss.ran)
+    if (g_app.ran)
         return setupFailed("the core already ran in this process and keeps global state, so it cannot run again; start a new BoxerUI");
     std::vector<boxer::ConfigFile> confs;
     boxer::FileSystem plainFiles;
     boxer::ShadowFileSystem shadowFiles;
     boxer::FileSystem *files = &plainFiles;
     SessionHost host;
+    // Declared after the locals it points into, so it ends first: on every
+    // return the session state goes and no global points at these locals.
+    SessionScope<SessionState> scope(g_session);
     g_host = &host;
-    // Whatever way this returns, no global keeps pointing at the locals
-    // above once they are gone.
-    struct Unpublish {
-        ~Unpublish() { g_host = nullptr; g_ss.emu = nullptr; g_lp.active = false; g_lp.fs = nullptr; }
-    } unpublish;
+    scope.onExit([] { g_host = nullptr; g_lp.active = false; g_lp.fs = nullptr; });
     std::vector<std::string> preflight = g_args.pre, launch = g_args.cmd;
     std::vector<boxer::ConfigFile> extra;
     for (const auto &c : g_args.confs) (c.required ? confs : extra).push_back(c);
@@ -1752,7 +1763,7 @@ static SessionResult runSession() {
             return setupFailed("new gamebox not opened: " + error);
         confs = layered;
         files = &plainFiles;
-        g_ss.title = name;
+        g_session->title = name;
     } else if (!g_args.gamebox.empty()) {
         std::string error, name;
         auto setupLog = [](const std::string &l) { logf("setup: %s", l.c_str()); };
@@ -1778,7 +1789,7 @@ static SessionResult runSession() {
             return setupFailed("gamebox not opened: " + error);
         confs = layered;
         files = &shadowFiles;
-        g_ss.title = name;
+        g_session->title = name;
         // The gamebox again, now with its identifier persisted by openGamebox.
         g_lp.active = g_lp.box.open(g_args.gamebox);
         if (g_lp.active) {
@@ -1832,14 +1843,14 @@ static SessionResult runSession() {
         emu.setMasterVolume((LONG)v / 100.0f);
         logf("session: master volume %d%% before start", (int)(LONG)v);
     }
-    g_ss.emu = &emu;
-    g_ss.smooth = g_args.style == "smoothed";
-    g_ss.running = true;
+    g_session->emu = &emu;
+    g_session->smooth = g_args.style == "smoothed";
+    g_session->running = true;
     st.mouseActive = false;   // until the DOS program installs a driver
     st.locked = false;
     st.emulating = true;
-    g_ss.statT0 = 0;
-    g_sessionTitle = g_ss.title;
+    g_session->statT0 = 0;
+    g_sessionTitle = g_session->title;
     updateTitle();
     // Zune turns Esc, Tab and the cursor keys into window actions (close
     // request, cycle chain) before any event handler sees them
@@ -1851,8 +1862,8 @@ static SessionResult runSession() {
     updateStatus();
     lpSyncToolbar();
     logf("session: start \"%s\", %u config files, %u preflight, %u launch commands, style %s",
-         g_ss.title.c_str(), unsigned(confs.size()), unsigned(preflight.size()),
-         unsigned(launch.size()), g_ss.smooth ? "smoothed" : "normal");
+         g_session->title.c_str(), unsigned(confs.size()), unsigned(preflight.size()),
+         unsigned(launch.size()), g_session->smooth ? "smoothed" : "normal");
     for (const auto &c : confs) logf("session: conf %s%s", c.path.c_str(), c.required ? "" : " (optional)");
 
     CoreCall call = {&emu, &confs, -1};
@@ -1871,8 +1882,8 @@ static SessionResult runSession() {
         logf("session: no memory for the core's stack");
     }
     // Only a core that really started uses up this process's one session.
-    g_ss.ran = boxer::Emulator::coreHasStarted();
-    const SessionEnd end = classifySessionEnd(true, stack != nullptr, g_ss.ran, call.result, emu.cancelled());
+    g_app.ran = boxer::Emulator::coreHasStarted();
+    const SessionEnd end = classifySessionEnd(true, stack != nullptr, g_app.ran, call.result, emu.cancelled());
     const SessionResult result = {end, !sessionEndIsError(end) ? std::string()
                                        : stack ? emu.lastError() : std::string("no memory for the core's stack")};
     releaseInput("session end");
@@ -1890,18 +1901,18 @@ static SessionResult runSession() {
     }
     g_lp.active = false;
     g_lp.fs = nullptr;
-    g_ss.running = false;
-    g_ss.haveFrame = false;
+    g_session->running = false;
+    g_session->haveFrame = false;
     renderSetFrame(ui.render, nullptr);
     renderSetFrame(ui.fsRender, nullptr);
-    if (g_ss.pointerHidden) setPointerHidden(false);
+    if (g_session->pointerHidden) setPointerHidden(false);
     st.locked = false;
     st.mouseActive = true;
-    logf("session: end result=%d frames=%lu error=%s -> %s", call.result, g_ss.frames, emu.lastError().c_str(),
+    logf("session: end result=%d frames=%lu error=%s -> %s", call.result, g_session->frames, emu.lastError().c_str(),
          sessionEndName(result.end));
     logf("session: audio %s", boxer::coreAudioStats().c_str());
     logLibraries("after session");
-    g_ss.emu = nullptr;
+    g_session->emu = nullptr;
     g_host = nullptr;
     // The session window closes with its emulator (BXSession emulatorDidFinish).
     if (st.fullscreen) setFullscreen(false);
@@ -2822,7 +2833,7 @@ static void showImportStage() {
         set(ui.impList, MUIA_List_Active, 0);   // preferred installer first (IP:246)
         // One core run per process; a second installer needs a new
         // BoxerUI (handing over to one is not implemented).
-        set(ui.impLaunch, MUIA_Disabled, g_ss.ran);
+        set(ui.impLaunch, MUIA_Disabled, g_app.ran);
         set(ui.impPages, MUIA_Group_ActivePage, 1);
         break;
     }
@@ -2935,7 +2946,7 @@ static bool askEndInstaller() {
     if (r == 0) return false;
     g_inst.finish = r == 1;
     g_inst.stop = r == 2;
-    g_ss.emu->requestQuit();
+    g_session->emu->requestQuit();
     return true;
 }
 
@@ -2943,16 +2954,16 @@ static bool handleId(ULONG id) {
     switch (id) {
     case MUIV_Application_ReturnID_Quit:
     case ID_QUIT:
-        if (g_ss.running && g_import.stage == boxer::ImportStage::RunningInstaller) {
+        if (sessionRunning() && g_import.stage == boxer::ImportStage::RunningInstaller) {
             askEndInstaller();
             return true;
         }
-        if (g_ss.running) {
+        if (sessionRunning()) {
             // Quit / window close end the session first (BXSession close ->
             // cancel the emulator, wait for it to finish), then the app.
             logf("quit: ending the session");
-            g_ss.emu->requestQuit();
-            g_ss.quitApp = true;
+            g_session->emu->requestQuit();
+            g_app.quitApp = true;
             return true;
         }
         return false;
@@ -3150,7 +3161,7 @@ static bool handleId(ULONG id) {
     }
     case ID_IMPORT_CLOSE:
         if (g_import.stage == boxer::ImportStage::RunningInstaller) {
-            if (g_ss.running) askEndInstaller();
+            if (sessionRunning()) askEndInstaller();
             break;
         }
         if (g_import.stage == boxer::ImportStage::Finished) {
@@ -3185,7 +3196,7 @@ static bool handleId(ULONG id) {
     case ID_PROMPT:
         logf("welcome: Open a DOS prompt -> DOS window");
         set(ui.dos, MUIA_Window_Open, TRUE);
-        if (!g_args.confDir.empty() && !g_ss.running && !g_ss.ran) g_args.kind = "dos-pending";
+        if (!g_args.confDir.empty() && !sessionRunning() && !g_app.ran) g_args.kind = "dos-pending";
         break;
     case ID_PROGRAMS: {
         IPTR v = 0; get(ui.programs, MUIA_Selected, &v);
@@ -3224,7 +3235,7 @@ static bool handleId(ULONG id) {
         logf("toolbar: playback mode %d", (int)(id - ID_SEG0));
         if (id == ID_SEG2) setTurbo(true, "toolbar");
         else setPaused(id == ID_SEG0, "toolbar");
-        if (!g_ss.running) st.playback = id - ID_SEG0;
+        if (!sessionRunning()) st.playback = id - ID_SEG0;
         break;
     }
     case ID_VOL_MIN: set(ui.volSlider, MUIA_Numeric_Value, 0); break;
@@ -3246,22 +3257,22 @@ static bool handleId(ULONG id) {
     case ID_LOCK_BUTTON: {
         IPTR v = 0; get(ui.lockBtn, MUIA_Selected, &v);
         if ((bool)v != st.locked) {
-            if (g_ss.running) setLocked(v, "lock button");
+            if (sessionRunning()) setLocked(v, "lock button");
             else { st.locked = v; logf("lock button -> %d", st.locked); updateStatus(); }
         }
         break;
     }
     case ID_LOCK_KEY:
         if (st.mouseActive) {
-            if (g_ss.running) setLocked(!st.locked, "RAmiga+L");
+            if (sessionRunning()) setLocked(!st.locked, "RAmiga+L");
             else { st.locked = !st.locked; logf("Amiga+L -> locked=%d", st.locked); updateStatus(); }
         }
         break;
     case ID_MOUSE_ACTIVE:
-        if (g_ss.running) break;   // the DOS program decides while a session runs
+        if (sessionRunning()) break;   // the DOS program decides while a session runs
         st.mouseActive = !st.mouseActive; if (!st.mouseActive) st.locked = false; updateStatus(); break;
     case ID_TRACK: st.track = !st.track; updateStatus(); break;
-    case ID_DUMP: dumpGeometry(g_ss.running ? "RAmiga+D" : "F3"); break;
+    case ID_DUMP: dumpGeometry(sessionRunning() ? "RAmiga+D" : "F3"); break;
     case ID_DUMP_LATER:
         if (!g_laterArmed) {
             g_laterIhn.ihn_Object = ui.toolbar;
@@ -3273,19 +3284,22 @@ static bool handleId(ULONG id) {
             logf("harness: dump armed for 2.5 s (dump #%d will be next)", g_dumpSerial + 1);
         }
         break;
-    case ID_STYLE:
-        g_ss.smooth = !g_ss.smooth;
-        g_args.style = g_ss.smooth ? "smoothed" : "normal";
+    case ID_STYLE: {
+        // Outside a session the style is only the preference a session starts with.
+        const bool smooth = g_session ? !g_session->smooth : g_args.style != "smoothed";
+        if (g_session) g_session->smooth = smooth;
+        g_args.style = smooth ? "smoothed" : "normal";
         logf("harness: rendering style %s", g_args.style.c_str());
-        if (g_ss.running && g_ss.haveFrame) {
-            g_ss.last.smooth = g_ss.smooth;
-            renderSetFrame(activeRender(), &g_ss.last);
+        if (sessionRunning() && g_session->haveFrame) {
+            g_session->last.smooth = g_session->smooth;
+            renderSetFrame(activeRender(), &g_session->last);
         }
         break;
+    }
     case ID_ASPECT:
-        g_ss.aspect = !g_ss.aspect;
-        logf("aspect correction %s (RAmiga+Shift+A)", g_ss.aspect ? "on" : "off");
-        if (g_ss.running && g_host && g_ss.frame.width) g_host->frameSizeChanged(g_ss.frame);
+        g_app.aspect = !g_app.aspect;
+        logf("aspect correction %s (RAmiga+Shift+A)", g_app.aspect ? "on" : "off");
+        if (sessionRunning() && g_host && g_session->frame.width) g_host->frameSizeChanged(g_session->frame);
         break;
     case ID_SIZE1: resizeRenderTo(640, 480, true); break;
     case ID_SIZE2: resizeRenderTo(720, 360, false); break;
@@ -3298,7 +3312,7 @@ static bool handleId(ULONG id) {
         if (knob != (LONG)v) nnset(ui.speedSlider, MUIA_Numeric_Value, knob);
         updateSpeedText();
         logf("cpu: slider %d -> speed %d, knob %d, \"%s\"", (int)(LONG)v, st.speed, (int)knob, g_speedText);
-        if (g_ss.running) {
+        if (sessionRunning()) {
             // BXSession setCPUSpeed:/setAutoSpeed: turn fast forward off.
             setTurbo(false, "speed change");
             logStats(true);
@@ -3314,7 +3328,7 @@ static bool handleId(ULONG id) {
         st.frameskip = -(int)(LONG)v;
         updateSpeedText();
         logf("cpu: frameskip %d \"%s\"", st.frameskip, g_frameText);
-        if (g_ss.running) {
+        if (sessionRunning()) {
             logStats(true);
             boxer::coreSetFrameskip(st.frameskip);
             logf("core: frameskip now %d", boxer::coreFrameskip());
@@ -3352,10 +3366,10 @@ static bool handleId(ULONG id) {
             logf("activation: welcome=%d dos=%d inspector=%d fullscreen=%d", (int)a1, (int)a2, (int)a3, (int)a4);
             // windowDidResignKey -> didResignKey: unlock, release keys and
             // buttons (BXDOSWindowController.m:1569, BXInputController.m:403).
-            if (g_ss.running && !a2 && !a4) {
+            if (sessionRunning() && !a2 && !a4) {
                 setLocked(false, "window inactive");
                 releaseInput("window inactive");
-                if (endTurboOnFocusLoss(boxer::coreTurbo(), g_ss.ffKeyHeld)) setTurbo(false, "window inactive");
+                if (endTurboOnFocusLoss(boxer::coreTurbo(), g_session->ffKeyHeld)) setTurbo(false, "window inactive");
             }
         }
         break;
@@ -3674,13 +3688,13 @@ int main(int argc, char **argv) {
         running = handleId(id);
         if (!running) break;
         if (g_args.kind == "dos-pending") { g_args.kind = "dos"; sessionWanted = true; }
-        if (sessionWanted && g_sigMask && !g_ss.ran) {
+        if (sessionWanted && g_sigMask && !g_app.ran) {
             sessionWanted = false;
             reportSession(runSession(), "The DOS session");
-            if (g_ss.quitApp) break;
+            if (g_app.quitApp) break;
             sigs = 0;
         }
-        if (g_inst.pending && g_sigMask && !g_ss.ran) {
+        if (g_inst.pending && g_sigMask && !g_app.ran) {
             set(ui.imp, MUIA_Window_Open, FALSE);
             const SessionResult r = runSession();
             if (!importContinuesAfterInstaller(r.end, g_inst.stop)) {
@@ -3691,7 +3705,7 @@ int main(int argc, char **argv) {
                 g_inst.stop = true;
             }
             importAfterInstaller();
-            if (g_ss.quitApp) break;
+            if (g_app.quitApp) break;
             sigs = 0;
         }
         if (g_copy && g_import.stage == boxer::ImportStage::ImportingSourceFiles) {
