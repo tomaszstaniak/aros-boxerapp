@@ -1743,7 +1743,7 @@ static IPTR coreEntry(CoreCall *call) {
     return 0;
 }
 
-static SessionResult runSession() {
+static SessionResult prepareAndRunSession() {
     auto setupFailed = [](const std::string &why) {
         logf("session: %s", why.c_str());
         return SessionResult{SessionEnd::PreparationFailed, why};
@@ -1963,6 +1963,22 @@ static SessionResult runSession() {
     // Again here: also when the session ended by an exception.
     g_app.ran = boxer::Emulator::coreHasStarted();
     return result;
+}
+
+// runStartedSession() turns every exception from the start on into the
+// session's result; one thrown while the session is still being prepared
+// (opening the gamebox, building the emulator) would otherwise leave
+// BoxerUI unreported. SessionScope has already cleaned up by then.
+static SessionResult runSession() {
+    try {
+        return prepareAndRunSession();
+    } catch (const std::exception &e) {
+        logf("session: exception while preparing: %s", e.what());
+        return {SessionEnd::PreparationFailed, e.what()};
+    } catch (...) {
+        logf("session: unknown exception while preparing");
+        return {SessionEnd::PreparationFailed, "unknown exception while preparing the session"};
+    }
 }
 
 // BXSession's error alerts: a session that could not start or ended with
