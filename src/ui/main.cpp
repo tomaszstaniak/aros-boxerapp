@@ -20,7 +20,9 @@
 // PREFSFAULT=<step>:fail|crash (with HARNESS=1) are for the data-directory tests.
 // GAMEBOX opens a gamebox session (writes shadowed into DATA), SESSION=dos a
 // plain DOS prompt; without either the windows show the slice-A test pattern
-// and "Open a DOS prompt" starts a session when CONFDIR is known. The core
+// and "Open a DOS prompt" starts a session when CONFDIR is known. When a
+// GAMEBOX or SESSION=dos session cannot be prepared, its window closes and
+// the error requester follows (no test pattern left open). The core
 // keeps global state, so one session per process (a new
 // process per session).
 //
@@ -3723,6 +3725,10 @@ int main(int argc, char **argv) {
     ULONG sigs = 0;
     bool running = !memcp("windows-open");
     bool sessionWanted = !g_args.gamebox.empty() || g_args.kind == "dos";
+    // A GAMEBOX or SESSION=dos start opened the session window above, before
+    // its session was prepared; until a frame arrives it shows the test
+    // pattern.
+    bool dosWindowForSession = sessionWanted && openDos;
     while (running) {
         ULONG id = DoMethod(ui.app, MUIM_Application_NewInput, (IPTR)&sigs);
         if (sigs) g_sigMask |= sigs;
@@ -3731,7 +3737,17 @@ int main(int argc, char **argv) {
         if (g_args.kind == "dos-pending") { g_args.kind = "dos"; sessionWanted = true; }
         if (sessionWanted && g_sigMask && !g_app.ran) {
             sessionWanted = false;
-            reportSession(runSession(), "The DOS session");
+            const SessionResult r = runSession();
+            // A session that never started must not leave its window behind
+            // with the test pattern: it closes before the requester, and with
+            // no other window open BoxerUI ends after it. The pattern stays
+            // for SCREEN=dos|inspector|all without GAMEBOX or SESSION.
+            if (r.end == SessionEnd::PreparationFailed && dosWindowForSession) {
+                set(ui.dos, MUIA_Window_Open, FALSE);
+                logf("session: window closed, the session did not start");
+            }
+            dosWindowForSession = false;
+            reportSession(r, "The DOS session");
             if (g_app.quitApp) break;
             sigs = 0;
         }
