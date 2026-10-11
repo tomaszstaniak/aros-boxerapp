@@ -11,7 +11,9 @@
 #ifndef BOXER_UI_SESSION_H
 #define BOXER_UI_SESSION_H
 
+#include <functional>
 #include <string>
+#include <vector>
 
 namespace boxer_ui {
 
@@ -44,6 +46,33 @@ const char *sessionEndName(SessionEnd end);
 // "Finish Importing", unless the user stopped the import; a session that
 // failed stops it, so nothing half-installed is imported as a finished game.
 bool importContinuesAfterInstaller(SessionEnd end, bool userStopped);
+
+// Owns the state of one session for exactly as long as the session runs.
+// Constructing it publishes a fresh State through `slot` (the pointer the
+// event handlers read); on every way out of the owning scope (the normal
+// return, an early return, an exception) the clean-ups registered with
+// onExit() run in reverse order and the slot gets back the value it had
+// before, so nothing keeps pointing at state that no longer exists.
+template <class State>
+class SessionScope {
+public:
+    explicit SessionScope(State *&slot) : slot_(slot), previous_(slot) { slot_ = &state_; }
+    ~SessionScope() {
+        for (auto it = cleanups_.rbegin(); it != cleanups_.rend(); ++it) (*it)();
+        slot_ = previous_;
+    }
+    SessionScope(const SessionScope &) = delete;
+    SessionScope &operator=(const SessionScope &) = delete;
+
+    State &state() { return state_; }
+    void onExit(std::function<void()> cleanup) { cleanups_.push_back(std::move(cleanup)); }
+
+private:
+    State state_;
+    State *&slot_;
+    State *previous_;
+    std::vector<std::function<void()>> cleanups_;
+};
 
 }  // namespace boxer_ui
 #endif

@@ -10,6 +10,8 @@
 #include "../session.h"
 
 #include <cstdio>
+#include <stdexcept>
+#include <string>
 
 using namespace boxer_ui;
 static int failures = 0;
@@ -37,9 +39,63 @@ static void testInstallerImport() {
     CHECK(!importContinuesAfterInstaller(SessionEnd::CoreFailed, false));
 }
 
+struct State {
+    bool running = false;
+    int frames = 0;
+};
+static State *published = nullptr;
+static int *borrowed = nullptr;   // another pointer a session publishes
+
+// Returns early, as runSession() does when preparation fails.
+static bool runAndReturnEarly(std::string &log) {
+    SessionScope<State> scope(published);
+    int local = 7;
+    borrowed = &local;
+    scope.onExit([&] { log += "a"; borrowed = nullptr; });
+    scope.onExit([&] { log += "b"; });
+    if (published != &scope.state()) return false;
+    return true;   // early: nothing below runs
+}
+
+static void testScope() {
+    CHECK(published == nullptr);
+    {
+        SessionScope<State> scope(published);
+        CHECK(published == &scope.state());
+        CHECK(!published->running && published->frames == 0);   // fresh state
+        published->running = true;
+        published->frames = 42;
+    }
+    CHECK(published == nullptr);
+    {
+        SessionScope<State> scope(published);
+        CHECK(!published->running && published->frames == 0);   // nothing left from the last one
+    }
+    std::string log;
+    CHECK(runAndReturnEarly(log));
+    CHECK(published == nullptr && borrowed == nullptr);
+    CHECK(log == "ba");                                          // reverse order, once
+    try {
+        SessionScope<State> scope(published);
+        scope.onExit([&] { log += "x"; });
+        throw std::runtime_error("core");
+    } catch (const std::exception &) {
+    }
+    CHECK(published == nullptr && log == "bax");
+    State outer;
+    published = &outer;
+    {
+        SessionScope<State> scope(published);
+        CHECK(published != &outer);
+    }
+    CHECK(published == &outer);
+    published = nullptr;
+}
+
 int main() {
     testEnds();
     testInstallerImport();
+    testScope();
     if (failures) { std::printf("%d failure(s)\n", failures); return 1; }
     std::printf("session_test: all checks passed\n");
     return 0;
