@@ -203,16 +203,6 @@ unsigned dosBackground(double x, double y, double W, double H) {
     return rgb(r, g, b);
 }
 
-SessionOutcome sessionOutcome(bool setupOk, bool coreEntered, bool coreStarted, int coreResult) {
-    if (!setupOk || !coreEntered) return SessionOutcome::SetupFailed;
-    if (coreResult == 0) return SessionOutcome::Ended;
-    return coreStarted ? SessionOutcome::CoreFailed : SessionOutcome::SetupFailed;
-}
-
-bool importContinuesAfterInstaller(SessionOutcome outcome, bool userStopped) {
-    return outcome == SessionOutcome::Ended && !userStopped;
-}
-
 KeyRoute routeSessionKey(unsigned rawCode, bool down, bool repeat, bool amigaQualified, bool paused) {
     if (!paused) return KeyRoute::ToDOS;
     // Raw codes 0x60-0x67: Shift, Caps Lock, Control, Alt, Amiga.

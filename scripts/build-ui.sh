@@ -79,9 +79,11 @@ c++ -std=c++17 -Wall -O1 -o "$out/host/ui_logic_test" "$src/tests/ui_logic_test.
 c++ -std=c++17 -Wall -O1 -o "$out/host/launchpanel_test" "$src/tests/launchpanel_test.cpp" \
   "$src/launchpanel_logic.cpp" "$PROJECT_ROOT"/src/model/*.cpp "$PROJECT_ROOT/src/emulator/filesystem.cpp"
 "$out/host/launchpanel_test" "$out/host/launchpanel scratch"
+c++ -std=c++17 -Wall -O1 -o "$out/host/session_test" "$src/tests/session_test.cpp" "$src/session.cpp"
+"$out/host/session_test"
 
 sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp"
-  "$src/coverassets.cpp")
+  "$src/coverassets.cpp" "$src/session.cpp")
 # The emulator layer and the model as in build-smoke.sh: files that include
 # the core's headers compile as gnu++14 (DOSBox 0.74's dynamic exception
 # specifications), the model and the UI as C++17.

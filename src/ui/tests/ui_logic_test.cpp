@@ -112,18 +112,6 @@ int main() {
     CHECK(welcomeGradient(260, 268 - 175, 520, 268) == 0);
     CHECK(welcomeGradient(260, 268 - 120, 520, 268) != 0);
 
-    // Session outcomes: only a core that started and failed is CoreFailed;
-    // the import goes on only after a normal end.
-    CHECK(sessionOutcome(false, false, false, 0) == SessionOutcome::SetupFailed);
-    CHECK(sessionOutcome(true, false, false, 0) == SessionOutcome::SetupFailed);   // no stack
-    CHECK(sessionOutcome(true, true, false, 1) == SessionOutcome::SetupFailed);    // missing Preflight.conf
-    CHECK(sessionOutcome(true, true, true, 1) == SessionOutcome::CoreFailed);
-    CHECK(sessionOutcome(true, true, true, 0) == SessionOutcome::Ended);
-    CHECK(!importContinuesAfterInstaller(SessionOutcome::SetupFailed, false));
-    CHECK(!importContinuesAfterInstaller(SessionOutcome::CoreFailed, false));
-    CHECK(!importContinuesAfterInstaller(SessionOutcome::Ended, true));
-    CHECK(importContinuesAfterInstaller(SessionOutcome::Ended, false));
-
     // Keys while paused: a plain key resumes and goes to DOS; repeats and
     // Amiga-qualified keys are not queued; releases and modifiers pass.
     CHECK(routeSessionKey(0x20, true, false, false, false) == KeyRoute::ToDOS);

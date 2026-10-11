@@ -41,6 +41,7 @@
 #include "classes.h"
 #include "gfx.h"
 #include "ui_logic.h"
+#include "session.h"
 #include "launchpanel_logic.h"
 #include "coverassets.h"
 #include "../emulator/emulator.h"
@@ -1716,15 +1717,10 @@ static IPTR coreEntry(CoreCall *call) {
     return 0;
 }
 
-struct SessionResult {
-    SessionOutcome outcome;
-    std::string error;
-};
-
 static SessionResult runSession() {
     auto setupFailed = [](const std::string &why) {
         logf("session: %s", why.c_str());
-        return SessionResult{SessionOutcome::SetupFailed, why};
+        return SessionResult{SessionEnd::PreparationFailed, why};
     };
     if (g_ss.ran)
         return setupFailed("the core already ran in this process and keeps global state, so it cannot run again; start a new BoxerUI");
@@ -1876,8 +1872,9 @@ static SessionResult runSession() {
     }
     // Only a core that really started uses up this process's one session.
     g_ss.ran = boxer::Emulator::coreHasStarted();
-    const SessionResult result = {sessionOutcome(true, stack != nullptr, g_ss.ran, call.result),
-                                  stack ? emu.lastError() : std::string("no memory for the core's stack")};
+    const SessionEnd end = classifySessionEnd(true, stack != nullptr, g_ss.ran, call.result, emu.cancelled());
+    const SessionResult result = {end, !sessionEndIsError(end) ? std::string()
+                                       : stack ? emu.lastError() : std::string("no memory for the core's stack")};
     releaseInput("session end");
     if (st.paused) setPaused(false, "session end");
     if (st.launchPanel) lpShow(false, "session end");
@@ -1900,7 +1897,8 @@ static SessionResult runSession() {
     if (g_ss.pointerHidden) setPointerHidden(false);
     st.locked = false;
     st.mouseActive = true;
-    logf("session: end result=%d frames=%lu error=%s", call.result, g_ss.frames, emu.lastError().c_str());
+    logf("session: end result=%d frames=%lu error=%s -> %s", call.result, g_ss.frames, emu.lastError().c_str(),
+         sessionEndName(result.end));
     logf("session: audio %s", boxer::coreAudioStats().c_str());
     logLibraries("after session");
     g_ss.emu = nullptr;
@@ -1916,11 +1914,10 @@ static SessionResult runSession() {
 // BXSession's error alerts: a session that could not start or ended with
 // an error says so instead of just closing.
 static void reportSession(const SessionResult &r, const std::string &what) {
-    if (r.outcome == SessionOutcome::Ended) return;
-    logf("session: %s (%s)", r.outcome == SessionOutcome::CoreFailed ? "ended with an error" : "did not start",
-         r.error.c_str());
-    const std::string text = (r.outcome == SessionOutcome::CoreFailed ? what + " ended with an error:\n"
-                                                                     : what + " could not be started:\n") +
+    if (!sessionEndIsError(r.end)) return;
+    logf("session: %s (%s)", sessionEndName(r.end), r.error.c_str());
+    const std::string text = (r.end == SessionEnd::CoreFailed ? what + " ended with an error:\n"
+                                                             : what + " could not be started:\n") +
                              (r.error.empty() ? std::string("(no details)") : r.error);
     MUI_Request(ui.app, NULL, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
 }
@@ -3686,8 +3683,8 @@ int main(int argc, char **argv) {
         if (g_inst.pending && g_sigMask && !g_ss.ran) {
             set(ui.imp, MUIA_Window_Open, FALSE);
             const SessionResult r = runSession();
-            if (!importContinuesAfterInstaller(r.outcome, g_inst.stop)) {
-                if (r.outcome != SessionOutcome::Ended) {
+            if (!importContinuesAfterInstaller(r.end, g_inst.stop)) {
+                if (sessionEndIsError(r.end)) {
                     logf("import: installer session failed; the import stops");
                     reportSession(r, "The installer of " + g_import.gameName());
                 }
