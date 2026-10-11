@@ -32,7 +32,11 @@ OT_Spec1_FontFile still names Fonts:TrueType/VeraSans*.ttf: that is the
 path of the unmodified system font the description points to, not a name
 of this file. The licence text must ship next to the generated files.
 
-Usage: make-fonts.py <iso Fonts dir> <output dir>
+--inputs writes "<sha256>  <path>" for each system description it read
+and for this script, so packaging can tell when a font input changed after
+the build (build-ui.sh records the list).
+
+Usage: make-fonts.py [--inputs MANIFEST] <iso Fonts dir> <output dir>
 """
 import hashlib, os, struct, sys
 
@@ -47,12 +51,20 @@ NEW_FAMILY = b"BoxerSans"
 
 
 def main():
-    if len(sys.argv) != 3:
+    args = sys.argv[1:]
+    inputs = None
+    if args[:1] == ["--inputs"] and len(args) >= 2:
+        inputs, args = args[1], args[2:]
+    if len(args) != 2:
         raise SystemExit(__doc__)
-    src, out = sys.argv[1], sys.argv[2]
+    src, out = args
     os.makedirs(out, exist_ok=True)
+    me = os.path.abspath(__file__)
+    read = []
     for name, (otag, sha1) in SOURCES.items():
-        data = bytearray(open(os.path.join(src, otag), "rb").read())
+        path = os.path.join(src, otag)
+        data = bytearray(open(path, "rb").read())
+        read.append((hashlib.sha256(data).hexdigest(), os.path.abspath(path)))
         if hashlib.sha1(data).hexdigest() != sha1:
             raise SystemExit("%s: unexpected content (sha1 %s)" % (otag, hashlib.sha1(data).hexdigest()))
         for off in range(0, len(data) - 8, 8):
@@ -78,6 +90,11 @@ def main():
         # An outline font's .font file is only the OFCH_ID header.
         open(os.path.join(out, name + ".font"), "wb").write(b"\x0f\x03\x00\x00")
         print("%s.otag sha256 %s" % (name, hashlib.sha256(data).hexdigest()))
+    if inputs:
+        read.append((hashlib.sha256(open(me, "rb").read()).hexdigest(), me))
+        with open(inputs, "w") as f:
+            for h, p in read:
+                f.write("%s  %s\n" % (h, p))
 
 
 main()

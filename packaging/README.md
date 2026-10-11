@@ -41,11 +41,20 @@ WAV, TTF, EXE, `.boxer` or Dune file ends up in the drawer.
 
 1. `BoxerUI` sha256 equals `BUILDINFO.txt`; `scripts/check-undefined.sh`
    passes with the empty allowlist.
-2. Every source file hash in `BUILDINFO.txt` matches the tree, and the core
-   library matches. `build-ui.sh` lists there every project file its
-   compiles read, headers included, taken from the compiler's dependency
-   files (`tools/depmanifest.py`); `scripts/check-sources.sh` refuses an
-   empty or malformed list. `work/boxer` must still equal the upstream pin
+2. Source/asset check (`scripts/check-build-inputs.sh`): every file hash
+   in the `sources:` and `build inputs:` lists of `BUILDINFO.txt` matches
+   the tree, and the core library matches. `build-ui.sh` lists under
+   `sources:` every project file its compiles read, headers included, taken
+   from the compiler's dependency files (`tools/depmanifest.py`). Under
+   `build inputs:` it lists what the generators read, as they report it
+   themselves (`tools/png2inc.py --inputs`: the embedded art and cover
+   templates; `tools/make-fonts.py --inputs`: the AROS ISO's font
+   descriptions; each also records itself), `build-ui.sh`, `env.sh` and the
+   Bitstream Vera notice it copies, and every file the compiles read from
+   `build/` (the SDL3 headers, the generated `gen/*.inc`), again from the
+   dependency files (`tools/inputmanifest.py` merges the lists).
+   `scripts/check-sources.sh` refuses an empty or malformed list, and a
+   `BUILDINFO.txt` without these lists is refused: rebuild. `work/boxer` must still equal the upstream pin
    plus the patch series (`scripts/reproduce --source-only`). Otherwise the source archive would not correspond to the
    binary and the script stops. `BOXER_PKG_ALLOW_STALE=1` builds a dry-run
    package anyway, versioned `-STALE` and marked NOT CORRESPONDING in
@@ -70,7 +79,12 @@ WAV, TTF, EXE, `.boxer` or Dune file ends up in the drawer.
    source correspond: the tree's contents are not recorded. A
    core record without the source-check line (built before it existed) is
    refused: rebuild the core.
-3. `work/boxer` conf files equal the upstream pin; `upstream/boxer` is at the
+3. Runtime-file check (`scripts/check-runtime-files.sh`): the files
+   `build-ui.sh` staged next to `BoxerUI` (`Fonts/`), listed under
+   `runtime files:` in `BUILDINFO.txt`, are unchanged in `stage/`, and the
+   drawer's copies are exactly those files (a changed, missing or extra
+   file is refused).
+   `work/boxer` conf files equal the upstream pin; `upstream/boxer` is at the
    commit in `upstreams.json`.
 4. `scripts/check-package-notices.sh` on the drawer must pass.
 

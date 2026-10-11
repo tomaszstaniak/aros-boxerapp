@@ -98,7 +98,9 @@ bytes.
 - `build-smoke.sh` builds `boxer-core-smoke`, a Shell program that runs the
   core without the UI.
 - `make-package.sh` refuses to package when the binary does not match its
-  `BUILDINFO.txt`, or when a source file has changed since the build. It
+  `BUILDINFO.txt`, when a source file or build input (embedded art, font
+  descriptions, generating scripts, SDL3 headers) has changed since the
+  build, or when the packaged `Fonts/` differ from the build's staging. It
   includes the complete corresponding source as an archive. Details:
   [packaging/README.md](../packaging/README.md).
 
@@ -110,6 +112,7 @@ tests/patch-tooling/run.sh                 # bootstrap/save-patch/reproduce scen
 python3 tests/build-tooling/test_depcheck.py
 python3 tests/build-tooling/test_check_sources.py   # the source check make-package.sh runs
 python3 tests/build-tooling/test_depmanifest.py     # the source list build-ui.sh writes
+python3 tests/build-tooling/test_build_inputs.py    # build inputs and runtime files; both packaging checks
 python3 tests/build-tooling/test_core_provenance.py # the core record and its packaging check
 python3 tests/build-tooling/test_install_assign.py  # packaging/Install-Assign in a Shell model
 python3 tests/build-tooling/test_package_notices.py # notices; diagnostic packages refused as releases

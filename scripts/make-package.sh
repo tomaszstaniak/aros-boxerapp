@@ -14,9 +14,12 @@
 #   MANIFEST-<abi>.sha256             every file in the drawer + the archive
 # Contents and rationale: packaging/README.md. The package is refused when
 # the binary does not match its BUILDINFO, has undefined symbols, or when a
-# source file listed in BUILDINFO, or the upstream pin or patch series
-# recorded in the core's BUILDINFO, has changed since the build (the shipped
-# source archive would then not correspond to the binary).
+# source file or build input listed in BUILDINFO (embedded art, font
+# descriptions, generating scripts, SDL3 headers), or the upstream pin or
+# patch series recorded in the core's BUILDINFO, has changed since the build
+# (the shipped source archive would then not correspond to the binary), and
+# when the staged runtime files (Fonts/) or their copies in the package are
+# not the ones the build recorded.
 set -euo pipefail
 die() { echo "make-package: $*" >&2; exit 2; }
 [ $# -eq 1 ] || die "usage: make-package.sh <abiv11|mainline-v1>"
@@ -40,8 +43,8 @@ got=$(shasum -a 256 "$bin" | cut -d' ' -f1)
 [ "$want" = "$got" ] || die "BoxerUI sha256 $got differs from BUILDINFO ($want)"
 "$here/check-undefined.sh" "$AROS_TOOLCHAIN/x86_64-aros-nm" "$bin" "$here/ui-undefined-allowlist.txt" \
   || die "undefined-symbol check failed"
-# 2. The tree still holds the sources that binary was built from.
-awk '/^sources:/{f=1;next} /^core library/{f=0} f{sub(/^  /,""); print}' "$info" > "$BUILD_DIR/.pkg-src.sha256"
+# 2. The tree still holds the sources and build inputs that binary was
+# built from (scripts/check-build-inputs.sh: "sources:" and "build inputs:").
 # Those include the core's headers from work/boxer; that tree must still be
 # the upstream pin plus the patch series, which the source archive ships.
 srccheck=$("$here/reproduce" --source-only 2>&1) \
@@ -61,26 +64,28 @@ stale=0; srcnote=""
 # be made (empty or malformed manifest, shasum failure) and is never taken
 # for "unchanged".
 set +e
-changed=$("$here/check-sources.sh" "$P" "$BUILD_DIR/.pkg-src.sha256")
+changed=$("$here/check-build-inputs.sh" "$P" "$info")
 srcrc=$?
 set -e
-[ $srcrc -eq 0 ] || [ $srcrc -eq 1 ] || die "could not check the sources listed in $info (exit $srcrc)"
+[ $srcrc -eq 0 ] || [ $srcrc -eq 1 ] \
+  || die "source/asset check: could not compare the sources and build inputs listed in $info (exit $srcrc)"
 if [ $srcrc -eq 1 ]; then
   if [ -n "${BOXER_PKG_ACCEPTED_BINARY:-}" ]; then
     [ "$BOXER_PKG_ACCEPTED_BINARY" = "$got" ] \
       || die "BOXER_PKG_ACCEPTED_BINARY ($BOXER_PKG_ACCEPTED_BINARY) is not this BoxerUI ($got)"
     [ -n "${BOXER_PKG_SOURCE_NOTE:-}" ] || die "BOXER_PKG_ACCEPTED_BINARY needs BOXER_PKG_SOURCE_NOTE"
     srcnote="$changed"
-    echo "make-package: packaging accepted binary $got; sources changed since the build:" >&2
+    echo "make-package: packaging accepted binary $got; sources or build inputs changed since the build:" >&2
     echo "$changed" | sed 's/^/  /' >&2
   elif [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ]; then
     stale=1; ver="$ver-STALE"
-    echo "make-package: WARNING sources changed since the build; dry run, not distributable" >&2
+    echo "make-package: WARNING sources or build inputs changed since the build; dry run, not distributable" >&2
+    echo "$changed" | sed 's/^/  /' >&2
   else
-    die "sources changed since the build; rebuild (build-core.sh, build-ui.sh) before packaging"
+    echo "$changed" | sed 's/^/  /' >&2
+    die "source/asset check failed: the files above changed since BoxerUI was built; rebuild (build-core.sh, build-ui.sh) before packaging"
   fi
 fi
-rm -f "$BUILD_DIR/.pkg-src.sha256"
 lib="$BUILD_DIR/core$HOST_SUFFIX/libboxer-dosbox.a"
 [ "$(sed -n 's/^core library: \([0-9a-f]*\).*/\1/p' "$info")" = "$(shasum -a 256 "$lib" | cut -d' ' -f1)" ] \
   || die "core library differs from the one BoxerUI was linked with"
@@ -139,7 +144,21 @@ out="${BOXER_PKG_OUT:-$BUILD_DIR/package$HOST_SUFFIX}"; pkg="$out/Boxer"
 # 3. Program, fonts, runtime files. Boxer's artwork is embedded in BoxerUI
 # (tools/png2inc.py), so no image or sound file is shipped separately.
 cp "$bin" "$pkg/BoxerUI"
+# Runtime-file check: the staged files are the ones the build recorded, and
+# so are the copies (scripts/check-runtime-files.sh, "runtime files:").
+runtime_check() {
+  local where=$1 dir=$2 diff rc
+  set +e; diff=$("$here/check-runtime-files.sh" "$info" "$dir"); rc=$?; set -e
+  case $rc in
+    0) ;;
+    1) echo "$diff" | sed 's/^/  /' >&2
+       die "runtime-file check failed: $where differs from the staging recorded in $info" ;;
+    *) die "runtime-file check: could not compare $where with $info (exit $rc)" ;;
+  esac
+}
+runtime_check "the build's stage/" "$ui/stage"
 cp -R "$ui/stage/Fonts" "$pkg/Fonts"
+runtime_check "the package drawer" "$pkg"
 # Only these two are read: sessionConfigFiles() passes no game profiles yet.
 for c in Preflight Launch; do
   cmp -s "$WORK_DIR/Resources/Configurations/$c.conf" "$UPSTREAM_DIR/Resources/Configurations/$c.conf" \

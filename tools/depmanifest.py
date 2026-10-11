@@ -8,10 +8,13 @@ object's <object>.d) that lies inside the project root is printed as
 "<sha256>  <path relative to the root>", sorted, once. Files below an
 --exclude directory (generated output whose identity is recorded
 separately) and files outside the root (SDK, toolchain) are left out.
+With --only, only files below one of the --only directories are listed
+(build-ui.sh lists headers and generated files read from build/, such as
+the SDL3 headers, this way, as a manifest of their own).
 Exit 2, printing nothing, when an object has no .d, a listed file is
 missing, or nothing would be listed: a manifest must never be quietly
 incomplete.
-Usage: depmanifest.py <project-root> [--exclude <dir>]... <object>...
+Usage: depmanifest.py <project-root> [--exclude <dir>]... [--only <dir>]... <object>...
 """
 import hashlib, os, sys
 
@@ -27,12 +30,14 @@ def inside(path, d):
 
 def main(argv):
     if len(argv) < 2:
-        fail("usage: depmanifest.py <project-root> [--exclude <dir>]... <object>...")
+        fail("usage: depmanifest.py <project-root> [--exclude <dir>]... [--only <dir>]... <object>...")
     root = os.path.realpath(argv[0])
-    excludes, objects, i = [], [], 1
+    excludes, only, objects, i = [], [], [], 1
     while i < len(argv):
         if argv[i] == "--exclude" and i + 1 < len(argv):
             excludes.append(os.path.realpath(argv[i + 1])); i += 2
+        elif argv[i] == "--only" and i + 1 < len(argv):
+            only.append(os.path.realpath(argv[i + 1])); i += 2
         else:
             objects.append(argv[i]); i += 1
     if not objects:
@@ -53,6 +58,8 @@ def main(argv):
             if not os.path.isfile(real):
                 fail("%s lists %s, which does not exist" % (dep, p))
             if not inside(real, root) or any(inside(real, x) for x in excludes):
+                continue
+            if only and not any(inside(real, x) for x in only):
                 continue
             files.add(os.path.relpath(real, root))
         if not found:

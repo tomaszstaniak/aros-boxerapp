@@ -8,8 +8,10 @@
 #   (sdl3: build/<abi>/ui-sdl3, core from core-sdl3, see scripts/env.sh)
 #
 # Output: build/<abi>/ui-sdl3/BoxerUI (ui/ for sdl2; the default host per ABI
-# is in env.sh), a build log and BUILDINFO.txt (compiler, SDK, hashes), plus
-# stage/ there holding the files a test installation needs (BoxerUI, Fonts/).
+# is in env.sh), a build log and BUILDINFO.txt (compiler, SDK, hashes; the
+# "sources:", "build inputs:" and "runtime files:" lists that make-package.sh
+# checks), plus stage/ there holding the files a test installation needs
+# (BoxerUI, Fonts/).
 # The host unit test of src/ui/ui_logic.cpp runs first; a failing test stops
 # the build, because the guest run would then test known-wrong logic.
 # No strip: a full strip breaks AROS x86_64 relocations (the program then
@@ -36,6 +38,9 @@ lib="$BUILD_DIR/core$HOST_SUFFIX/libboxer-dosbox.a"
 mkdir -p "$out/host" "$out/stage" "$out/gen" "$out/obj"
 # A stale staged binary from an earlier build must never survive a failed one.
 rm -rf "$out/stage/BoxerUI" "$out/BoxerUI" "$out/stage/Fonts"
+# Input lists of this build (tools/inputmanifest.py merges them into
+# BUILDINFO's "build inputs:"); none may survive from an earlier build.
+rm -f "$out"/gen/*.inputs
 
 # Original Boxer artwork (GPL-2.0) embedded as RGBA arrays; see
 # assets/README.md.
@@ -44,7 +49,7 @@ art="$PROJECT_ROOT/assets/runtime/boxer"
 # (assets/replacement-assets.json). The four Welcome/Gamebox icons are
 # Boxer's originals (assets/README.md).
 repl="$PROJECT_ROOT/assets/runtime/replacements"
-python3 "$PROJECT_ROOT/tools/png2inc.py" "$out/gen/boxer_assets.inc" \
+python3 "$PROJECT_ROOT/tools/png2inc.py" --inputs "$out/gen/boxer_assets.inputs" "$out/gen/boxer_assets.inc" \
   WelcomeSpotlight="$art/WelcomeSpotlight.png" WelcomeFocusRing="$art/WelcomeFocusRing.png" \
   CPU="$art/CPU.png" Mouse="$art/Mouse.png" Joystick="$art/Joystick.png" Drives="$art/Drives.png" \
   LauncherListTemplate="$art/LauncherListTemplate.png" DocumentationTemplate="$art/DocumentationTemplate.png" \
@@ -61,16 +66,20 @@ python3 "$PROJECT_ROOT/tools/png2inc.py" "$out/gen/boxer_assets.inc" \
   LockLockedTemplate="$repl/LockLockedTemplate.png" LockUnlockedTemplate="$repl/LockUnlockedTemplate.png"
 # Cover templates (BXBootlegCoverArt.m) and BoxArtShine at the 128 px icon
 # size (BXCoverArt.m), Boxer originals (GPL-2.0, category a).
-python3 "$PROJECT_ROOT/tools/png2inc.py" "$out/gen/cover_assets.inc" \
+python3 "$PROJECT_ROOT/tools/png2inc.py" --inputs "$out/gen/cover_assets.inputs" "$out/gen/cover_assets.inc" \
   CDCase="$art/CDCase-128.png" CDCover="$art/CDCover-128.png" \
   35Diskette="$art/35Diskette-128.png" 35DisketteShine="$art/35DisketteShine-128.png" \
   525Diskette="$art/525Diskette-128.png" BoxArtShine="$art/BoxArtShine.png@128"
 # Private outline font descriptions (glyph clipping on mainline v1; see
 # tools/make-fonts.py). AROS_ISO_FONTS: an AROS ISO's Fonts/ directory.
 [ -n "${AROS_ISO_FONTS:-}" ] || die "AROS_ISO_FONTS is not set (an AROS ISO's Fonts/ directory)"
-python3 "$PROJECT_ROOT/tools/make-fonts.py" "$AROS_ISO_FONTS" "$out/stage/Fonts"
+python3 "$PROJECT_ROOT/tools/make-fonts.py" --inputs "$out/gen/fonts.inputs" "$AROS_ISO_FONTS" "$out/stage/Fonts"
 # Bitstream Vera terms: the notice travels with the modified descriptions.
 cp "$PROJECT_ROOT/LICENSES/Bitstream-Vera.txt" "$out/stage/Fonts/"
+# This script and env.sh choose the generators' inputs and the compile
+# flags; the licence is the one copied above.
+shasum -a 256 "$here/$(basename "$0")" "$here/env.sh" "$PROJECT_ROOT/LICENSES/Bitstream-Vera.txt" \
+  > "$out/gen/build-ui.inputs"
 
 c++ -std=c++17 -Wall -O1 -o "$out/host/ui_logic_test" "$src/tests/ui_logic_test.cpp" "$src/ui_logic.cpp"
 "$out/host/ui_logic_test"
@@ -167,7 +176,20 @@ fi
 # package. Generated files under build/ are recorded by their own lines.
 manifest=$(python3 "$PROJECT_ROOT/tools/depmanifest.py" "$PROJECT_ROOT" --exclude "$PROJECT_ROOT/build" \
   --exclude "$out" "${objs[@]}") || { rm -f "$out/BoxerUI"; die "could not list the sources from the dependency files"; }
+# Headers and generated files the compiles read from build/ (the SDL3
+# headers of build-sdl3.sh, gen/*.inc), and what the generators read, form
+# "build inputs:"; make-package compares them like the sources.
+python3 "$PROJECT_ROOT/tools/depmanifest.py" "$PROJECT_ROOT" --only "$PROJECT_ROOT/build" --only "$out" \
+  "${objs[@]}" > "$out/gen/build-tree.inputs" \
+  || { rm -f "$out/BoxerUI"; die "could not list the build-tree files from the dependency files"; }
+inputs=$(python3 "$PROJECT_ROOT/tools/inputmanifest.py" "$PROJECT_ROOT" "$out"/gen/*.inputs) \
+  || { rm -f "$out/BoxerUI"; die "could not record the build inputs"; }
 cp "$out/BoxerUI" "$out/stage/BoxerUI"
+# Every staged file but BoxerUI (whose hash is "sha256:") is copied into the
+# package; make-package checks the stage and the copy against this list.
+runtime=$(cd "$out/stage" && find . -type f ! -path ./BoxerUI -print0 | LC_ALL=C sort -z \
+  | xargs -0 shasum -a 256 | sed 's|  \./|  |')
+[ -n "$runtime" ] || { rm -f "$out/BoxerUI" "$out/stage/BoxerUI"; die "nothing staged next to BoxerUI"; }
 {
   echo "date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "abi: $BOXER_ABI"
@@ -187,7 +209,10 @@ cp "$out/BoxerUI" "$out/stage/BoxerUI"
   echo "embedded art: $(shasum -a 256 "$out/gen/boxer_assets.inc" | cut -d' ' -f1)  (tools/png2inc.py, assets/runtime/boxer)"
   echo "cover templates: $(shasum -a 256 "$out/gen/cover_assets.inc" | cut -d' ' -f1)  (tools/png2inc.py, assets/runtime/boxer)"
   echo "fonts dir: $AROS_ISO_FONTS"
-  (cd "$out/stage/Fonts" && shasum -a 256 *) | sed 's/^/  Fonts\//' 
+  echo "build inputs: (generator inputs, build scripts, files read from build/; tools/inputmanifest.py)"
+  printf '%s\n' "$inputs" | sed 's/^/  /'
+  echo "runtime files: (stage/ next to BoxerUI, copied into the package)"
+  printf '%s\n' "$runtime" | sed 's/^/  /'
   [ "$BOXER_ABI" = mainline-v1 ] && echo "unwind fix: $(shasum -a 256 "$BUILD_DIR/unwind-fix/unwind-dw2.o" | cut -d' ' -f1)  unwind-dw2.o linked before libgcc (dwarf_reg_size_table present)"
   echo "undefined-symbol check: passed (nm -u empty; allowlist scripts/ui-undefined-allowlist.txt is empty)"
 } > "$out/BUILDINFO.txt"
