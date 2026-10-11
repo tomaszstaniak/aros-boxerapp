@@ -126,6 +126,14 @@ int main() {
     CHECK(endTurboOnFocusLoss(true, true));
     CHECK(!endTurboOnFocusLoss(true, false));
     CHECK(!endTurboOnFocusLoss(false, false));
+    // The DOS window without a frame: the test pattern and BOXTEST only in
+    // the harness view; a window opened for a session stays plain.
+    DosIdleView idle = dosIdleView(true);
+    CHECK(!idle.testPattern);
+    CHECK(std::strcmp(idle.title, "Boxer") == 0);
+    idle = dosIdleView(false);
+    CHECK(idle.testPattern);
+    CHECK(std::strcmp(idle.title, "BOXTEST") == 0);
 
     if (failures) { std::printf("%d failure(s)\n", failures); return 1; }
     std::printf("ui_logic_test: all checks passed\n");

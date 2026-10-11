@@ -108,9 +108,12 @@ struct RenderFrame {
     int scaledW, scaledH;
     bool smooth;              // Smoothed (bilinear) instead of Normal (nearest)
 };
-// Shows f (null: back to the test pattern) and redraws. The pixels must stay
+// Shows f (null: back to the frameless view) and redraws. The pixels must stay
 // valid until the next call; the view keeps the pointer for exposures.
 void renderSetFrame(Object *renderView, const RenderFrame *f);
+// Without a frame: the slice-A test pattern (on; the harness view) or only
+// the window background (off, the default). See dosIdleView().
+void renderShowTestPattern(Object *renderView, bool on);
 // The viewport inside the view, relative to its top-left (_mleft/_mtop).
 Rect renderViewport(Object *renderView);
 

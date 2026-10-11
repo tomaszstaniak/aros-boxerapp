@@ -20,9 +20,11 @@
 // PREFSFAULT=<step>:fail|crash (with HARNESS=1) are for the data-directory tests.
 // GAMEBOX opens a gamebox session (writes shadowed into DATA), SESSION=dos a
 // plain DOS prompt; without either the windows show the slice-A test pattern
-// and "Open a DOS prompt" starts a session when CONFDIR is known. When a
+// and the title BOXTEST (the harness view), and "Open a DOS prompt" starts a
+// session when CONFDIR is known. A window opened for a session shows only
+// its background and "Boxer" while the session is prepared. When a
 // GAMEBOX or SESSION=dos session cannot be prepared, its window closes and
-// the error requester follows (no test pattern left open). The core
+// the error requester follows (no empty window left open). The core
 // keeps global state, so one session per process (a new
 // process per session).
 //
@@ -296,10 +298,23 @@ static const char *kTabTitles[5] = {"Gamebox Inspector", "CPU Inspector", "Mouse
 static char g_dosTitle[64];
 static char g_speedText[64], g_frameText[64];
 
-static std::string g_sessionTitle = "BOXTEST";   // the slice-A stand-in until a session names it
+static std::string g_sessionTitle;   // setDosIdleView(), then the session's name
 static void updateTitle() {
     std::snprintf(g_dosTitle, sizeof g_dosTitle, st.paused ? "%s (Paused)" : "%s", g_sessionTitle.c_str());
     set(ui.dos, MUIA_Window_Title, (IPTR)g_dosTitle);
+}
+
+// The DOS window before a session's first frame (dosIdleView): the harness
+// view keeps the slice-A test pattern and BOXTEST; a window opened for a
+// session shows only its background and "Boxer" while it is prepared.
+static void setDosIdleView(bool forSession) {
+    const DosIdleView v = dosIdleView(forSession);
+    g_sessionTitle = v.title;
+    renderShowTestPattern(ui.render, v.testPattern);
+    renderShowTestPattern(ui.fsRender, v.testPattern);
+    updateTitle();
+    logf("dos window: %s, title \"%s\"", v.testPattern ? "test pattern (harness view)" : "no pattern (session)",
+         v.title);
 }
 
 static void updateStatus() {
@@ -687,7 +702,7 @@ static Object *buildDOS() {
         Child, (IPTR)ui.lockBtn, Child, (IPTR)ui.statusText, TAG_DONE);
 
     return WindowObject,
-        MUIA_Window_Title, (IPTR)"BOXTEST",
+        MUIA_Window_Title, (IPTR)g_dosTitle,   // setDosIdleView() before it opens
         MUIA_Window_LeftEdge, 8, MUIA_Window_TopEdge, 24,
         // RMBTRAP: the right button belongs to DOS (BXInputController
         // rightMouseDown:). Without it Intuition took the button for menu
@@ -3252,11 +3267,14 @@ static bool handleId(ULONG id) {
         set(ui.imp, MUIA_Window_Open, FALSE);
         logf("import: window closed, nothing created");
         break;
-    case ID_PROMPT:
+    case ID_PROMPT: {
         logf("welcome: Open a DOS prompt -> DOS window");
+        const bool start = !g_args.confDir.empty() && !sessionRunning() && !g_app.ran;
+        if (start) setDosIdleView(true);
         set(ui.dos, MUIA_Window_Open, TRUE);
-        if (!g_args.confDir.empty() && !sessionRunning() && !g_app.ran) g_args.kind = "dos-pending";
+        if (start) g_args.kind = "dos-pending";
         break;
+    }
     case ID_PROGRAMS: {
         IPTR v = 0; get(ui.programs, MUIA_Selected, &v);
         logf("toolbar: Programs -> launchPanelShown=%d", (int)v);
@@ -3722,7 +3740,9 @@ int main(int argc, char **argv) {
     set(ui.pages, MUIA_Group_ActivePage, 1);
     if (g_args.volume >= 0) nnset(ui.volSlider, MUIA_Numeric_Value, g_args.volume);
     updateSpeedText();
-    updateTitle();
+    // The harness view only without a session to run (SCREEN=dos|inspector|all
+    // with neither GAMEBOX nor SESSION=dos).
+    setDosIdleView(!g_args.gamebox.empty() || g_args.kind == "dos");
 
     bool openWelcome = !std::strcmp(screen, "welcome") || !std::strcmp(screen, "all");
     bool openDos = !std::strcmp(screen, "dos") || !std::strcmp(screen, "inspector") || !std::strcmp(screen, "all");
@@ -3742,8 +3762,8 @@ int main(int argc, char **argv) {
     bool running = !memcp("windows-open");
     bool sessionWanted = !g_args.gamebox.empty() || g_args.kind == "dos";
     // A GAMEBOX or SESSION=dos start opened the session window above, before
-    // its session was prepared; until a frame arrives it shows the test
-    // pattern.
+    // its session was prepared; until a frame arrives it shows only its
+    // background (setDosIdleView).
     bool dosWindowForSession = sessionWanted && openDos;
     while (running) {
         ULONG id = DoMethod(ui.app, MUIM_Application_NewInput, (IPTR)&sigs);
@@ -3754,10 +3774,9 @@ int main(int argc, char **argv) {
         if (sessionWanted && g_sigMask && !g_app.ran) {
             sessionWanted = false;
             const SessionResult r = runSession();
-            // A session that never started must not leave its window behind
-            // with the test pattern: it closes before the requester, and with
-            // no other window open BoxerUI ends after it. The pattern stays
-            // for SCREEN=dos|inspector|all without GAMEBOX or SESSION.
+            // A session that never started must not leave its empty window
+            // behind: it closes before the requester, and with no other
+            // window open BoxerUI ends after it.
             if (r.end == SessionEnd::PreparationFailed && dosWindowForSession) {
                 set(ui.dos, MUIA_Window_Open, FALSE);
                 logf("session: window closed, the session did not start");

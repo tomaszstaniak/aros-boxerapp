@@ -216,4 +216,9 @@ bool endTurboOnFocusLoss(bool turboOn, bool heldByKey) {
     return turboOn && heldByKey;
 }
 
+DosIdleView dosIdleView(bool forSession) {
+    if (forSession) return {false, "Boxer"};
+    return {true, "BOXTEST"};
+}
+
 }  // namespace boxer_ui

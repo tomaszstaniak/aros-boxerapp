@@ -1489,7 +1489,8 @@ bool sliderState(Object *o, bool *hover, bool *pressed, bool *focused) {
 // (aspect-corrected size fitted and centred, BXGLRenderingView
 // viewportForFrame:) over the DOS window background, and reports keys and
 // pointer events to the session (g_renderEvents). Without a frame it shows
-// the slice-A test pattern at 4:3.
+// the window background only, or, when renderShowTestPattern() asked for
+// it (the harness view), the slice-A test pattern at 4:3.
 //
 // Scaling is done here, not with cybergraphics ScalePixelArray: Smoothed
 // needs bilinear filtering, which ScalePixelArray does not offer, and one
@@ -1500,6 +1501,7 @@ struct RVData {
     int lastW, lastH;
     RenderFrame frame;          // pixels owned by the emulator; null = none
     bool hasFrame;
+    bool testPattern;           // without a frame: the slice-A pattern (harness)
     bool shown;                 // between MUIM_Show and MUIM_Hide
     std::vector<uint32_t> scaled;
     std::vector<int> xmap;
@@ -1587,11 +1589,11 @@ static IPTR RV_Draw(struct IClass *cl, Object *obj, struct MUIP_Draw *msg) {
     if (full) {
         // Background (BXDOSWindowBackgroundView) outside the viewport.
         Canvas cv(W, H);
-        const Canvas *pattern = d->hasFrame ? nullptr : &testPattern();
+        const Canvas *pattern = d->hasFrame || !d->testPattern ? nullptr : &testPattern();
         for (int y = 0; y < H; ++y) {
             bool rowIn = y >= vp.y && y < vp.y + vp.h;
             for (int x = 0; x < W; ++x) {
-                if (rowIn && x >= vp.x && x < vp.x + vp.w) {
+                if (rowIn && x >= vp.x && x < vp.x + vp.w && (d->hasFrame || pattern)) {
                     if (!pattern) continue;   // the frame is drawn below
                     int sy = std::min(pattern->h - 1, (y - vp.y) * pattern->h / vp.h);
                     int sx = std::min(pattern->w - 1, (x - vp.x) * pattern->w / vp.w);
@@ -1635,6 +1637,13 @@ void renderSetFrame(Object *obj, const RenderFrame *f) {
     if (!d->shown) return;   // drawn on the next MUIM_Draw
     bool layoutChanged = had != d->hasFrame || before.w != d->frame.scaledW || before.h != d->frame.scaledH;
     MUI_Redraw(obj, layoutChanged ? MADF_DRAWOBJECT : MADF_DRAWUPDATE);
+}
+
+void renderShowTestPattern(Object *obj, bool on) {
+    RVData *d = (RVData *)INST_DATA(mccRender->mcc_Class, obj);
+    if (d->testPattern == on) return;
+    d->testPattern = on;
+    if (d->shown && !d->hasFrame) MUI_Redraw(obj, MADF_DRAWOBJECT);
 }
 
 BOOPSI_DISPATCHER(IPTR, RV_Dispatcher, cl, obj, msg)

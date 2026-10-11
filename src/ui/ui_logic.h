@@ -105,5 +105,15 @@ KeyRoute routeSessionKey(unsigned rawCode, bool down, bool repeat, bool amigaQua
 // on with the toolbar stays on until switched off.
 bool endTurboOnFocusLoss(bool turboOn, bool heldByKey);
 
+// What the DOS window shows while it has no frame. The slice-A test pattern
+// and the stand-in title "BOXTEST" are the harness view: SCREEN=dos,
+// inspector or all with no session to run. A window opened for a session
+// (GAMEBOX=, SESSION=dos, or Welcome's "Open a DOS prompt" with a
+// configuration) shows only the DOS window background
+// (BXDOSWindowBackgroundView) and the application's name while the session
+// is prepared; the session then sets its own title.
+struct DosIdleView { bool testPattern; const char *title; };
+DosIdleView dosIdleView(bool forSession);
+
 }  // namespace boxer_ui
 #endif
