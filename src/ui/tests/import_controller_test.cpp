@@ -119,7 +119,8 @@ static boxer::InstallerScanResult scan(const std::string &dir) {
 static bool chooseAndScan(ImportController &c, const Fixture &f) {
     std::string msg;
     if (c.chooseSource(f.src, f.loc, f.games, &msg) != boxer::SourceCheck::Ok) return false;
-    return c.applyScan(scan(f.src)) == boxer::InstallerScanError::None;
+    boxer::InstallerScanError e = boxer::InstallerScanError::None;
+    return c.applyScan(scan(f.src), f.src, &e) && e == boxer::InstallerScanError::None;
 }
 
 // The new gamebox avoids "Tyrian 2000" (gamebox and icon) and
@@ -483,6 +484,108 @@ static void testCollisions() {
     }
 }
 
+// Before the gamebox exists another folder may be chosen (the requester or
+// a drop): the earlier scan goes with the old source, a scan that does not
+// belong to the current source is refused, and a refused folder leaves the
+// choice already made as it was.
+static void testReplaceSourceBeforeGamebox() {
+    Fixture f = makeFixture("Replace Source", true);
+    const std::string other = fu::join(f.base, "Other Game");
+    put(fu::join(other, "PLAY.EXE"), dosExe());
+    const auto before = snap(f.base);
+    std::vector<std::string> log;
+    ImportController c([&](const std::string &l) { log.push_back(l); });
+    CHECK(chooseAndScan(c, f));
+    CHECK(c.stage() == ImportStage::WaitingForInstaller && c.session().scan.installers.size() == 1);
+
+    // A refused folder: the installer choice of the first source stays.
+    std::string msg;
+    CHECK(c.acceptsSource(&msg) && msg.empty());
+    CHECK(c.chooseSource(f.games, f.loc, f.games, &msg) == boxer::SourceCheck::GamesFolder && !msg.empty());
+    CHECK(c.stage() == ImportStage::WaitingForInstaller && c.session().sourcePath == f.src);
+    CHECK(c.session().scan.installers.size() == 1);
+
+    // Another folder: the old scan is gone before the new one arrives, so
+    // the old installer cannot be launched for the new source.
+    CHECK(c.chooseSource(other, f.loc, f.games, &msg) == boxer::SourceCheck::Ok);
+    CHECK(c.stage() == ImportStage::LoadingSource && c.session().sourcePath == other);
+    CHECK(c.session().scan.installers.empty() && c.session().scan.dosExecutables.empty());
+    CHECK(c.launchInstaller(0, f.games).refused() && c.startCopy(f.games).refused());
+    CHECK(!fu::exists(expectedBox(f)));
+
+    // The old folder's scan, finished late, is stale: refused, nothing changes.
+    boxer::InstallerScanError e = boxer::InstallerScanError::None;
+    CHECK(!c.applyScan(scan(f.src), f.src, &e));
+    CHECK(c.stage() == ImportStage::LoadingSource && c.session().scan.installers.empty());
+    bool logged = false;
+    for (const auto &l : log) logged = logged || l.find("stale scan") != std::string::npos;
+    CHECK(logged);
+    // The new folder's own scan is taken: no installer there, ready to copy.
+    CHECK(c.applyScan(scan(other), other, &e) && e == boxer::InstallerScanError::None);
+    CHECK(c.stage() == ImportStage::ReadyToFinalize && c.session().scan.installers.empty());
+    // Applied once only.
+    CHECK(!c.applyScan(scan(other), other, &e) && c.stage() == ImportStage::ReadyToFinalize);
+    // From the ready page too: back to the first folder and its installer.
+    CHECK(c.chooseSource(f.src, f.loc, f.games, &msg) == boxer::SourceCheck::Ok);
+    CHECK(c.applyScan(scan(f.src), f.src, &e) && c.stage() == ImportStage::WaitingForInstaller);
+    CHECK(c.session().sourcePath == f.src && c.session().scan.installers.size() == 1);
+    CHECK(snap(f.base) == before);   // choosing creates nothing
+
+    // A scan error of the new folder ends at the dropzone, as with the requester.
+    const std::string empty = fu::join(f.base, "No Programs");
+    put(fu::join(empty, "README.TXT"), "text");
+    CHECK(c.chooseSource(empty, f.loc, f.games, &msg) == boxer::SourceCheck::Ok);
+    CHECK(c.applyScan(scan(empty), empty, &e) && e == boxer::InstallerScanError::NoExecutables);
+    CHECK(c.stage() == ImportStage::WaitingForSource && c.session().sourcePath.empty());
+}
+
+// While the import copies, runs its installer or holds its unfinished
+// gamebox, no new source is taken: it is refused with a sentence naming
+// the game, and the running import goes on untouched.
+static void testRefuseSourceWhileBusy() {
+    Fixture f = makeFixture("Busy", true);
+    const std::string other = fu::join(f.base, "Other Game");
+    put(fu::join(other, "PLAY.EXE"), dosExe());
+    const auto otherBefore = snap(other);
+    std::string msg;
+
+    ImportController c;
+    CHECK(chooseAndScan(c, f));
+    c.skipInstaller();
+    CHECK(!c.startCopy(f.games).refused());
+    CHECK(!c.copyStep(65536).ended() && c.copying());
+    const uint64_t copied = c.copiedBytes();
+    CHECK(!c.acceptsSource(&msg) && msg.find("still importing") != std::string::npos);
+    CHECK(msg.find("Tyrian 2000 (3)") != std::string::npos);
+    msg.clear();
+    CHECK(c.chooseSource(other, f.loc, f.games, &msg) != boxer::SourceCheck::Ok && !msg.empty());
+    CHECK(c.copying() && c.session().sourcePath == f.src && c.copiedBytes() == copied);
+    CHECK(c.open() == ImportController::Open::Resumed);
+    copyToEnd(c);
+    CHECK(c.stage() == ImportStage::ChoosingStartupProgram);
+    CHECK(get(fu::join(expectedBox(f), "C.harddisk/tyrian20/DATA/LEVEL1.DAT")).size() == 200000);
+    // Copied, startup program not chosen: still unfinished, still refused.
+    CHECK(!c.acceptsSource(&msg) && msg.find("has not finished") != std::string::npos);
+    CHECK(c.chooseSource(other, f.loc, f.games, &msg) != boxer::SourceCheck::Ok);
+    CHECK(c.stage() == ImportStage::ChoosingStartupProgram && c.session().sourcePath == f.src);
+    // Finished: a new import may start (open() first).
+    CHECK(!c.useStartupProgram("C.harddisk/tyrian20/TYRIAN.EXE").refused());
+    CHECK(c.acceptsSource(&msg));
+    CHECK(c.chooseSource(other, f.loc, f.games, &msg) == boxer::SourceCheck::Missing);   // not without open()
+    CHECK(c.open() == ImportController::Open::Started);
+    CHECK(c.chooseSource(other, f.loc, f.games, &msg) == boxer::SourceCheck::Ok);
+    CHECK(fu::isDirectory(expectedBox(f)));   // the finished gamebox stays
+
+    ImportController d;
+    CHECK(chooseAndScan(d, f));
+    CHECK(!d.launchInstaller(0, f.games).refused());
+    CHECK(!d.acceptsSource(&msg) && msg.find("installer") != std::string::npos);
+    CHECK(d.chooseSource(other, f.loc, f.games, &msg) != boxer::SourceCheck::Ok);
+    CHECK(d.installing() && d.installerPending() && d.session().installerPath == "INSTALL.EXE");
+    CHECK(d.finishAtExit().removed);
+    CHECK(snap(other) == otherBefore);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: import_controller_test <scratch dir>\n"); return 2; }
     scratch = argv[1];
@@ -497,6 +600,8 @@ int main(int argc, char **argv) {
     testNeverDeletesWhatItDidNotMake();
     testEarlyExit();
     testCollisions();
+    testReplaceSourceBeforeGamebox();
+    testRefuseSourceWhileBusy();
     if (failures) {
         std::printf("import_controller_test: %d of %d checks FAILED\n", failures, checks);
         return 1;

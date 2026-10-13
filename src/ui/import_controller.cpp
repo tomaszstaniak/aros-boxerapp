@@ -70,18 +70,50 @@ ImportController::Open ImportController::open() {
     return Open::Started;
 }
 
+bool ImportController::acceptsSource(std::string *why) const {
+    auto refuse = [&](const std::string &text) {
+        if (why) *why = text;
+        return false;
+    };
+    const std::string name = "\"" + s_.gameName() + "\"";
+    if (installerPending_ || installing())
+        return refuse("Boxer is running the installer of " + name +
+                      ".\n\nFinish or stop that import before importing another game.");
+    if (copying_)
+        return refuse("Boxer is still importing " + name +
+                      ".\n\nWait until it has finished, or stop it, before importing another game.");
+    if (holdsUnfinishedGamebox())
+        return refuse("The import of " + name +
+                      " has not finished.\n\nFinish it, or stop it, before importing another game.");
+    if (why) why->clear();
+    return true;
+}
+
 boxer::SourceCheck ImportController::chooseSource(const std::string &path, const boxer::DataLocations &locations,
                                                   const std::string &gamesFolder, std::string *message) {
-    // Only a fresh import picks a source; the chooser is on the dropzone page.
-    if (!s_.createdGamebox.empty() || copying_ || installerPending_) {
+    if (!acceptsSource(message)) return boxer::SourceCheck::Missing;
+    if (!s_.createdGamebox.empty()) {
         if (message) *message = "This import has already started.";
         return boxer::SourceCheck::Missing;
     }
+    // Checked before anything changes: a refused folder leaves the source
+    // already chosen (and its scan) as they were.
+    const boxer::SourceCheck c = boxer::checkImportSource(path, locations, gamesFolder, message);
+    if (c != boxer::SourceCheck::Ok) return c;
+    if (!s_.sourcePath.empty()) say("import: source replaced, earlier scan dropped: \"" + s_.sourcePath + "\"");
+    s_.cancelSourceSelection();
     return s_.chooseSource(path, locations, gamesFolder, message);
 }
 
-boxer::InstallerScanError ImportController::applyScan(const boxer::InstallerScanResult &result) {
-    return s_.applyScan(result);
+bool ImportController::applyScan(const boxer::InstallerScanResult &result, const std::string &scannedPath,
+                                 boxer::InstallerScanError *error) {
+    if (s_.stage != ImportStage::LoadingSource || scannedPath != s_.sourcePath) {
+        say("import: stale scan of \"" + scannedPath + "\" ignored");
+        return false;
+    }
+    const boxer::InstallerScanError e = s_.applyScan(result);
+    if (error) *error = e;
+    return true;
 }
 
 void ImportController::skipInstaller() { s_.skipInstaller(); }

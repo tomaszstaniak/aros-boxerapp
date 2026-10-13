@@ -3002,6 +3002,47 @@ static void reportImportAbandoned(const ImportOutcome &o) {
     }
 }
 
+// IS:importFromSourceURL: the controller's checks, then the installer
+// scan, the same for every way a folder is chosen.
+static void takeImportSource(std::string d) {
+    // SYS: and its volume name are the same place; the reserved-folder
+    // rules compare paths, so both sides must be in DOS's own form.
+    d = canonicalDir(d);
+    boxer::DataLocations loc;
+    loc.dataDir = g_args.data;
+    std::string msg;
+    auto c = g_imports->chooseSource(d, loc, g_gamesFolder, &msg);
+    logf("import: source \"%s\" -> %s", d.c_str(), c == boxer::SourceCheck::Ok ? "accepted" : msg.c_str());
+    if (c != boxer::SourceCheck::Ok) {
+        MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)msg.c_str());
+        return;
+    }
+    // The page of an earlier source must not stay up while the new one is
+    // scanned: its installer list belongs to the old folder.
+    showImportStage();
+    // BXInstallerScan, run in the UI task: folders are small next to
+    // the copy that follows, and the busy pointer covers the wait.
+    set(ui.app, MUIA_Application_Sleep, TRUE);
+    boxer::FileSystem fs;
+    auto scan = boxer::scanForInstallers(fs, d);
+    set(ui.app, MUIA_Application_Sleep, FALSE);
+    logf("import: scan of \"%s\": %u DOS programs, %u Windows, %u confs, installed=%d, %u installers%s%s",
+         d.c_str(), (unsigned)scan.dosExecutables.size(), (unsigned)scan.windowsExecutables.size(),
+         (unsigned)scan.dosboxConfigurations.size(), (int)scan.alreadyInstalled,
+         (unsigned)scan.installers.size(), scan.installers.empty() ? "" : ", first ",
+         scan.installers.empty() ? "" : scan.installers.front().c_str());
+    auto err = boxer::InstallerScanError::None;
+    if (!g_imports->applyScan(scan, d, &err)) return;   // stale; logged by the controller
+    if (err != boxer::InstallerScanError::None) {
+        std::string text = boxer::installerScanErrorText(err, boxer::fsutil::baseName(d));
+        logf("import: scan refused the source: %s", text.c_str());
+        showImportStage();
+        MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
+        return;
+    }
+    showImportStage();
+}
+
 // BXCloseAlert closeAlertWhileRunningInstaller. Returns false for Cancel.
 static bool askEndInstaller() {
     const std::string name = g_imports->gameName();
@@ -3066,37 +3107,7 @@ static bool handleId(ULONG id) {
         std::string d = pickDrawer(last.empty() ? std::string("SYS:") : last,
                                    "Choose a DOS game folder to import:", false);
         if (d.empty()) { logf("import: chooser cancelled, still waiting for source"); break; }
-        // SYS: and its volume name are the same place; the reserved-folder
-        // rules compare paths, so both sides must be in DOS's own form.
-        d = canonicalDir(d);
-        boxer::DataLocations loc;
-        loc.dataDir = g_args.data;
-        std::string msg;
-        auto c = g_imports->chooseSource(d, loc, g_gamesFolder, &msg);
-        logf("import: source \"%s\" -> %s", d.c_str(), c == boxer::SourceCheck::Ok ? "accepted" : msg.c_str());
-        if (c != boxer::SourceCheck::Ok) {
-            MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)msg.c_str());
-            break;
-        }
-        // BXInstallerScan, run in the UI task: folders are small next to
-        // the copy that follows, and the busy pointer covers the wait.
-        set(ui.app, MUIA_Application_Sleep, TRUE);
-        boxer::FileSystem fs;
-        auto scan = boxer::scanForInstallers(fs, d);
-        set(ui.app, MUIA_Application_Sleep, FALSE);
-        logf("import: scan of \"%s\": %u DOS programs, %u Windows, %u confs, installed=%d, %u installers%s%s",
-             d.c_str(), (unsigned)scan.dosExecutables.size(), (unsigned)scan.windowsExecutables.size(),
-             (unsigned)scan.dosboxConfigurations.size(), (int)scan.alreadyInstalled,
-             (unsigned)scan.installers.size(), scan.installers.empty() ? "" : ", first ",
-             scan.installers.empty() ? "" : scan.installers.front().c_str());
-        auto err = g_imports->applyScan(scan);
-        if (err != boxer::InstallerScanError::None) {
-            std::string text = boxer::installerScanErrorText(err, boxer::fsutil::baseName(d));
-            logf("import: scan refused the source: %s", text.c_str());
-            MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
-            break;
-        }
-        showImportStage();
+        takeImportSource(d);
         break;
     }
     case ID_IMPORT_SKIP:

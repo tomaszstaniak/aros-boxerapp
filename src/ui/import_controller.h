@@ -108,10 +108,26 @@ public:
     enum class Open { Started, Resumed, Busy };
     Open open();
 
-    // IS:importFromSourceURL and installerScanDidFinish:.
+    // A new source may be taken (from the folder requester or a drop):
+    // false, with the sentence for the user, while the import copies, runs
+    // its installer or holds an unfinished gamebox. That import is neither
+    // interrupted nor forgotten; the new source is simply not taken.
+    bool acceptsSource(std::string *why = nullptr) const;
+    // IS:importFromSourceURL. Before the gamebox exists the user may point
+    // at another folder: an accepted one replaces the source and drops the
+    // earlier scan, so nothing found in the old folder is offered for the
+    // new one. A refused one (checkImportSource) changes nothing. Refused
+    // with Missing while acceptsSource() is false or the import is finished
+    // (open() starts a fresh one).
     boxer::SourceCheck chooseSource(const std::string &path, const boxer::DataLocations &locations,
                                     const std::string &gamesFolder, std::string *message = nullptr);
-    boxer::InstallerScanError applyScan(const boxer::InstallerScanResult &result);
+    // installerScanDidFinish: for the scan of `scannedPath`. Taken only while
+    // that folder is the source waiting for its scan; any other scan is
+    // stale (the source changed, or it was applied already) and changes
+    // nothing: false. True: *error is the scan's own error, if any (the
+    // import is then back at WaitingForSource).
+    bool applyScan(const boxer::InstallerScanResult &result, const std::string &scannedPath,
+                   boxer::InstallerScanError *error = nullptr);
     void skipInstaller();
     // Back from the installer choice or the ready page: Cancelled. Refused
     // once the import has made its gamebox (the Back button is ghosted then).
