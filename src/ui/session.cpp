@@ -38,6 +38,13 @@ bool importContinuesAfterInstaller(SessionEnd end, bool userStopped) {
     return !sessionEndIsError(end) && !userStopped;
 }
 
+int sessionExitCode(SessionEnd end) { return sessionEndIsError(end) ? kExitError : kExitOk; }
+
+void ExitStatus::note(SessionEnd end) {
+    const int c = sessionExitCode(end);
+    if (c > code_) code_ = c;
+}
+
 const char *teardownStepName(TeardownStep step) {
     static const char *const names[kTeardownSteps] = {
         "free stack", "release input", "unpause", "hide launch panel", "stop session", "detach views",

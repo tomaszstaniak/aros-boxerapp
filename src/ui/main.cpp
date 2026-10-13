@@ -295,6 +295,9 @@ static std::string g_gamesFolder;   // from the prefs; "" until chosen
 // steps from the main loop, so the Gauge moves and Stop is heard between
 // them (cancelSourceFileImport, IS:1070).
 static ImportController *g_imports;
+// BoxerUI's return code: not 0 once a session could not be prepared or
+// its core failed (sessionExitCode).
+static ExitStatus g_exit;
 
 // Icons dropped on the Welcome window (0) and the Import window (1). The
 // ports live as long as main(); the windows are registered while open.
@@ -4044,6 +4047,7 @@ int main(int argc, char **argv) {
         if (sessionWanted && g_sigMask && !g_app.ran) {
             sessionWanted = false;
             const SessionResult r = runSession();
+            g_exit.note(r.end);
             // A session that never started must not leave its empty window
             // behind: it closes before the requester, and with no other
             // window open BoxerUI ends after it.
@@ -4059,6 +4063,7 @@ int main(int argc, char **argv) {
         if (g_imports->installerPending() && g_sigMask && !g_app.ran) {
             closeDropWindow(ui.imp);
             const SessionResult r = runSession();
+            g_exit.note(r.end);
             // A failed session ends the import (installerEnded); its error
             // is shown first, while the gamebox is still named in it.
             if (sessionEndIsError(r.end)) reportSession(r, "The installer of " + g_imports->gameName());
@@ -4102,7 +4107,7 @@ int main(int argc, char **argv) {
     // it was replaced goes now; one still held is named, so it can be found.
     for (const auto &p : boxer::fsutil::retryPendingCleanup())
         logf("cleanup: old version \"%s\" still in use, NOT deleted", p.c_str());
-    logf("exit");
+    logf("exit: rc %d", g_exit.code());
     dumpGeometry("exit");
     if (g_laterArmed) DoMethod(ui.app, MUIM_Application_RemInputHandler, (IPTR)&g_laterIhn);
     dropGuard.release();
@@ -4119,5 +4124,5 @@ int main(int argc, char **argv) {
     g_log = nullptr;   // the import controller's destructor runs after this
     memcp("end");
     memDone();
-    return 0;
+    return g_exit.code();
 }

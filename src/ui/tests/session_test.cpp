@@ -333,12 +333,42 @@ static void testStartedSession() {
     }
 }
 
+// The return code: errors of preparation and of the core are not 0, a
+// normal end and a cancel are; across several sessions the worst stays.
+static void testExitCode() {
+    CHECK(sessionExitCode(SessionEnd::Normal) == 0);
+    CHECK(sessionExitCode(SessionEnd::Cancelled) == 0);
+    CHECK(sessionExitCode(SessionEnd::PreparationFailed) == kExitError);
+    CHECK(sessionExitCode(SessionEnd::CoreFailed) == kExitError);
+    CHECK(kExitError == 10);   // RETURN_ERROR: "If ERROR" and "If WARN" both see it
+    ExitStatus x;
+    CHECK(x.code() == 0);
+    x.note(SessionEnd::Normal);
+    x.note(SessionEnd::Cancelled);
+    CHECK(x.code() == 0);
+    x.note(SessionEnd::PreparationFailed);
+    CHECK(x.code() == kExitError);
+    x.note(SessionEnd::Normal);   // a later good session does not hide it
+    CHECK(x.code() == kExitError);
+    ExitStatus y;
+    y.note(SessionEnd::CoreFailed);
+    y.note(SessionEnd::Cancelled);
+    CHECK(y.code() == kExitError);
+    ExitStatus z;
+    z.noteError();
+    CHECK(z.code() == kExitError);
+    // An installer session ends the same way: its failure is an error too.
+    for (SessionEnd e : {SessionEnd::Normal, SessionEnd::Cancelled, SessionEnd::PreparationFailed, SessionEnd::CoreFailed})
+        CHECK((sessionExitCode(e) != 0) == sessionEndIsError(e));
+}
+
 int main() {
     testEnds();
     testInstallerImport();
     testScope();
     testTeardownOrder();
     testStartedSession();
+    testExitCode();
     if (failures) { std::printf("%d of %d checks failed\n", failures, checks); return 1; }
     std::printf("session_test: all %d checks passed\n", checks);
     return 0;

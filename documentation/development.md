@@ -143,6 +143,14 @@ BoxerUI LOG <file>                               ; log somewhere other than RAM:
 
 The same keys work as ToolTypes (`KEY=value`).
 
+Return code: 0 after a normal end or when the user cancelled a session; 10
+(`RETURN_ERROR`) when a session could not be prepared (for example a broken
+gamebox) or its core failed, also if a later session in the same run ended
+normally; 10 or 20 for errors before any window opens (missing gamebox, no
+usable games folder, bad arguments). The messages shown are the same in
+either case. In a script: `BoxerUI GAMEBOX <path>` then `If WARN` or
+`Echo $RC`.
+
 ## Where data lives on AROS
 
 In place of the original's `~/Library` locations:

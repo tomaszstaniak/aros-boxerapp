@@ -48,6 +48,23 @@ const char *sessionEndName(SessionEnd end);
 // failed stops it, so nothing half-installed is imported as a finished game.
 bool importContinuesAfterInstaller(SessionEnd end, bool userStopped);
 
+// BoxerUI's return code (AmigaDOS: 0 OK, 10 ERROR), so that a script or a
+// launcher can tell from RC that a session could not be prepared or that
+// the core failed. A normal end and the user's own cancel are not errors.
+constexpr int kExitOk = 0, kExitError = 10;
+int sessionExitCode(SessionEnd end);
+// One BoxerUI may run more than one session (a DOS session, an installer):
+// the worst outcome wins, and a later good session does not hide an earlier
+// failure.
+class ExitStatus {
+public:
+    void note(SessionEnd end);
+    void noteError() { code_ = kExitError; }   // an error outside a session (setup)
+    int code() const { return code_; }
+private:
+    int code_ = kExitOk;
+};
+
 // Owns the state of one session for exactly as long as the session runs.
 // Constructing it publishes a fresh State through `slot` (the pointer the
 // event handlers read); on every way out of the owning scope (the normal
