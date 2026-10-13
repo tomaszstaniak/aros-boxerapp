@@ -242,6 +242,30 @@ static void testPlans() {
     CHECK(planDrop(folder, DropZone::ImportWindow, true, busy).action == DropAction::Import);
 }
 
+// Registration: the responder comes first; without it no AppWindow is
+// added at all, and a responder that is not needed is ended again.
+static void testRegistration() {
+    std::vector<std::string> calls;
+    auto steps = [&](bool responder, bool appWindow) {
+        DropRegistrationSteps s;
+        s.startResponder = [&calls, responder] { calls.push_back("responder"); return responder; };
+        s.addAppWindow = [&calls, appWindow] { calls.push_back("appwindow"); return appWindow; };
+        s.endResponder = [&calls] { calls.push_back("end responder"); };
+        return s;
+    };
+    CHECK(registerDropTarget(steps(true, true)) == DropRegistration::Registered);
+    CHECK((calls == std::vector<std::string>{"responder", "appwindow"}));
+    // The injected failure: no process for the responder.
+    calls.clear();
+    CHECK(registerDropTarget(steps(false, true)) == DropRegistration::NoResponder);
+    CHECK((calls == std::vector<std::string>{"responder"}));   // AddAppWindow never called
+    calls.clear();
+    CHECK(registerDropTarget(steps(true, false)) == DropRegistration::NoAppWindow);
+    CHECK((calls == std::vector<std::string>{"responder", "appwindow", "end responder"}));
+    CHECK(registerDropTarget(DropRegistrationSteps{}) == DropRegistration::NoResponder);
+    CHECK(std::string(dropRegistrationName(DropRegistration::NoResponder)).find("NO") == 0);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: drop_logic_test <scratch dir>\n"); return 2; }
     scratch = argv[1];
@@ -250,6 +274,7 @@ int main(int argc, char **argv) {
     testClassify();
     testZones();
     testPlans();
+    testRegistration();
     if (failures) {
         std::printf("drop_logic_test: %d of %d checks FAILED\n", failures, checks);
         return 1;

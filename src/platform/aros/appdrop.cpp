@@ -55,12 +55,44 @@ bool AppDropTarget::create() {
 
 ULONG AppDropTarget::signalMask() const { return port_ ? 1UL << port_->mp_SigBit : 0; }
 
-bool AppDropTarget::attach(struct Window *window) {
-    if (!port_ || !window) return false;
-    if (appWindow_) detach();
+bool AppDropTarget::startResponder() {
+    if (!port_) return false;
+    if (appWindow_ || responder_) detach();
+    stop_ = 0;
+    answered_ = 0;
+    struct Process *p = nullptr;
+    for (int tries = 0; !p && tries < 3; ++tries) {
+        // No home or current directory: a helper must not keep the
+        // program's drawer in use.
+        p = CreateNewProcTags(NP_Entry, (IPTR)&AppDropTarget::answer, NP_UserData, (IPTR)this,
+                              NP_Name, (IPTR) "BoxerUI drop answerer", NP_StackSize, 16384,
+                              NP_NotifyOnDeath, TRUE, NP_Input, 0, NP_Output, 0, NP_Error, 0,
+                              NP_WindowPtr, (IPTR)-1, NP_CurrentDir, 0, NP_HomeDir, 0, TAG_DONE);
+        if (!p) Delay(5);
+    }
+    if (!p) return false;
+    responder_ = GetETaskID(&p->pr_Task);
+    responderTask_ = &p->pr_Task;
+    return true;
+}
+
+bool AppDropTarget::addAppWindow(struct Window *window) {
+    if (!port_ || !window || !responder_ || appWindow_) return false;
     appWindow_ = AddAppWindowA(0, 0, window, port_, nullptr);
     window_ = appWindow_ ? window : nullptr;
     return appWindow_ != nullptr;
+}
+
+// The responder leaves its wait (it has not touched the port), finds stop
+// set, drains once and exits; its exit, not a flag, is waited for.
+void AppDropTarget::endResponder() {
+    if (!responder_) return;
+    stop_ = 1;
+    Signal(responderTask_, SIGBREAKF_CTRL_F);
+    while (ChildStatus(responder_) != CHILD_EXITED) Delay(1);
+    ChildFree(responder_);
+    responder_ = 0;
+    responderTask_ = nullptr;
 }
 
 // The object's full path: the lock names the drawer it is in, or, for a
@@ -96,15 +128,16 @@ bool AppDropTarget::take(AppDrop &out) {
     return true;
 }
 
-// The answering process: replies to every drop while the task that owns
-// the port waits in RemoveAppWindow. GetMsg and ReplyMsg from another task
-// are exec's ordinary contract. stop_ is read before each drain, so a drop
-// that came before it was set is still answered.
+// The answering process: parked from the registration on, then replies to
+// every drop while the task that owns the port waits in RemoveAppWindow.
+// GetMsg and ReplyMsg from another task are exec's ordinary contract.
+// stop_ is read before each drain, so a drop that came before it was set
+// is still answered.
 void AppDropTarget::answer() {
     AppDropTarget *t = (AppDropTarget *)FindTask(nullptr)->tc_UserData;
     struct Message *m;
     int last;
-    Wait(SIGBREAKF_CTRL_F);   // until the parent has its task id
+    Wait(SIGBREAKF_CTRL_F);   // parked until detach (or endResponder) wakes it
     do {
         last = t->stop_;
         while ((m = GetMsg(t->port_))) {
@@ -118,64 +151,42 @@ void AppDropTarget::answer() {
 // The order is what makes a close safe with a drop in flight:
 // 1. Messages already queued on the port are answered (unread): their
 //    senders wait holding the Workbench semaphore shared.
-// 2. The answering process starts; from now on a drop that arrives is
-//    answered by it, not by this task.
+// 2. The parked responder (started at registration, so it exists) is woken;
+//    from now on a drop that arrives is answered by it, not by this task.
 // 3. RemoveAppWindow: it takes the semaphore exclusively, so it returns
 //    only after every sender has its reply and let go; after it no sender
 //    can find the window, and Workbench keeps no pointer to it.
-// 4. The answerer is told to stop, drains once more and exits; its exit
+// 4. The responder is told to stop, drains once more and exits; its exit
 //    (ChildStatus) is waited for, so it never touches a port that is gone.
 // 5. Anything still on the port is answered. Only then may the caller
 //    close the Intuition window. Nothing taken from a message is a pointer
 //    into it: take() copies the paths before replying.
 unsigned AppDropTarget::detach() {
-    if (!appWindow_) return 0;
+    if (!appWindow_) {
+        endResponder();   // parked for a registration that did not happen
+        return 0;
+    }
     struct Message *m;
-    answered_ = 0;
-    stop_ = 0;
     while ((m = GetMsg(port_))) {
         answered_ = answered_ + 1;
         ReplyMsg(m);
     }
-    struct Process *p = nullptr;
-    for (int tries = 0; !p && tries < 3; ++tries) {
-        // No home or current directory: a helper must not keep the
-        // program's drawer in use.
-        p = CreateNewProcTags(NP_Entry, (IPTR)&AppDropTarget::answer, NP_UserData, (IPTR)this,
-                              NP_Name, (IPTR) "BoxerUI drop answerer", NP_StackSize, 16384,
-                              NP_NotifyOnDeath, TRUE, NP_Input, 0, NP_Output, 0, NP_Error, 0,
-                              NP_WindowPtr, (IPTR)-1, NP_CurrentDir, 0, NP_HomeDir, 0, TAG_DONE);
-        if (!p) Delay(5);
-    }
-    ULONG child = 0;
-    if (p) {
-        child = GetETaskID(&p->pr_Task);
-        Signal(&p->pr_Task, SIGBREAKF_CTRL_F);
-    } else {
-        // Without a process (no memory) only the narrow old window is
-        // left: a drop sent between this drain and RemoveAppWindow.
-        while ((m = GetMsg(port_))) {
-            answered_ = answered_ + 1;
-            ReplyMsg(m);
-        }
-    }
-    // Waits for every sender to let the semaphore go, which a sender does
-    // only after its reply; after it no sender can find the window.
+    Signal(responderTask_, SIGBREAKF_CTRL_F);
     RemoveAppWindow((struct AppWindow *)appWindow_);
     appWindow_ = nullptr;
     window_ = nullptr;
-    if (child) {
-        // The port and this object stay until the answerer has exited: its
-        // exit, not a flag it sets, is the proof.
-        stop_ = 1;
-        while (ChildStatus(child) != CHILD_EXITED) Delay(1);
-        ChildFree(child);
-    }
+    stop_ = 1;
+    while (ChildStatus(responder_) != CHILD_EXITED) Delay(1);
+    ChildFree(responder_);
+    responder_ = 0;
+    responderTask_ = nullptr;
     while ((m = GetMsg(port_))) {
         answered_ = answered_ + 1;
         ReplyMsg(m);
     }
-    return answered_;
+    const unsigned n = answered_;
+    answered_ = 0;
+    return n;
 }
 
 }  // namespace boxer

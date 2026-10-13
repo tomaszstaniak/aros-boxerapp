@@ -10,9 +10,11 @@
 // (names, locks) is kept past the reply. RemoveAppWindow takes the same
 // semaphore exclusively: a drop that arrives after this task's last reply
 // and before RemoveAppWindow would leave both waiting for each other.
-// detach() therefore starts a small process that replies to every drop
-// while this task waits in RemoveAppWindow, and returns only once that
-// process has exited.
+// So another process answers the drops while this task waits in
+// RemoveAppWindow. That process is started before the window is
+// registered and waits, parked, until detach() needs it: a window whose
+// answerer cannot be started is not registered (ui/drop_logic.h
+// registerDropTarget), and detach() never has to start a process.
 #pragma once
 
 #include <exec/types.h>
@@ -50,11 +52,18 @@ public:
     // detach(), then the port goes (anything left on it answered first).
     void close();
 
-    // Registers the open Intuition window (a window registered before is
-    // detached first). False: not registered.
-    bool attach(struct Window *window);
-    // Unregisters (see above). Drops that were waiting and not taken are
-    // answered unread; their count is returned. Safe when not attached.
+    // The three steps of a registration, in registerDropTarget's order.
+    // startResponder: the parked answering process (false: none could be
+    // created). addAppWindow: registers the open Intuition window; only
+    // with a parked responder. endResponder: ends a parked responder that
+    // is not needed (AddAppWindow failed). A target already attached is
+    // detached by startResponder first.
+    bool startResponder();
+    bool addAppWindow(struct Window *window);
+    void endResponder();
+    // Unregisters (see appdrop.cpp for the order). Drops that were waiting
+    // and not taken are answered unread; their count is returned. Safe
+    // when not attached.
     unsigned detach();
     struct Window *window() const { return window_; }
 
@@ -67,6 +76,8 @@ private:
     struct MsgPort *port_ = nullptr;
     void *appWindow_ = nullptr;
     struct Window *window_ = nullptr;
+    ULONG responder_ = 0;            // the parked answerer's task id, while attached
+    struct Task *responderTask_ = nullptr;
     // Read by the answering process.
     volatile int stop_ = 0;
     volatile ULONG answered_ = 0;

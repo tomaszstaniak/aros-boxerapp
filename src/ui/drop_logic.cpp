@@ -194,4 +194,20 @@ GameStart startDroppedGame(const std::string &gamebox, const GameLauncher &launc
     return g;
 }
 
+const char *dropRegistrationName(DropRegistration r) {
+    switch (r) {
+    case DropRegistration::Registered: return "yes";
+    case DropRegistration::NoResponder: return "NO (no process to answer drops while the window closes)";
+    case DropRegistration::NoAppWindow: return "NO (AddAppWindow failed)";
+    }
+    return "?";
+}
+
+DropRegistration registerDropTarget(const DropRegistrationSteps &steps) {
+    if (!steps.startResponder || !steps.startResponder()) return DropRegistration::NoResponder;
+    if (steps.addAppWindow && steps.addAppWindow()) return DropRegistration::Registered;
+    if (steps.endResponder) steps.endResponder();
+    return DropRegistration::NoAppWindow;
+}
+
 }  // namespace boxer_ui

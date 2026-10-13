@@ -3105,17 +3105,28 @@ static void closeDropWindow(Object *win) {
 // registration goes, the new window is registered. Called from the main
 // loop and the session's event service.
 static void dropSync() {
+    // The window a registration was refused for: not tried again on every
+    // pass (each try would start a process), only once it is opened anew.
+    static struct Window *refused[2];
     for (int i = 0; i < 2; ++i) {
         boxer::AppDropTarget *t = g_dropTargets[i];
         if (!t) continue;
         struct Window *w = nullptr;
         get(dropWindowObject(i), MUIA_Window_Window, &w);
-        if (w == t->window()) continue;
+        if (w == t->window() || (w && w == refused[i])) continue;
+        refused[i] = nullptr;
         if (t->window()) {
             const unsigned unread = t->detach();
             logf("drop: %s window closed by Zune; AppWindow removed (%u answered unread)", dropWindowName(i), unread);
         }
-        if (w) logf("drop: %s window takes drops: %s", dropWindowName(i), t->attach(w) ? "yes" : "NO (AddAppWindow failed)");
+        if (!w) continue;
+        // Without a responder the window is not registered: it works, but
+        // takes no drops, rather than risk a close that could hang.
+        const DropRegistration r = registerDropTarget({[t] { return t->startResponder(); },
+                                                       [t, w] { return t->addAppWindow(w); },
+                                                       [t] { t->endResponder(); }});
+        logf("drop: %s window takes drops: %s", dropWindowName(i), dropRegistrationName(r));
+        if (r != DropRegistration::Registered) refused[i] = w;
     }
 }
 

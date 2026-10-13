@@ -116,5 +116,19 @@ struct GameStart {
 };
 GameStart startDroppedGame(const std::string &gamebox, const GameLauncher &launch);
 
+// Registering a window for drops (platform/aros/appdrop). Removing an
+// AppWindow is safe only while another process answers the drops that
+// arrive during RemoveAppWindow, so that process is started first, at
+// registration: no responder, no registration (the window then works
+// without drops), and the removal never depends on starting a process.
+struct DropRegistrationSteps {
+    std::function<bool()> startResponder;   // the answering process, parked until the removal
+    std::function<bool()> addAppWindow;
+    std::function<void()> endResponder;     // ends a parked responder that is not needed
+};
+enum class DropRegistration { Registered, NoResponder, NoAppWindow };
+const char *dropRegistrationName(DropRegistration r);
+DropRegistration registerDropTarget(const DropRegistrationSteps &steps);
+
 }  // namespace boxer_ui
 #endif
