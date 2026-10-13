@@ -89,10 +89,14 @@ Report problems through the
 [issue tracker](https://github.com/tomaszstaniak/aros-boxerapp/issues).
 Hardware testing and feedback are welcome.
 
-BoxerUI logs to `RAM:boxerui.log` by default, which is lost when AROS
-restarts or crashes. To keep it, start BoxerUI with a log in a writable
-drawer, for example the ToolType `LOG=Work:boxerui.log` or, from a Shell,
-`BoxerUI LOG Work:boxerui.log` (the Boxer drawer itself may be read-only).
+Each BoxerUI process writes its own log, by default a new file in
+`RAM:BoxerLogs/` (`boxerui-1.log`, `boxerui-2.log`, ...; a game started
+from its icon or by a drop is a process of its own). The first line of a
+log names its file. RAM: is lost when AROS restarts or crashes. To keep the
+log, start BoxerUI with a log in a writable drawer, for example the ToolType
+`LOG=Work:boxerui.log` or, from a Shell, `BoxerUI LOG Work:boxerui.log`
+(the Boxer drawer itself may be read-only). While that file is open in one
+BoxerUI, another one logs to a numbered file beside it.
 
 Please include:
 

@@ -124,7 +124,7 @@ python3 tests/build-tooling/test_package_notices.py # notices; diagnostic packag
 `src/ui/tests/import_controller_test.cpp` (the stages and ends of an import,
 and what each leaves on disk) and `src/ui/tests/drop_logic_test.cpp` (what
 a dropped icon is, and what a drop leads to in each window and import
-state). `tests/fixtures/boxtest/` is a small
+state) and `src/ui/tests/logfile_test.cpp` (the log file's name). `tests/fixtures/boxtest/` is a small
 DOS test program (NASM source and expected logs) for runs on AROS;
 `tests/fixtures/gamebox/` makes synthetic test gameboxes around it. No game
 data is part of this repository.
@@ -138,7 +138,7 @@ Install the package as its `ReadMe.txt` describes. From a Shell (stack
 BoxerUI                                          ; the welcome window
 BoxerUI GAMEBOX <path> DATA <dir> CONFDIR <dir>  ; open one gamebox
 BoxerUI SESSION dos CONFDIR <dir>                ; a plain DOS prompt
-BoxerUI LOG <file>                               ; log somewhere other than RAM:boxerui.log
+BoxerUI LOG <file>                               ; log to <file> instead of RAM:BoxerLogs/boxerui-<n>.log
 ```
 
 The same keys work as ToolTypes (`KEY=value`).

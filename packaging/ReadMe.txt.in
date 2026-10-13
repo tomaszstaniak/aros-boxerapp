@@ -93,11 +93,17 @@ Limitations
 
 When something goes wrong
 -------------------------
-BoxerUI writes a log, by default to RAM:boxerui.log. Each start of BoxerUI
-(also "Launch game" and every game icon) starts the log again, and
-everything in RAM: is lost when AROS restarts or crashes. If Boxer hangs
-or takes the system down, the RAM: log is usually gone by the time you
-look for it.
+Each BoxerUI writes a log of its own. By default it is a new file in the
+drawer RAM:BoxerLogs (made when it is missing): boxerui-1.log for the
+first BoxerUI, boxerui-2.log for the next, and so on. A game started from
+its icon, by "Launch game" or by dropping it on Boxer is a BoxerUI of its
+own, with its own file; no file that is already there is replaced. The
+first line of each log names its file, and a start from a Shell prints
+it there. The newest log is the one with the highest number:
+  List RAM:BoxerLogs
+Everything in RAM: is lost when AROS restarts or crashes, so if Boxer
+hangs or takes the system down, the RAM: logs are usually gone by the
+time you look for them.
 
 To keep the log on disk from the start, choose a drawer you can write to.
 The Boxer drawer itself may be read-only, or on a read-only installation,
@@ -109,18 +115,21 @@ so do not rely on it; Work: is a common choice. Then either:
   - from a Shell:
       Stack 65536
       BoxerUI LOG Work:boxerui.log
-The log on disk is also restarted by each start of BoxerUI, so copy it
-away before you try again.
+A log named with LOG is restarted by each start of BoxerUI, so copy it
+away before you try again. While one BoxerUI has that file open, another
+(for example a game started from its icon, which reads the same ToolType)
+writes to a numbered file beside it instead: Work:boxerui-1.log, and so
+on. Its first line says so.
 
 If Boxer is still on screen but seems hung:
 1. Open a second Shell (Wanderer menu, or Right-Amiga+W).
-2. Copy the log somewhere that survives a restart, for example:
-     Copy RAM:boxerui.log Work:boxerui-1.log
+2. Copy the logs somewhere that survives a restart, for example:
+     Copy RAM:BoxerLogs Work:BoxerLogs-copy ALL
 3. Type Status to list running programs; note whether BoxerUI is there.
 
 Report problems through the issue tracker at
   https://github.com/tomaszstaniak/aros-boxerapp/issues
-Please send: which game you tried, the log file, what you did just
+Please send: which game you tried, the log files, what you did just
 before (which screen, which button or key), the AROS version and
 distribution (Kickstart/Workbench version from the Wanderer "About"
 window), the ABI (ABIv11 or mainline), the amount of RAM, whether it

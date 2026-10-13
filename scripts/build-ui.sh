@@ -99,9 +99,13 @@ c++ -std=c++17 -Wall -O1 -o "$out/host/import_controller_test" "$src/tests/impor
 c++ -std=c++17 -Wall -O1 -o "$out/host/drop_logic_test" "$src/tests/drop_logic_test.cpp" "$src/drop_logic.cpp" \
   "$src/import_controller.cpp" "$src/session.cpp" "$PROJECT_ROOT"/src/model/*.cpp "$PROJECT_ROOT/src/emulator/filesystem.cpp"
 "$out/host/drop_logic_test" "$out/host/drop scratch"
+# The log file's name: one per process, never an existing file.
+c++ -std=c++17 -Wall -O1 -o "$out/host/logfile_test" "$src/tests/logfile_test.cpp" "$src/logfile.cpp" \
+  "$PROJECT_ROOT/src/model/fsutil.cpp"
+"$out/host/logfile_test" "$out/host/log scratch"
 
 sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp"
-  "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp" "$src/drop_logic.cpp")
+  "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp" "$src/drop_logic.cpp" "$src/logfile.cpp")
 # The emulator layer and the model as in build-smoke.sh: files that include
 # the core's headers compile as gnu++14 (DOSBox 0.74's dynamic exception
 # specifications), the model and the UI as C++17.
