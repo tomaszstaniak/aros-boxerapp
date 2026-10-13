@@ -2641,6 +2641,14 @@ static void notifyId(Object *o, ULONG attr, IPTR value, ULONG id) {
     DoMethod(o, MUIM_Notify, attr, value, (IPTR)ui.app, 2, MUIM_Application_ReturnID, id);
 }
 
+// BoxerUI ends when none of its windows is open, unless an installer
+// session is about to open its own.
+static bool anyWindowOpen() {
+    for (Object *w : {ui.welcome, ui.dos, ui.insp, ui.fs, ui.imp})
+        if (windowOpen(w)) return true;
+    return g_imports->installerPending();
+}
+
 static Object *g_wins[4];
 static struct MUI_InputHandlerNode g_laterIhn;
 static bool g_laterArmed;
@@ -4067,7 +4075,9 @@ int main(int argc, char **argv) {
                 if (!g_imports->copying()) showImportStage();   // copied: on to the startup program
             }
             if (SetSignal(0, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C) break;
-        } else if (sigs) {
+        } else if (sigs && anyWindowOpen()) {
+            // Not once the last window has closed: a close gadget sends
+            // nothing after its request, so no event would end this Wait.
             sigs = Wait(sigs | SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_F);
             if (sigs & SIGBREAKF_CTRL_C) break;
         }
@@ -4075,11 +4085,7 @@ int main(int argc, char **argv) {
             g_renderResized = false;
             if (windowOpen(ui.dos)) correctAspect();
         }
-        IPTR w1 = 0, w2 = 0, w3 = 0, w4 = 0;
-        get(ui.welcome, MUIA_Window_Open, &w1); get(ui.dos, MUIA_Window_Open, &w2);
-        get(ui.insp, MUIA_Window_Open, &w3); get(ui.fs, MUIA_Window_Open, &w4);
-        IPTR w5 = 0; get(ui.imp, MUIA_Window_Open, &w5);
-        if (!w1 && !w2 && !w3 && !w4 && !w5 && !g_imports->installerPending()) running = false;
+        if (!anyWindowOpen()) running = false;
     }
     // An Inspector rename waits for the session's end (its drives were
     // mounted from the old path); the gamebox and its icon are renamed now.
