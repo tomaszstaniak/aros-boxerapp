@@ -119,8 +119,10 @@ python3 tests/build-tooling/test_package_notices.py # notices; diagnostic packag
 ```
 
 `build-ui.sh` also runs `src/ui/tests/ui_logic_test.cpp`,
-`src/ui/tests/launchpanel_test.cpp` and `src/ui/tests/session_test.cpp`
-(session ends and the session teardown). `tests/fixtures/boxtest/` is a small
+`src/ui/tests/launchpanel_test.cpp`, `src/ui/tests/session_test.cpp`
+(session ends and the session teardown) and
+`src/ui/tests/import_controller_test.cpp` (the stages and ends of an import,
+and what each leaves on disk). `tests/fixtures/boxtest/` is a small
 DOS test program (NASM source and expected logs) for runs on AROS;
 `tests/fixtures/gamebox/` makes synthetic test gameboxes around it. No game
 data is part of this repository.

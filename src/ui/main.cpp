@@ -47,6 +47,7 @@
 #include "gfx.h"
 #include "ui_logic.h"
 #include "session.h"
+#include "import_controller.h"
 #include "launchpanel_logic.h"
 #include "coverassets.h"
 #include "../emulator/emulator.h"
@@ -285,13 +286,12 @@ static struct {
 } st;
 
 static std::string g_gamesFolder;   // from the prefs; "" until chosen
-static boxer::ImportSession g_import;
-// The installer runs in this process's one core session; the main loop
-// starts it, and these say how the user ended it.
-static struct { bool pending = false, finish = false, stop = false; } g_inst;
-// The source copy runs in steps from the main loop so the Gauge moves and
-// Stop is heard between them (cancelSourceFileImport, IS:1070).
-static boxer::SourceCopy *g_copy;
+// The import of a game (state, copy, installer, cleanup): owned by main()
+// for as long as the application runs, published here for the handlers.
+// The installer runs in this process's one core session and the copy in
+// steps from the main loop, so the Gauge moves and Stop is heard between
+// them (cancelSourceFileImport, IS:1070).
+static ImportController *g_imports;
 
 static const char *kTabLabels[5] = {"Gamebox", "CPU", "Mouse", "Joystick", "Drives"};
 static const char *kTabTitles[5] = {"Gamebox Inspector", "CPU Inspector", "Mouse Inspector",
@@ -1781,14 +1781,15 @@ static SessionResult prepareAndRunSession() {
     for (const auto &c : g_args.confs) (c.required ? confs : extra).push_back(c);
     g_lp = {};
     g_lpAll.clear();
-    const bool installing = g_import.stage == boxer::ImportStage::RunningInstaller;
+    const boxer::ImportSession &import = g_imports->session();
+    const bool installing = g_imports->installing();
     if (installing) {
         std::string error, name;
         auto setupLog = [](const std::string &l) { logf("setup: %s", l.c_str()); };
         std::vector<boxer::ConfigFile> layered = extra;
-        if (!boxer::installerSessionCommands(g_import.sourcePath, g_import.installerPath, preflight, launch))
-            return setupFailed("source path cannot be mounted: " + g_import.sourcePath);
-        if (!boxer::openGamebox(setupLog, g_import.createdGamebox, g_args.data, g_args.confDir, layered,
+        if (!boxer::installerSessionCommands(import.sourcePath, import.installerPath, preflight, launch))
+            return setupFailed("source path cannot be mounted: " + import.sourcePath);
+        if (!boxer::openGamebox(setupLog, import.createdGamebox, g_args.data, g_args.confDir, layered,
                                 preflight, launch, shadowFiles, error, &name, false))
             return setupFailed("new gamebox not opened: " + error);
         confs = layered;
@@ -2764,6 +2765,16 @@ static std::string iconStemOf(const std::string &gameboxPath) {
     return boxer::fsutil::stripExtension(boxer::fsutil::trimTrailingSlash(gameboxPath));
 }
 
+// The finished import's cover record and its sidecar launch icon
+// "<name>.info" beside "<name>.boxer", showing the cover
+// (ImportController::useStartupProgram). An existing icon is never replaced.
+static bool importDecorate(boxer::Gamebox &box, const std::string &source, std::string &err) {
+    ensureCoverRecord(box, source);
+    const bool icon = writeCoverIcon(box.path(), iconStemOf(box.path()), false, err);
+    logf("import: sidecar icon %s%s", icon ? "written" : "NOT written: ", err.c_str());
+    return icon;
+}
+
 // Cover choice from the cycle (index into kCoverStyles) or the well (-1:
 // a picture). Records it, redraws the well and rewrites the icon.
 static void changeCover(const std::string &gameboxPath, int index, Object *win, Object *well, Object *cycle,
@@ -2838,13 +2849,13 @@ static bool commitImportName() {
     STRPTR text = nullptr;
     get(ui.impName, MUIA_String_Contents, &text);
     const std::string want = text ? (const char *)text : "";
-    if (want == g_import.gameName()) return true;
-    const std::string now = renameGamebox(g_import.createdGamebox, want, ui.imp);
-    g_import.createdGamebox = now;
+    if (want == g_imports->gameName()) return true;
+    const std::string now = renameGamebox(g_imports->session().createdGamebox, want, ui.imp);
+    g_imports->gameboxRenamed(now);
     showCover(ui.impWell, ui.impCover, ui.impName, now);   // the field shows the name it has now
-    std::string line = "\"" + g_import.gameName() + "\" is in " + g_import.gamesFolder + ".";
+    std::string line = "\"" + g_imports->gameName() + "\" is in " + g_imports->session().gamesFolder + ".";
     set(ui.impDoneText, MUIA_Text_Contents, (IPTR)line.c_str());
-    return g_import.gameName() == boxer::validGameboxName(want);
+    return g_imports->gameName() == boxer::validGameboxName(want);
 }
 
 // Inspector Gamebox tab for the session's gamebox; ghosted without one.
@@ -2893,17 +2904,18 @@ static void inspectorRename() {
 // BXImportWindowController panel choice for the session's stage.
 static void showImportStage() {
     using S = boxer::ImportStage;
-    const std::string name = boxer::fsutil::baseName(g_import.sourcePath);
-    switch (g_import.stage) {
+    const boxer::ImportSession &imp = g_imports->session();
+    const std::string name = boxer::fsutil::baseName(imp.sourcePath);
+    switch (imp.stage) {
     case S::WaitingForSource:
     case S::LoadingSource:
         set(ui.impPages, MUIA_Group_ActivePage, 0);
         break;
     case S::WaitingForInstaller: {
-        std::string line = "Source: " + g_import.sourcePath;
+        std::string line = "Source: " + imp.sourcePath;
         set(ui.impSource, MUIA_Text_Contents, (IPTR)line.c_str());
         DoMethod(ui.impList, MUIM_List_Clear);
-        for (const auto &p : g_import.scan.installers)
+        for (const auto &p : imp.scan.installers)
             DoMethod(ui.impList, MUIM_List_InsertSingle, (IPTR)p.c_str(), MUIV_List_Insert_Bottom);
         set(ui.impList, MUIA_List_Active, 0);   // preferred installer first (IP:246)
         // One core run per process; a second installer needs a new
@@ -2919,18 +2931,18 @@ static void showImportStage() {
         // Shortened like the ready panel; the full name is the bubble help
         // (Zune keeps the pointer, so the string must outlive this).
         static std::string fullName;
-        fullName = g_import.gameName();
+        fullName = imp.gameName();
         const std::string line = boxer::startupProgramText(fullName);
         set(ui.impProgText, MUIA_Text_Contents, (IPTR)line.c_str());
         set(ui.impProgText, MUIA_ShortHelp, (IPTR)fullName.c_str());
         DoMethod(ui.impProgList, MUIM_List_Clear);
-        auto progs = boxer::scanExecutables(fs, g_import.rootDrivePath());
+        auto progs = boxer::scanExecutables(fs, imp.rootDrivePath());
         std::vector<std::string> rel;
-        for (const auto &p : progs) rel.push_back(boxer::fsutil::relativeTo(p, g_import.rootDrivePath()));
+        for (const auto &p : progs) rel.push_back(boxer::fsutil::relativeTo(p, imp.rootDrivePath()));
         boxer::sortByPathDepth(rel);
         for (const auto &r : rel)
             DoMethod(ui.impProgList, MUIM_List_InsertSingle, (IPTR)r.c_str(), MUIV_List_Insert_Bottom);
-        const int pick = boxer::preferredStartupProgram(rel, g_import.gameName());
+        const int pick = boxer::preferredStartupProgram(rel, imp.gameName());
         set(ui.impProgList, MUIA_List_Active, pick < 0 ? 0 : pick);
         set(ui.impUse, MUIA_Disabled, rel.empty());
         logf("import: %u programs in the gamebox, preselected %d", (unsigned)rel.size(), pick);
@@ -2938,14 +2950,14 @@ static void showImportStage() {
         break;
     }
     case S::Finished: {
-        std::string line = "\"" + g_import.gameName() + "\" is in " + g_import.gamesFolder + ".";
+        std::string line = "\"" + imp.gameName() + "\" is in " + imp.gamesFolder + ".";
         set(ui.impDoneText, MUIA_Text_Contents, (IPTR)line.c_str());
-        showCover(ui.impWell, ui.impCover, ui.impName, g_import.createdGamebox);
+        showCover(ui.impWell, ui.impCover, ui.impName, imp.createdGamebox);
         set(ui.impPages, MUIA_Group_ActivePage, 4);
         break;
     }
     case S::ImportingSourceFiles: {
-        std::string line = "Importing " + g_import.gameName() + "...";
+        std::string line = "Importing " + imp.gameName() + "...";
         set(ui.impCopyText, MUIA_Text_Contents, (IPTR)line.c_str());
         set(ui.impGauge, MUIA_Gauge_Current, 0);
         set(ui.impPages, MUIA_Group_ActivePage, 5);
@@ -2954,7 +2966,7 @@ static void showImportStage() {
     case S::ReadyToFinalize: {
         // Once a gamebox exists (an installer ran) there is no source
         // choice to go back to; Stop is the window's close question.
-        set(ui.impBack2, MUIA_Disabled, !g_import.createdGamebox.empty());
+        set(ui.impBack2, MUIA_Disabled, !imp.createdGamebox.empty());
         // A long name is shortened on the panel; the bubble help gives it
         // in full (Zune keeps the pointer, so the string must outlive this).
         static std::string fullName;
@@ -2966,52 +2978,33 @@ static void showImportStage() {
         break;
     }
     }
-    logf("import: stage %d", (int)g_import.stage);
+    logf("import: stage %d", (int)imp.stage);
 }
 
-// IS:715 finishInstaller / IS:_cleanup, after the installer's session ended.
-static void importAfterInstaller() {
-    g_inst.pending = false;
-    if (g_inst.stop) {
-        std::string err;
-        bool ok = g_import.discardGamebox(&err);
-        logf("import: stopped; unfinished gamebox %s%s", ok ? "deleted" : "NOT deleted: ", err.c_str());
-        g_import.cancelSourceSelection();
-        if (!ok) MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)err.c_str());
-    } else if (g_import.gameDidInstall()) {
-        g_import.stage = boxer::ImportStage::ChoosingStartupProgram;
-        logf("import: installer finished, files in the gamebox");
-    } else {
-        // Nothing was installed: the source files are imported instead
-        // (IS:745).
-        g_import.stage = boxer::ImportStage::ReadyToFinalize;
-        logf("import: installer finished without installing files");
-    }
-    g_inst.finish = g_inst.stop = false;
+// IS:715 finishInstaller, after the installer's session ended: the
+// controller has decided how the import goes on (or removed its gamebox);
+// the window shows where it is now.
+static void importAfterInstaller(const ImportOutcome &o) {
+    if (o.ended() && !o.removed)
+        MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)o.cleanupError.c_str());
     set(ui.imp, MUIA_Window_Open, TRUE);
     showImportStage();
 }
 
-// Stop or failure while copying: only the new gamebox goes; the source stays.
-static void importAbandon(const std::string &why) {
-    if (g_copy) { g_copy->close(); delete g_copy; g_copy = nullptr; }
-    const std::string name = g_import.gameName(), source = g_import.sourcePath;
-    std::string err;
-    bool ok = g_import.discardGamebox(&err);
-    logf("import: abandoned (%s); unfinished gamebox %s%s", why.c_str(), ok ? "deleted" : "NOT deleted: ", err.c_str());
-    g_import.cancelSourceSelection();
+// Stop or failure while copying: only the new gamebox went; the source stays.
+static void reportImportAbandoned(const ImportOutcome &o) {
     showImportStage();
-    if (why != "stopped" || !ok) {
-        std::string text = "Boxer could not import " + name + ":\n" + why + "\n\n" +
-            (ok ? "The unfinished gamebox was removed. " : "The unfinished gamebox could not be removed: " + err + ". ") +
-            "The game folder " + source + " was not changed.";
+    if (o.end != ImportEnd::Stopped || !o.removed) {
+        std::string text = "Boxer could not import " + o.gameName + ":\n" + o.error + "\n\n" +
+            (o.removed ? "The unfinished gamebox was removed. " : "The unfinished gamebox could not be removed: " + o.cleanupError + ". ") +
+            "The game folder " + o.sourcePath + " was not changed.";
         MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)text.c_str());
     }
 }
 
 // BXCloseAlert closeAlertWhileRunningInstaller. Returns false for Cancel.
 static bool askEndInstaller() {
-    const std::string name = g_import.gameName();
+    const std::string name = g_imports->gameName();
     LONG r = MUI_Request(ui.app, ui.dos, 0, (char *)"Boxer",
         (char *)"Finish Importing|Stop Importing|Cancel",
         (char *)"Do you want to finish importing %s first?\n\n"
@@ -3019,8 +3012,7 @@ static bool askEndInstaller() {
         (IPTR)name.c_str());
     logf("import: close while installing -> %d", (int)r);
     if (r == 0) return false;
-    g_inst.finish = r == 1;
-    g_inst.stop = r == 2;
+    g_imports->endInstallerRequested(r == 2);
     g_session->emu->requestQuit();
     return true;
 }
@@ -3029,7 +3021,7 @@ static bool handleId(ULONG id) {
     switch (id) {
     case MUIV_Application_ReturnID_Quit:
     case ID_QUIT:
-        if (sessionRunning() && g_import.stage == boxer::ImportStage::RunningInstaller) {
+        if (sessionRunning() && g_imports->installing()) {
             askEndInstaller();
             return true;
         }
@@ -3050,14 +3042,28 @@ static bool handleId(ULONG id) {
         browseGames();
         break;
     case ID_IMPORT:
-        // BXAppController orderFrontImportGamePanel: a fresh session at the dropzone.
-        g_import = boxer::ImportSession();
-        set(ui.impPages, MUIA_Group_ActivePage, 0);
-        set(ui.imp, MUIA_Window_Open, TRUE);
-        logf("import: window opened (waiting for source)");
+        // BXAppController orderFrontImportGamePanel: a fresh session at the
+        // dropzone, or the import that is still going on.
+        switch (g_imports->open()) {
+        case ImportController::Open::Started:
+            set(ui.impPages, MUIA_Group_ActivePage, 0);
+            set(ui.imp, MUIA_Window_Open, TRUE);
+            logf("import: window opened (waiting for source)");
+            break;
+        case ImportController::Open::Resumed:
+            set(ui.imp, MUIA_Window_Open, TRUE);
+            showImportStage();
+            logf("import: window opened on the unfinished import of \"%s\"", g_imports->gameName().c_str());
+            break;
+        case ImportController::Open::Busy:
+            logf("import: the installer of \"%s\" is running; its window opens when it ends",
+                 g_imports->gameName().c_str());
+            break;
+        }
         break;
     case ID_IMPORT_CHOOSE: {
-        std::string d = pickDrawer(g_import.sourcePath.empty() ? std::string("SYS:") : g_import.sourcePath,
+        const std::string &last = g_imports->session().sourcePath;
+        std::string d = pickDrawer(last.empty() ? std::string("SYS:") : last,
                                    "Choose a DOS game folder to import:", false);
         if (d.empty()) { logf("import: chooser cancelled, still waiting for source"); break; }
         // SYS: and its volume name are the same place; the reserved-folder
@@ -3066,7 +3072,7 @@ static bool handleId(ULONG id) {
         boxer::DataLocations loc;
         loc.dataDir = g_args.data;
         std::string msg;
-        auto c = g_import.chooseSource(d, loc, g_gamesFolder, &msg);
+        auto c = g_imports->chooseSource(d, loc, g_gamesFolder, &msg);
         logf("import: source \"%s\" -> %s", d.c_str(), c == boxer::SourceCheck::Ok ? "accepted" : msg.c_str());
         if (c != boxer::SourceCheck::Ok) {
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s", (IPTR)msg.c_str());
@@ -3083,7 +3089,7 @@ static bool handleId(ULONG id) {
              (unsigned)scan.dosboxConfigurations.size(), (int)scan.alreadyInstalled,
              (unsigned)scan.installers.size(), scan.installers.empty() ? "" : ", first ",
              scan.installers.empty() ? "" : scan.installers.front().c_str());
-        auto err = g_import.applyScan(scan);
+        auto err = g_imports->applyScan(scan);
         if (err != boxer::InstallerScanError::None) {
             std::string text = boxer::installerScanErrorText(err, boxer::fsutil::baseName(d));
             logf("import: scan refused the source: %s", text.c_str());
@@ -3094,7 +3100,7 @@ static bool handleId(ULONG id) {
         break;
     }
     case ID_IMPORT_SKIP:
-        g_import.skipInstaller();
+        g_imports->skipInstaller();
         logf("import: installer skipped");
         showImportStage();
         break;
@@ -3103,27 +3109,19 @@ static bool handleId(ULONG id) {
         // "ready" is as harmless as going back from the installer choice.
         [[fallthrough]];
     case ID_IMPORT_BACK:
-        g_import.cancelSourceSelection();
-        set(ui.impPages, MUIA_Group_ActivePage, 0);
-        logf("import: back to source selection");
+        // Refused (and logged) once the import holds a gamebox; Back is
+        // ghosted then.
+        if (g_imports->back().end == ImportEnd::Cancelled) set(ui.impPages, MUIA_Group_ActivePage, 0);
         break;
     case ID_IMPORT_LAUNCH: {
         IPTR active = 0;
         get(ui.impList, MUIA_List_Active, &active);
-        if ((LONG)active < 0 || active >= g_import.scan.installers.size()) break;
-        std::string err;
-        if (!g_import.createGamebox(g_gamesFolder, &err)) {
-            logf("import: gamebox not created: %s", err.c_str());
+        if ((LONG)active < 0 || active >= g_imports->session().scan.installers.size()) break;
+        // The main loop runs the installer's session once this is done.
+        const ImportOutcome o = g_imports->launchInstaller(active, g_gamesFolder);
+        if (o.refusal == ImportRefusal::Gamebox)
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
-                        (char *)"The gamebox could not be created:\n%s", (IPTR)err.c_str());
-            break;
-        }
-        g_import.installerPath = g_import.scan.installers[active];
-        g_import.stage = boxer::ImportStage::RunningInstaller;
-        g_inst = {};
-        g_inst.pending = true;
-        logf("import: created \"%s\" (id %s), running installer %s", g_import.createdGamebox.c_str(),
-             g_import.createdIdentifier.c_str(), g_import.installerPath.c_str());
+                        (char *)"The gamebox could not be created:\n%s", (IPTR)o.error.c_str());
         break;
     }
     case ID_IMPORT_USE: {
@@ -3132,58 +3130,41 @@ static bool handleId(ULONG id) {
         get(ui.impProgList, MUIA_List_Active, &active);
         DoMethod(ui.impProgList, MUIM_List_GetEntry, active, (IPTR)&entry);
         if (!entry) break;
-        boxer::Gamebox box;
-        std::string err;
-        const std::string rel = std::string("C.harddisk/") + (const char *)entry;
-        bool ok = box.open(g_import.createdGamebox, &err) && boxer::setDefaultLauncher(box, rel, &err);
-        logf("import: startup program %s -> %s%s", rel.c_str(), ok ? "saved" : "NOT saved: ", err.c_str());
-        if (!ok) {
+        // The sidecar icon is written by importDecorate (the controller's
+        // hook, set in main()); a failure there leaves the import finished.
+        const ImportOutcome o = g_imports->useStartupProgram(std::string("C.harddisk/") + (const char *)entry);
+        if (o.refusal == ImportRefusal::Launcher) {
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
-                        (char *)"The startup program could not be saved:\n%s", (IPTR)err.c_str());
+                        (char *)"The startup program could not be saved:\n%s", (IPTR)o.error.c_str());
             break;
         }
-        // Sidecar launch icon "<name>.info" beside "<name>.boxer",
-        // showing the cover. A failure is reported but does not undo
-        // the import: the gamebox is complete without it.
-        ensureCoverRecord(box, g_import.sourcePath);
-        std::string iconErr;
-        bool icon = writeCoverIcon(g_import.createdGamebox, iconStemOf(g_import.createdGamebox), false, iconErr);
-        logf("import: sidecar icon %s%s", icon ? "written" : "NOT written: ", iconErr.c_str());
-        if (!icon)
+        if (!o.warning.empty())
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
-                        (char *)"The game was imported, but its icon could not be written:\n%s", (IPTR)iconErr.c_str());
-        g_import.stage = boxer::ImportStage::Finished;
+                        (char *)"The game was imported, but its icon could not be written:\n%s", (IPTR)o.warning.c_str());
         showImportStage();
         break;
     }
     case ID_IMPORT_CREATE: {
-        // importSourceFiles for a game that installed nothing (IS:745-1037).
-        std::string err, dest;
-        if (g_import.createdGamebox.empty() && !g_import.createGamebox(g_gamesFolder, &err)) {
-            logf("import: gamebox not created: %s", err.c_str());
+        // importSourceFiles for a game that installed nothing (IS:745-1037);
+        // the main loop copies in steps.
+        const ImportOutcome o = g_imports->startCopy(g_gamesFolder);
+        if (o.refusal == ImportRefusal::Gamebox) {
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
-                        (char *)"The gamebox could not be created:\n%s", (IPTR)err.c_str());
+                        (char *)"The gamebox could not be created:\n%s", (IPTR)o.error.c_str());
             break;
         }
-        g_copy = new boxer::SourceCopy;
-        if (!g_import.prepareCopyDestination(dest, &err) || !g_copy->prepare(g_import.sourcePath, dest, &err)) {
-            importAbandon(err);
-            break;
-        }
-        g_import.stage = boxer::ImportStage::ImportingSourceFiles;
-        logf("import: copying %u files, %llu bytes from \"%s\" to \"%s\"", (unsigned)g_copy->fileCount(),
-             (unsigned long long)g_copy->totalBytes(), g_import.sourcePath.c_str(), dest.c_str());
+        if (o.ended()) { reportImportAbandoned(o); break; }
         showImportStage();
         break;
     }
     case ID_IMPORT_STOP: {
-        if (!g_copy) break;
+        if (!g_imports->copying()) break;
         LONG r = MUI_Request(ui.app, ui.imp, 0, (char *)"Boxer", (char *)"Stop Importing|Cancel",
             (char *)"Boxer has not finished importing %s.\n\n"
                     "If you stop importing, any already-imported game files will be discarded.",
-            (IPTR)g_import.gameName().c_str());
+            (IPTR)g_imports->gameName().c_str());
         logf("import: stop while copying -> %d", (int)r);
-        if (r == 1) importAbandon("stopped");
+        if (r == 1) reportImportAbandoned(g_imports->stop());
         break;
     }
     case ID_IMPORT_LAUNCH_GAME: {
@@ -3195,13 +3176,13 @@ static bool handleId(ULONG id) {
         // A name being typed is committed first; a refused one keeps the
         // panel (launchGamebox: makeFirstResponder:nil fails on validation).
         if (!commitImportName()) break;
-        const std::string icon = boxer::fsutil::join(g_import.gamesFolder, g_import.gameName());
+        const std::string icon = boxer::fsutil::join(g_imports->session().gamesFolder, g_imports->gameName());
         const bool ok = openInWanderer(icon);
         logf("import: launch game: open \"%s\" -> %s", icon.c_str(), ok ? "ok" : "failed");
         if (!ok) {
             MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK",
                         (char *)"The game could not be started.\nOpen it from its icon in %s.",
-                        (IPTR)g_import.gamesFolder.c_str());
+                        (IPTR)g_imports->session().gamesFolder.c_str());
             break;
         }
         return false;   // quit this BoxerUI
@@ -3212,14 +3193,14 @@ static bool handleId(ULONG id) {
         logf("import: finished window closed");
         break;
     case ID_IMPORT_NAME:
-        if (g_import.stage == boxer::ImportStage::Finished) commitImportName();
+        if (g_imports->stage() == boxer::ImportStage::Finished) commitImportName();
         break;
     case ID_IMPORT_COVER:
     case ID_IMPORT_WELL: {
-        if (g_import.stage != boxer::ImportStage::Finished) break;
+        if (g_imports->stage() != boxer::ImportStage::Finished) break;
         IPTR idx = 0;
         get(ui.impCover, MUIA_Cycle_Active, &idx);
-        changeCover(g_import.createdGamebox, id == ID_IMPORT_WELL ? -1 : (int)idx, ui.imp, ui.impWell, ui.impCover,
+        changeCover(g_imports->session().createdGamebox, id == ID_IMPORT_WELL ? -1 : (int)idx, ui.imp, ui.impWell, ui.impCover,
                     ui.impName);
         break;
     }
@@ -3235,38 +3216,38 @@ static bool handleId(ULONG id) {
         break;
     }
     case ID_IMPORT_CLOSE:
-        if (g_import.stage == boxer::ImportStage::RunningInstaller) {
+        if (g_imports->installing()) {
             if (sessionRunning()) askEndInstaller();
             break;
         }
-        if (g_import.stage == boxer::ImportStage::Finished) {
+        if (g_imports->stage() == boxer::ImportStage::Finished) {
             if (!commitImportName()) break;
             set(ui.imp, MUIA_Window_Open, FALSE);
             break;
         }
-        if (g_copy) {
+        if (g_imports->copying()) {
             handleId(ID_IMPORT_STOP);
-            if (g_copy) break;      // Cancel: keep copying
+            if (g_imports->copying()) break;      // Cancel: keep copying
             set(ui.imp, MUIA_Window_Open, FALSE);
             break;
         }
-        if (!g_import.createdGamebox.empty()) {
+        if (g_imports->holdsUnfinishedGamebox()) {
             // BXCloseAlert closeAlertWhileImportingGame.
-            const std::string name = g_import.gameName();
+            const std::string name = g_imports->gameName();
             LONG r = MUI_Request(ui.app, ui.imp, 0, (char *)"Boxer", (char *)"Stop Importing|Cancel",
                 (char *)"Boxer has not finished importing %s.\n\n"
                         "If you stop importing, any already-imported game files will be discarded.",
                 (IPTR)name.c_str());
             if (r != 1) break;
-            std::string err;
-            bool ok = g_import.discardGamebox(&err);
-            logf("import: stopped; unfinished gamebox %s%s", ok ? "deleted" : "NOT deleted: ", err.c_str());
+            const ImportOutcome o = g_imports->stop();
+            if (!o.removed)
+                MUI_Request(ui.app, ui.imp, 0, (char *)"Import a Game", (char *)"OK", (char *)"%s",
+                            (IPTR)o.cleanupError.c_str());
         }
-        // Nothing has been created at these stages, so closing only forgets
+        // Nothing of the import is left on disk now, so closing only forgets
         // the source (IS:311 asks first only once a gamebox exists).
-        g_import.cancelSourceSelection();
+        g_imports->windowClosed();
         set(ui.imp, MUIA_Window_Open, FALSE);
-        logf("import: window closed, nothing created");
         break;
     case ID_PROMPT: {
         logf("welcome: Open a DOS prompt -> DOS window");
@@ -3618,6 +3599,14 @@ int main(int argc, char **argv) {
         MUI_DisposeObject(ui.welcome); deleteClasses(); closeFonts(); memcp("end"); memDone(); return 0;
     }
     ui.imp = buildImport();
+    // The import's owner for the rest of main(): on every way out (the end
+    // below, an early return, an exception) an unfinished import removes
+    // its own gamebox. The guard after it unpublishes it first.
+    ImportController imports([](const std::string &l) { logf("%s", l.c_str()); }, importDecorate);
+    g_imports = &imports;
+    struct UnpublishImports {
+        ~UnpublishImports() { g_imports = nullptr; }
+    } unpublishImports;
     ui.app = ApplicationObject,
         MUIA_Application_Title, (IPTR)"BoxerUI",
         MUIA_Application_Base, (IPTR)"BOXERUI",
@@ -3788,34 +3777,23 @@ int main(int argc, char **argv) {
             if (g_app.quitApp) break;
             sigs = 0;
         }
-        if (g_inst.pending && g_sigMask && !g_app.ran) {
+        if (g_imports->installerPending() && g_sigMask && !g_app.ran) {
             set(ui.imp, MUIA_Window_Open, FALSE);
             const SessionResult r = runSession();
-            if (!importContinuesAfterInstaller(r.end, g_inst.stop)) {
-                if (sessionEndIsError(r.end)) {
-                    logf("import: installer session failed; the import stops");
-                    reportSession(r, "The installer of " + g_import.gameName());
-                }
-                g_inst.stop = true;
-            }
-            importAfterInstaller();
+            // A failed session ends the import (installerEnded); its error
+            // is shown first, while the gamebox is still named in it.
+            if (sessionEndIsError(r.end)) reportSession(r, "The installer of " + g_imports->gameName());
+            importAfterInstaller(g_imports->installerEnded(r.end, r.error));
             if (g_app.quitApp) break;
             sigs = 0;
         }
-        if (g_copy && g_import.stage == boxer::ImportStage::ImportingSourceFiles) {
-            std::string err;
-            if (!g_copy->step(256 * 1024, &err)) {
-                importAbandon(err);
+        if (g_imports->copying()) {
+            const ImportOutcome o = g_imports->copyStep(256 * 1024);
+            if (o.ended()) {
+                reportImportAbandoned(o);
             } else {
-                const uint64_t total = g_copy->totalBytes();
-                set(ui.impGauge, MUIA_Gauge_Current, total ? (LONG)(g_copy->copiedBytes() * 1000 / total) : 1000);
-                if (g_copy->finished()) {
-                    logf("import: copied %llu bytes", (unsigned long long)g_copy->copiedBytes());
-                    delete g_copy;
-                    g_copy = nullptr;
-                    g_import.stage = boxer::ImportStage::ChoosingStartupProgram;
-                    showImportStage();
-                }
+                set(ui.impGauge, MUIA_Gauge_Current, g_imports->copyPermille());
+                if (!g_imports->copying()) showImportStage();   // copied: on to the startup program
             }
             if (SetSignal(0, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C) break;
         } else if (sigs) {
@@ -3830,7 +3808,7 @@ int main(int argc, char **argv) {
         get(ui.welcome, MUIA_Window_Open, &w1); get(ui.dos, MUIA_Window_Open, &w2);
         get(ui.insp, MUIA_Window_Open, &w3); get(ui.fs, MUIA_Window_Open, &w4);
         IPTR w5 = 0; get(ui.imp, MUIA_Window_Open, &w5);
-        if (!w1 && !w2 && !w3 && !w4 && !w5 && !g_inst.pending) running = false;
+        if (!w1 && !w2 && !w3 && !w4 && !w5 && !g_imports->installerPending()) running = false;
     }
     // An Inspector rename waits for the session's end (its drives were
     // mounted from the old path); the gamebox and its icon are renamed now.
@@ -3840,13 +3818,9 @@ int main(int argc, char **argv) {
         g_pendingRename.clear();
     }
     // IS:1579 _cleanup: an import that did not finish takes its gamebox
-    // with it, and only that directory.
-    if (g_copy) { g_copy->close(); delete g_copy; g_copy = nullptr; }
-    if (!g_import.createdGamebox.empty() && g_import.stage != boxer::ImportStage::Finished) {
-        std::string err;
-        bool ok = g_import.discardGamebox(&err);
-        logf("import: unfinished at exit; gamebox %s%s", ok ? "deleted" : "NOT deleted: ", err.c_str());
-    }
+    // with it, and only that directory. Here, before the log closes; the
+    // controller's destructor does the same on any other way out of main.
+    g_imports->finishAtExit();
     // An old icon or settings file that a reader (Wanderer) still held when
     // it was replaced goes now; one still held is named, so it can be found.
     for (const auto &p : boxer::fsutil::retryPendingCleanup())
@@ -3864,6 +3838,7 @@ int main(int argc, char **argv) {
     closeInput();
     if (g_blankPointer) FreeVec(g_blankPointer);
     if (g_log) std::fclose(g_log);
+    g_log = nullptr;   // the import controller's destructor runs after this
     memcp("end");
     memDone();
     return 0;
