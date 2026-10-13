@@ -115,6 +115,19 @@ void AppDropTarget::answer() {
     } while (!last);
 }
 
+// The order is what makes a close safe with a drop in flight:
+// 1. Messages already queued on the port are answered (unread): their
+//    senders wait holding the Workbench semaphore shared.
+// 2. The answering process starts; from now on a drop that arrives is
+//    answered by it, not by this task.
+// 3. RemoveAppWindow: it takes the semaphore exclusively, so it returns
+//    only after every sender has its reply and let go; after it no sender
+//    can find the window, and Workbench keeps no pointer to it.
+// 4. The answerer is told to stop, drains once more and exits; its exit
+//    (ChildStatus) is waited for, so it never touches a port that is gone.
+// 5. Anything still on the port is answered. Only then may the caller
+//    close the Intuition window. Nothing taken from a message is a pointer
+//    into it: take() copies the paths before replying.
 unsigned AppDropTarget::detach() {
     if (!appWindow_) return 0;
     struct Message *m;

@@ -32,6 +32,25 @@ const char *dropKindName(DropKind kind) {
     return "?";
 }
 
+const char *dropRefusalName(DropRefusal refusal) {
+    switch (refusal) {
+    case DropRefusal::None: return "none";
+    case DropRefusal::OutsideZone: return "outside the buttons";
+    case DropRefusal::ImportUnavailable: return "import not available";
+    case DropRefusal::PromptTakesNoFolder: return "folder on the DOS prompt button";
+    case DropRefusal::Several: return "several items";
+    case DropRefusal::Volume: return "volume";
+    case DropRefusal::DiscImage: return "disc image";
+    case DropRefusal::File: return "file";
+    case DropRefusal::Missing: return "missing";
+    case DropRefusal::Unreadable: return "unreadable";
+    case DropRefusal::CopyRunning: return "copy running";
+    case DropRefusal::InstallerRunning: return "installer running";
+    case DropRefusal::UnfinishedImport: return "unfinished import";
+    }
+    return "?";
+}
+
 bool isDiscImageName(const std::string &name) {
     // Info.plist's image types (cue, ima, vfd, gog, inst) and the system
     // ones it relies on (iso, cdr, toast, img), plus the common PC formats.
@@ -99,8 +118,9 @@ DropZone welcomeZone(int x, int y, const DropRect &importButton, const DropRect 
     return DropZone::WelcomeElsewhere;
 }
 
-static DropPlan refuse(const std::string &message) {
+static DropPlan refuse(DropRefusal why, const std::string &message) {
     DropPlan p;
+    p.refusal = why;
     p.message = message;
     return p;
 }
@@ -111,30 +131,30 @@ static std::string quoted(const std::string &path) { return "\"" + path + "\""; 
 DropPlan planDrop(const DropClass &drop, DropZone zone, bool importAvailable, const ImportController &imports) {
     if (drop.kind == DropKind::Nothing) return {};
     if (zone == DropZone::WelcomeElsewhere)
-        return refuse("To import a game, drop its folder on \"Import a new game\".\n"
+        return refuse(DropRefusal::OutsideZone, "To import a game, drop its folder on \"Import a new game\".\n"
                       "To play a gamebox, drop it on \"Import a new game\" or \"Open a DOS prompt\".");
     if (zone == DropZone::WelcomeImport && !importAvailable)
-        return refuse("Boxer cannot import games until it has a games folder.");
+        return refuse(DropRefusal::ImportUnavailable, "Boxer cannot import games until it has a games folder.");
     switch (drop.kind) {
     case DropKind::Nothing:
         return {};
     case DropKind::Several:
-        return refuse(std::to_string(drop.count) + " items were dropped.\n\n"
+        return refuse(DropRefusal::Several, std::to_string(drop.count) + " items were dropped.\n\n"
                       "Boxer imports one game at a time: drop a single game folder or gamebox.");
     case DropKind::Volume:
-        return refuse(quoted(drop.path) + " is a whole disk.\n\n"
+        return refuse(DropRefusal::Volume, quoted(drop.path) + " is a whole disk.\n\n"
                       "Boxer imports one game folder at a time: open the disk and drop the game's folder.");
     case DropKind::DiscImage:
-        return refuse(quoted(drop.path) + " is a disc image.\n\n"
+        return refuse(DropRefusal::DiscImage, quoted(drop.path) + " is a disc image.\n\n"
                       "Boxer cannot import disc images yet: drop the folder that holds the game's files.");
     case DropKind::File:
-        return refuse(quoted(drop.path) + " is not a folder.\n\n"
+        return refuse(DropRefusal::File, quoted(drop.path) + " is not a folder.\n\n"
                       "Boxer can only import game folders for now: drop the folder that holds the game.");
     case DropKind::Missing:
-        return refuse(quoted(drop.path) + " could not be found.\n\n"
+        return refuse(DropRefusal::Missing, quoted(drop.path) + " could not be found.\n\n"
                       "Only its icon is there; the file or gamebox it belongs to may have been moved or deleted.");
     case DropKind::Unreadable:
-        return refuse("Boxer could not read the name of the dropped item (its path may be too long).");
+        return refuse(DropRefusal::Unreadable, "Boxer could not read the name of the dropped item (its path may be too long).");
     case DropKind::Gamebox: {
         DropPlan p;
         p.action = DropAction::OpenGame;
@@ -143,10 +163,17 @@ DropPlan planDrop(const DropClass &drop, DropZone zone, bool importAvailable, co
     }
     case DropKind::Folder: {
         if (zone == DropZone::WelcomePrompt)
-            return refuse("\"Open a DOS prompt\" cannot use a folder yet.\n\n"
+            return refuse(DropRefusal::PromptTakesNoFolder, "\"Open a DOS prompt\" cannot use a folder yet.\n\n"
                           "To import a game, drop its folder on \"Import a new game\".");
         std::string why;
-        if (!imports.acceptsSource(&why)) return refuse(why);
+        if (!imports.acceptsSource(&why)) {
+            switch (imports.busy()) {
+            case ImportController::Busy::Copying: return refuse(DropRefusal::CopyRunning, why);
+            case ImportController::Busy::Installer: return refuse(DropRefusal::InstallerRunning, why);
+            case ImportController::Busy::UnfinishedGamebox:
+            case ImportController::Busy::None: return refuse(DropRefusal::UnfinishedImport, why);
+            }
+        }
         DropPlan p;
         p.action = DropAction::Import;
         p.path = drop.path;
@@ -154,6 +181,17 @@ DropPlan planDrop(const DropClass &drop, DropZone zone, bool importAvailable, co
     }
     }
     return {};
+}
+
+GameStart startDroppedGame(const std::string &gamebox, const GameLauncher &launch) {
+    GameStart g;
+    std::string why;
+    g.started = launch && launch(gamebox, &why);
+    if (!g.started)
+        g.message = "The game could not be started:\n" + quoted(gamebox) + "\n" +
+                    (why.empty() ? std::string("") : why + "\n") +
+                    "\nOpen it from its icon in Wanderer. Anything else Boxer is doing goes on as before.";
+    return g;
 }
 
 }  // namespace boxer_ui

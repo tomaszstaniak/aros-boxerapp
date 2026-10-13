@@ -90,6 +90,7 @@
 #include <devices/input.h>
 #include <devices/inputevent.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <string>
@@ -3074,6 +3075,13 @@ static void closeDropWindow(Object *win) {
         if (dropWindowObject(i) != win || !g_dropTargets[i] || !g_dropTargets[i]->window()) continue;
         const unsigned unread = g_dropTargets[i]->detach();
         logf("drop: %s window closing, AppWindow removed (%u drop(s) answered unread)", dropWindowName(i), unread);
+        // A drop on this window taken but not yet handled (its message was
+        // answered when it was copied) is forgotten with the window.
+        if (g_dropWaiting && g_waitingDrop.window == i) {
+            logf("drop: %s: the waiting drop is dropped with its window", dropWindowName(i));
+            g_waitingDrop = WaitingDrop();
+            g_dropWaiting = false;
+        }
     }
     set(win, MUIA_Window_Open, FALSE);
 }
@@ -3143,10 +3151,14 @@ static const char *dropZoneName(DropZone z) {
 // game does (a Workbench start keeps no lock on this program's drawer, a
 // SystemTags start did); a gamebox without one is passed to PROGDIR:BoxerUI
 // as a Workbench argument, the way Wanderer passes a project to its tool.
-static void openDroppedGamebox(const std::string &gamebox, Object *window) {
+// workbench.library reports a failed start to nobody (its handler does the
+// LoadSeg later), so the start counts only once a new process named
+// BoxerUI is seen.
+static bool launchGamebox(const std::string &gamebox, std::string *why) {
     const std::string stem = boxer::fsutil::stripExtension(gamebox);
     std::string id, named;
     const bool sidecar = boxer::readSidecarToolTypes(stem, id, named) && (!id.empty() || !named.empty());
+    const std::vector<const void *> before = boxer::tasksNamed("BoxerUI");
     bool ok = false;
     std::string how;
     if (sidecar) {
@@ -3156,7 +3168,7 @@ static void openDroppedGamebox(const std::string &gamebox, Object *window) {
         const std::string tool = boxer::fsutil::join(g_progDir, "BoxerUI");
         how = "\"" + tool + "\" with \"" + gamebox + "\"";
         // Without its icon Workbench would start the tool as a Shell
-        // command with the default stack (and report a failure to nobody).
+        // command with the default stack.
         BPTR dir = exists(tool + ".info") ? Lock((CONST_STRPTR)boxer::fsutil::parent(gamebox).c_str(), SHARED_LOCK) : 0;
         struct Library *wb = dir ? OpenLibrary((STRPTR) "workbench.library", 44) : nullptr;
         if (wb) {
@@ -3170,11 +3182,27 @@ static void openDroppedGamebox(const std::string &gamebox, Object *window) {
         }
         if (dir) UnLock(dir);
     }
-    logf("drop: open gamebox \"%s\" via %s -> %s", gamebox.c_str(), how.c_str(), ok ? "started" : "failed");
-    if (!ok)
-        MUI_Request(ui.app, window, 0, (char *)"Boxer", (char *)"OK",
-                    (char *)"The game could not be started:\n%s\n\nOpen it from its icon in Wanderer.",
-                    (IPTR)gamebox.c_str());
+    if (!ok) {
+        if (why) *why = "Workbench did not accept it.";
+        logf("drop: open gamebox \"%s\" via %s -> refused by Workbench", gamebox.c_str(), how.c_str());
+        return false;
+    }
+    // Up to 20 s: the new process exists only after its handler has
+    // loaded BoxerUI, which is slow under emulation. Drops keep being
+    // answered meanwhile (dropSignal), so Wanderer is not held up.
+    set(ui.app, MUIA_Application_Sleep, TRUE);
+    bool seen = false;
+    for (int tick = 0; tick < 20 * 50 && !seen; tick += 10) {
+        Delay(10);
+        dropSignal();
+        for (const void *t : boxer::tasksNamed("BoxerUI"))
+            if (std::find(before.begin(), before.end(), t) == before.end()) seen = true;
+    }
+    set(ui.app, MUIA_Application_Sleep, FALSE);
+    logf("drop: open gamebox \"%s\" via %s -> %s", gamebox.c_str(), how.c_str(),
+         seen ? "started (new process seen)" : "no new process within 20 s");
+    if (!seen && why) *why = "No new Boxer process appeared.";
+    return seen;
 }
 
 // IS:importFromSourceURL from a drop: into the import window, which opens
@@ -3206,14 +3234,19 @@ static void handleDrop(const WaitingDrop &w) {
                                         : welcomeZone(w.drop.mouseX, w.drop.mouseY, objectRect(ui.wb[1]), objectRect(ui.wb[2]));
     const DropPlan plan = planDrop(c, zone, !g_gamesFolder.empty(), *g_imports);
     logf("drop: %s \"%s\" on the %s -> %s", dropKindName(c.kind), c.path.c_str(), dropZoneName(zone),
-         plan.action == DropAction::Import ? "import" : plan.action == DropAction::OpenGame ? "open game" : "nothing");
+         plan.action == DropAction::Import ? "import" : plan.action == DropAction::OpenGame ? "open game"
+                                                                                          : dropRefusalName(plan.refusal));
     switch (plan.action) {
     case DropAction::Import:
         importDroppedFolder(plan.path);
         break;
-    case DropAction::OpenGame:
-        openDroppedGamebox(plan.path, dropWindowObject(w.window));
+    case DropAction::OpenGame: {
+        const GameStart g = startDroppedGame(plan.path, launchGamebox);
+        if (!g.started)
+            MUI_Request(ui.app, dropWindowObject(w.window), 0, (char *)"Boxer", (char *)"OK", (char *)"%s",
+                        (IPTR)g.message.c_str());
         break;
+    }
     case DropAction::None:
         if (!plan.message.empty()) {
             logf("drop: refused: %s", plan.message.c_str());

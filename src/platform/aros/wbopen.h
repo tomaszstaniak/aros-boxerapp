@@ -13,6 +13,7 @@
 
 #include <dos/bptr.h>
 #include <string>
+#include <vector>
 
 struct AppMessage;
 
@@ -38,5 +39,12 @@ GameboxArg resolveGameboxArg(BPTR lock, const char *name, std::string &gamebox);
 
 // First gamebox among the arguments of an AppWindow/AppIcon message.
 GameboxArg gameboxFromAppMessage(const struct AppMessage *msg, std::string &gamebox);
+
+// The tasks and processes (other than the caller) whose name is `name`,
+// as identities to compare before and after a start. Workbench names a
+// process it starts after the tool's file name, and workbench.library
+// reports a failed start to nobody, so a new entry here is the only sign
+// that a start worked.
+std::vector<const void *> tasksNamed(const char *name);
 
 } // namespace boxer

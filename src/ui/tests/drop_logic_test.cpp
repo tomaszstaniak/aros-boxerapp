@@ -141,12 +141,13 @@ static void testPlans() {
     const DropClass box = classifyDrop({named(fu::join(f.games, "Dune 2"))});
 
     DropPlan p = planDrop(folder, DropZone::WelcomeImport, true, idle);
-    CHECK(p.action == DropAction::Import && p.path == f.folder && p.message.empty());
+    CHECK(p.action == DropAction::Import && p.path == f.folder && p.message.empty() && p.refusal == DropRefusal::None);
     p = planDrop(folder, DropZone::ImportWindow, true, idle);
     CHECK(p.action == DropAction::Import && p.path == f.folder);
     // The DOS prompt button opens gameboxes only.
     p = planDrop(folder, DropZone::WelcomePrompt, true, idle);
-    CHECK(p.action == DropAction::None && p.message.find("Import a new game") != std::string::npos);
+    CHECK(p.action == DropAction::None && p.refusal == DropRefusal::PromptTakesNoFolder);
+    CHECK(p.message.find("Import a new game") != std::string::npos);
     p = planDrop(box, DropZone::WelcomePrompt, true, idle);
     CHECK(p.action == DropAction::OpenGame && p.path == f.box);
     p = planDrop(box, DropZone::WelcomeImport, true, idle);
@@ -158,24 +159,25 @@ static void testPlans() {
     // whatever was dropped.
     for (const DropClass &c : {folder, box}) {
         p = planDrop(c, DropZone::WelcomeElsewhere, true, idle);
-        CHECK(p.action == DropAction::None && !p.message.empty());
+        CHECK(p.action == DropAction::None && p.refusal == DropRefusal::OutsideZone && !p.message.empty());
         p = planDrop(c, DropZone::WelcomeImport, false, idle);
-        CHECK(p.action == DropAction::None && p.message.find("games folder") != std::string::npos);
+        CHECK(p.action == DropAction::None && p.refusal == DropRefusal::ImportUnavailable);
+        CHECK(p.message.find("games folder") != std::string::npos);
     }
 
     // Unsupported objects: a sentence each, in every zone that takes drops.
-    const struct { DropClass c; const char *says; } refused[] = {
-        {classifyDrop({{"Work:", false}}), "whole disk"},
-        {classifyDrop({named(f.image)}), "disc image"},
-        {classifyDrop({named(f.file)}), "not a folder"},
-        {classifyDrop({named(fu::join(f.games, "Gone"))}), "could not be found"},
-        {classifyDrop({{"", true}}), "could not read"},
-        {classifyDrop({drawer(f.folder), drawer(f.box)}), "2 items"},
+    const struct { DropClass c; DropRefusal why; const char *says; } refused[] = {
+        {classifyDrop({{"Work:", false}}), DropRefusal::Volume, "whole disk"},
+        {classifyDrop({named(f.image)}), DropRefusal::DiscImage, "disc image"},
+        {classifyDrop({named(f.file)}), DropRefusal::File, "not a folder"},
+        {classifyDrop({named(fu::join(f.games, "Gone"))}), DropRefusal::Missing, "could not be found"},
+        {classifyDrop({{"", true}}), DropRefusal::Unreadable, "could not read"},
+        {classifyDrop({drawer(f.folder), drawer(f.box)}), DropRefusal::Several, "2 items"},
     };
     for (const auto &r : refused)
         for (DropZone z : {DropZone::WelcomeImport, DropZone::WelcomePrompt, DropZone::ImportWindow}) {
             p = planDrop(r.c, z, true, idle);
-            CHECK(p.action == DropAction::None && p.message.find(r.says) != std::string::npos);
+            CHECK(p.action == DropAction::None && p.refusal == r.why && p.message.find(r.says) != std::string::npos);
         }
     CHECK(planDrop(DropClass{}, DropZone::ImportWindow, true, idle).message.empty());
 
@@ -189,13 +191,53 @@ static void testPlans() {
     const std::string madeBox = busy.session().createdGamebox;
     const DropClass other = classifyDrop({drawer(f.base)});
     p = planDrop(other, DropZone::ImportWindow, true, busy);
-    CHECK(p.action == DropAction::None && p.message.find("still importing") != std::string::npos);
+    CHECK(p.action == DropAction::None && p.refusal == DropRefusal::CopyRunning);
+    CHECK(p.message.find("still copying") != std::string::npos);
     p = planDrop(other, DropZone::WelcomeImport, true, busy);
-    CHECK(p.action == DropAction::None && p.message.find("Commander Keen") != std::string::npos);
+    CHECK(p.refusal == DropRefusal::CopyRunning && p.message.find("Commander Keen") != std::string::npos);
     p = planDrop(box, DropZone::WelcomeImport, true, busy);
-    CHECK(p.action == DropAction::OpenGame);
+    CHECK(p.action == DropAction::OpenGame && p.refusal == DropRefusal::None);
     CHECK(busy.copying() && busy.session().sourcePath == f.folder && busy.session().createdGamebox == madeBox);
+
+    // The gamebox cannot be started (Workbench refused it, or no new process
+    // appeared): the user is told, and the copy goes on exactly as it was.
+    const uint64_t copiedBefore = busy.copiedBytes();
+    const boxer::ImportStage stageBefore = busy.stage();
+    std::string launched;
+    GameStart g = startDroppedGame(p.path, [&](const std::string &gb, std::string *why) {
+        launched = gb;
+        *why = "No new Boxer process appeared.";
+        return false;
+    });
+    CHECK(!g.started && launched == f.box);
+    CHECK(g.message.find(f.box) != std::string::npos && g.message.find("No new Boxer process") != std::string::npos);
+    CHECK(busy.copying() && busy.stage() == stageBefore && busy.copiedBytes() == copiedBefore);
+    CHECK(busy.session().sourcePath == f.folder && busy.session().createdGamebox == madeBox && fu::isDirectory(madeBox));
+    // A launch that works says nothing; no launcher at all is a failure.
+    g = startDroppedGame(p.path, [](const std::string &, std::string *) { return true; });
+    CHECK(g.started && g.message.empty());
+    CHECK(!startDroppedGame(p.path, GameLauncher()).started);
+    // Copied, startup program not yet chosen: refused as an unfinished import.
+    int guard = 0;
+    while (busy.copying() && guard++ < 1000) busy.copyStep(65536);
+    p = planDrop(other, DropZone::ImportWindow, true, busy);
+    CHECK(p.refusal == DropRefusal::UnfinishedImport && p.message.find("gamebox") != std::string::npos);
+    g = startDroppedGame(box.path, [](const std::string &, std::string *why) { *why = "refused"; return false; });
+    CHECK(!g.started && busy.stage() == boxer::ImportStage::ChoosingStartupProgram && fu::isDirectory(madeBox));
     CHECK(busy.stop().removed && !fu::exists(madeBox));
+
+    // The installer is running: refused with that reason.
+    const std::string withInstaller = fu::join(f.base, "Setup Game");
+    put(fu::join(withInstaller, "INSTALL.EXE"), dosExe());
+    ImportController inst;
+    CHECK(inst.chooseSource(withInstaller, f.loc, f.games, &msg) == boxer::SourceCheck::Ok);
+    CHECK(inst.applyScan(scan(withInstaller), withInstaller));
+    CHECK(!inst.launchInstaller(0, f.games).refused() && inst.installing());
+    p = planDrop(folder, DropZone::WelcomeImport, true, inst);
+    CHECK(p.action == DropAction::None && p.refusal == DropRefusal::InstallerRunning);
+    CHECK(p.message.find("installer of \"Setup Game\"") != std::string::npos);
+    CHECK(planDrop(box, DropZone::WelcomePrompt, true, inst).action == DropAction::OpenGame);
+    CHECK(inst.installing() && inst.finishAtExit().removed);
     // Stopped: drops are taken again.
     CHECK(planDrop(folder, DropZone::ImportWindow, true, busy).action == DropAction::Import);
 }

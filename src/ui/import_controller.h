@@ -108,10 +108,18 @@ public:
     enum class Open { Started, Resumed, Busy };
     Open open();
 
-    // A new source may be taken (from the folder requester or a drop):
-    // false, with the sentence for the user, while the import copies, runs
-    // its installer or holds an unfinished gamebox. That import is neither
+    // Why no new source may be taken now. The import named here is neither
     // interrupted nor forgotten; the new source is simply not taken.
+    enum class Busy {
+        None,
+        Copying,            // its files are being copied into its gamebox
+        Installer,          // its installer is waiting to run or running
+        UnfinishedGamebox,  // its gamebox exists, the import has not finished
+    };
+    Busy busy() const;
+    // A new source may be taken (from the folder requester or a drop):
+    // false while busy(), with the sentence for the user naming the game
+    // and that reason.
     bool acceptsSource(std::string *why = nullptr) const;
     // IS:importFromSourceURL. Before the gamebox exists the user may point
     // at another folder: an accepted one replaces the source and drops the

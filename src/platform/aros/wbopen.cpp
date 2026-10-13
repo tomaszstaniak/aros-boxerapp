@@ -3,11 +3,14 @@
 
 #include "wbopen.h"
 
+#include <exec/execbase.h>
 #include <proto/dos.h>
+#include <proto/exec.h>
 #include <workbench/startup.h>
 #include <workbench/workbench.h>
 
 #include <cctype>
+#include <cstring>
 
 namespace boxer {
 
@@ -89,6 +92,20 @@ GameboxArg gameboxFromAppMessage(const struct AppMessage *msg, std::string &game
         if (k != GameboxArg::None && k != GameboxArg::Missing) return k;
     }
     return GameboxArg::None;
+}
+
+std::vector<const void *> tasksNamed(const char *name) {
+    std::vector<const void *> out;
+    out.reserve(16);
+    // Only pointers are copied under Forbid (no allocation: the vector has
+    // room for more processes of one name than a user runs).
+    Forbid();
+    struct List *lists[2] = {&SysBase->TaskReady, &SysBase->TaskWait};
+    for (struct List *l : lists)
+        for (struct Node *n = l->lh_Head; n->ln_Succ; n = n->ln_Succ)
+            if (n->ln_Name && !std::strcmp(n->ln_Name, name) && out.size() < out.capacity()) out.push_back(n);
+    Permit();
+    return out;
 }
 
 } // namespace boxer

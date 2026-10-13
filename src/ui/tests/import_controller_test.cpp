@@ -500,7 +500,7 @@ static void testReplaceSourceBeforeGamebox() {
 
     // A refused folder: the installer choice of the first source stays.
     std::string msg;
-    CHECK(c.acceptsSource(&msg) && msg.empty());
+    CHECK(c.acceptsSource(&msg) && msg.empty() && c.busy() == ImportController::Busy::None);
     CHECK(c.chooseSource(f.games, f.loc, f.games, &msg) == boxer::SourceCheck::GamesFolder && !msg.empty());
     CHECK(c.stage() == ImportStage::WaitingForInstaller && c.session().sourcePath == f.src);
     CHECK(c.session().scan.installers.size() == 1);
@@ -555,7 +555,8 @@ static void testRefuseSourceWhileBusy() {
     CHECK(!c.startCopy(f.games).refused());
     CHECK(!c.copyStep(65536).ended() && c.copying());
     const uint64_t copied = c.copiedBytes();
-    CHECK(!c.acceptsSource(&msg) && msg.find("still importing") != std::string::npos);
+    CHECK(c.busy() == ImportController::Busy::Copying);
+    CHECK(!c.acceptsSource(&msg) && msg.find("still copying") != std::string::npos);
     CHECK(msg.find("Tyrian 2000 (3)") != std::string::npos);
     msg.clear();
     CHECK(c.chooseSource(other, f.loc, f.games, &msg) != boxer::SourceCheck::Ok && !msg.empty());
@@ -565,7 +566,9 @@ static void testRefuseSourceWhileBusy() {
     CHECK(c.stage() == ImportStage::ChoosingStartupProgram);
     CHECK(get(fu::join(expectedBox(f), "C.harddisk/tyrian20/DATA/LEVEL1.DAT")).size() == 200000);
     // Copied, startup program not chosen: still unfinished, still refused.
+    CHECK(c.busy() == ImportController::Busy::UnfinishedGamebox);
     CHECK(!c.acceptsSource(&msg) && msg.find("has not finished") != std::string::npos);
+    CHECK(msg.find("gamebox") != std::string::npos);
     CHECK(c.chooseSource(other, f.loc, f.games, &msg) != boxer::SourceCheck::Ok);
     CHECK(c.stage() == ImportStage::ChoosingStartupProgram && c.session().sourcePath == f.src);
     // Finished: a new import may start (open() first).
@@ -579,7 +582,8 @@ static void testRefuseSourceWhileBusy() {
     ImportController d;
     CHECK(chooseAndScan(d, f));
     CHECK(!d.launchInstaller(0, f.games).refused());
-    CHECK(!d.acceptsSource(&msg) && msg.find("installer") != std::string::npos);
+    CHECK(d.busy() == ImportController::Busy::Installer);
+    CHECK(!d.acceptsSource(&msg) && msg.find("installer of") != std::string::npos);
     CHECK(d.chooseSource(other, f.loc, f.games, &msg) != boxer::SourceCheck::Ok);
     CHECK(d.installing() && d.installerPending() && d.session().installerPath == "INSTALL.EXE");
     CHECK(d.finishAtExit().removed);

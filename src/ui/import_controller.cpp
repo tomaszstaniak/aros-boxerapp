@@ -70,23 +70,36 @@ ImportController::Open ImportController::open() {
     return Open::Started;
 }
 
+ImportController::Busy ImportController::busy() const {
+    if (installerPending_ || installing()) return Busy::Installer;
+    if (copying_) return Busy::Copying;
+    if (holdsUnfinishedGamebox()) return Busy::UnfinishedGamebox;
+    return Busy::None;
+}
+
 bool ImportController::acceptsSource(std::string *why) const {
-    auto refuse = [&](const std::string &text) {
-        if (why) *why = text;
-        return false;
-    };
     const std::string name = "\"" + s_.gameName() + "\"";
-    if (installerPending_ || installing())
-        return refuse("Boxer is running the installer of " + name +
-                      ".\n\nFinish or stop that import before importing another game.");
-    if (copying_)
-        return refuse("Boxer is still importing " + name +
-                      ".\n\nWait until it has finished, or stop it, before importing another game.");
-    if (holdsUnfinishedGamebox())
-        return refuse("The import of " + name +
-                      " has not finished.\n\nFinish it, or stop it, before importing another game.");
-    if (why) why->clear();
-    return true;
+    std::string text;
+    switch (busy()) {
+    case Busy::None:
+        if (why) why->clear();
+        return true;
+    case Busy::Installer:
+        text = "The installer of " + name + " is running.\n\n"
+               "Finish or stop that import before importing another game.";
+        break;
+    case Busy::Copying:
+        text = "Boxer is still copying the files of " + name + " into its gamebox.\n\n"
+               "Wait until the copy has finished, or stop it, before importing another game.";
+        break;
+    case Busy::UnfinishedGamebox:
+        text = "The import of " + name + " has not finished: its gamebox has been made, "
+               "but the import is not complete.\n\n"
+               "Finish it, or stop it, before importing another game.";
+        break;
+    }
+    if (why) *why = text;
+    return false;
 }
 
 boxer::SourceCheck ImportController::chooseSource(const std::string &path, const boxer::DataLocations &locations,

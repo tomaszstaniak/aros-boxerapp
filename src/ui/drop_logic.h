@@ -21,6 +21,7 @@
 #ifndef BOXER_UI_DROP_LOGIC_H
 #define BOXER_UI_DROP_LOGIC_H
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -77,8 +78,23 @@ enum class DropAction {
     Import,     // `path` becomes the import's source (chooseSource and its checks)
     OpenGame,   // `path`, a gamebox, opens in a new BoxerUI process
 };
+// Why nothing starts: each refusal has its own reason, and its message
+// says it in words.
+enum class DropRefusal {
+    None,               // not refused (or nothing was dropped)
+    OutsideZone,        // on the Welcome window, not on a button that takes drops
+    ImportUnavailable,  // on the ghosted Import button (no games folder)
+    PromptTakesNoFolder,// a folder on "Open a DOS prompt"
+    Several, Volume, DiscImage, File, Missing, Unreadable,   // as DropKind
+    CopyRunning,        // the import is copying (ImportController::Busy)
+    InstallerRunning,   // the import's installer is waiting or running
+    UnfinishedImport,   // the import holds its unfinished gamebox
+};
+const char *dropRefusalName(DropRefusal refusal);
+
 struct DropPlan {
     DropAction action = DropAction::None;
+    DropRefusal refusal = DropRefusal::None;
     std::string path;
     std::string message;
 };
@@ -88,6 +104,17 @@ struct DropPlan {
 // the import cannot take a new source (ImportController::acceptsSource);
 // a gamebox opens whatever the import is doing, since it does not touch it.
 DropPlan planDrop(const DropClass &drop, DropZone zone, bool importAvailable, const ImportController &imports);
+
+// Carries out an OpenGame plan with `launch`, which starts the gamebox in
+// a new process and says whether that process was seen (with a reason when
+// not). The import is not touched either way: a launch that fails only
+// returns the sentence for the user.
+using GameLauncher = std::function<bool(const std::string &gamebox, std::string *why)>;
+struct GameStart {
+    bool started = false;
+    std::string message;   // for the user when not started
+};
+GameStart startDroppedGame(const std::string &gamebox, const GameLauncher &launch);
 
 }  // namespace boxer_ui
 #endif
