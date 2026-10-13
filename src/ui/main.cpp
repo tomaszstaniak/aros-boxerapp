@@ -47,6 +47,7 @@
 #include "gfx.h"
 #include "ui_logic.h"
 #include "session.h"
+#include "drop_logic.h"
 #include "import_controller.h"
 #include "launchpanel_logic.h"
 #include "coverassets.h"
@@ -63,6 +64,7 @@
 #include "../model/gamebox.h"
 #include "../model/programs.h"
 #include "../model/shadowfs.h"
+#include "../platform/aros/appdrop.h"
 #include "../platform/aros/coreinput.h"
 #include "../platform/aros/coverio.h"
 #include "../platform/aros/corecontrol.h"
@@ -292,6 +294,19 @@ static std::string g_gamesFolder;   // from the prefs; "" until chosen
 // steps from the main loop, so the Gauge moves and Stop is heard between
 // them (cancelSourceFileImport, IS:1070).
 static ImportController *g_imports;
+
+// Icons dropped on the Welcome window (0) and the Import window (1). The
+// ports live as long as main(); the windows are registered while open.
+// A drop is copied and answered inside Zune's input loop (dropSignal),
+// then handled from the main loop or the session's event service, never
+// from inside Zune's dispatch, so its requesters run where the others do.
+static boxer::AppDropTarget *g_dropTargets[2];
+struct WaitingDrop {
+    int window = 0;
+    boxer::AppDrop drop;
+};
+static WaitingDrop g_waitingDrop;
+static bool g_dropWaiting, g_dropBusy;
 
 static const char *kTabLabels[5] = {"Gamebox", "CPU", "Mouse", "Joystick", "Drives"};
 static const char *kTabTitles[5] = {"Gamebox Inspector", "CPU Inspector", "Mouse Inspector",
@@ -974,6 +989,8 @@ static bool sessionRunning() { return g_session && g_session->running; }
 
 static ULONG g_sigMask;
 static bool handleId(ULONG id);
+static void dropSync();
+static void serviceDrops();
 static void updateStatus();
 
 static Object *activeRender() { return st.fullscreen ? ui.fsRender : ui.render; }
@@ -1559,6 +1576,8 @@ static void serviceSignals(ULONG got) {
             g_session->emu->requestQuit();
         }
     }
+    dropSync();
+    serviceDrops();
     if (g_renderResized) {
         g_renderResized = false;
         if (windowOpen(ui.dos)) correctAspect();
@@ -3043,6 +3062,182 @@ static void takeImportSource(std::string d) {
     showImportStage();
 }
 
+// ---- icons dropped on the Welcome and the Import window --------------------
+static Object *dropWindowObject(int i) { return i == 0 ? ui.welcome : ui.imp; }
+static const char *dropWindowName(int i) { return i == 0 ? "welcome" : "import"; }
+
+// Every close of a drop window goes through here: the AppWindow is removed
+// while the window is still open (appdrop.h says how a drop in flight is
+// answered meanwhile), so Wanderer never holds a window that is gone.
+static void closeDropWindow(Object *win) {
+    for (int i = 0; i < 2; ++i) {
+        if (dropWindowObject(i) != win || !g_dropTargets[i] || !g_dropTargets[i]->window()) continue;
+        const unsigned unread = g_dropTargets[i]->detach();
+        logf("drop: %s window closing, AppWindow removed (%u drop(s) answered unread)", dropWindowName(i), unread);
+    }
+    set(win, MUIA_Window_Open, FALSE);
+}
+
+// Registers a drop window once it is open, and catches a window that Zune
+// closed or reopened on its own (a screen or prefs change): its old
+// registration goes, the new window is registered. Called from the main
+// loop and the session's event service.
+static void dropSync() {
+    for (int i = 0; i < 2; ++i) {
+        boxer::AppDropTarget *t = g_dropTargets[i];
+        if (!t) continue;
+        struct Window *w = nullptr;
+        get(dropWindowObject(i), MUIA_Window_Window, &w);
+        if (w == t->window()) continue;
+        if (t->window()) {
+            const unsigned unread = t->detach();
+            logf("drop: %s window closed by Zune; AppWindow removed (%u answered unread)", dropWindowName(i), unread);
+        }
+        if (w) logf("drop: %s window takes drops: %s", dropWindowName(i), t->attach(w) ? "yes" : "NO (AddAppWindow failed)");
+    }
+}
+
+// Zune's input handler for the drop ports: copies and answers every
+// message at once (Wanderer waits for the reply). One drop waits to be
+// handled; one that comes while another waits is answered and only logged.
+static void dropSignal() {
+    for (int i = 0; i < 2; ++i) {
+        boxer::AppDrop d;
+        while (g_dropTargets[i] && g_dropTargets[i]->take(d)) {
+            if (d.count == 0) {
+                logf("drop: %s: a message without objects, answered", dropWindowName(i));
+                continue;
+            }
+            if (g_dropWaiting) {
+                logf("drop: %s: %u item(s) ignored, another drop is waiting", dropWindowName(i), (unsigned)d.count);
+                continue;
+            }
+            logf("drop: %s: %u item(s) at %d,%d, first \"%s\"", dropWindowName(i), (unsigned)d.count, d.mouseX,
+                 d.mouseY, d.args.empty() ? "" : d.args[0].path.c_str());
+            g_waitingDrop.window = i;
+            g_waitingDrop.drop = std::move(d);
+            g_dropWaiting = true;
+        }
+    }
+}
+
+static DropRect objectRect(Object *o) {
+    IPTR l = 0, t = 0, w = 0, h = 0;
+    get(o, MUIA_LeftEdge, &l); get(o, MUIA_TopEdge, &t); get(o, MUIA_Width, &w); get(o, MUIA_Height, &h);
+    return DropRect{(int)l, (int)t, (int)w, (int)h};
+}
+
+static const char *dropZoneName(DropZone z) {
+    switch (z) {
+    case DropZone::WelcomeImport: return "Import button";
+    case DropZone::WelcomePrompt: return "DOS prompt button";
+    case DropZone::WelcomeElsewhere: return "Welcome window outside the buttons";
+    case DropZone::ImportWindow: return "Import window";
+    }
+    return "?";
+}
+
+// BXAppController openDocument for a gamebox, but always in a new BoxerUI
+// process: this one may have used its one core run, and the import, if
+// any, goes on here untouched. Its own sidecar icon is opened as Launch
+// game does (a Workbench start keeps no lock on this program's drawer, a
+// SystemTags start did); a gamebox without one is passed to PROGDIR:BoxerUI
+// as a Workbench argument, the way Wanderer passes a project to its tool.
+static void openDroppedGamebox(const std::string &gamebox, Object *window) {
+    const std::string stem = boxer::fsutil::stripExtension(gamebox);
+    std::string id, named;
+    const bool sidecar = boxer::readSidecarToolTypes(stem, id, named) && (!id.empty() || !named.empty());
+    bool ok = false;
+    std::string how;
+    if (sidecar) {
+        how = "icon \"" + stem + "\"";
+        ok = openInWanderer(stem);
+    } else {
+        const std::string tool = boxer::fsutil::join(g_progDir, "BoxerUI");
+        how = "\"" + tool + "\" with \"" + gamebox + "\"";
+        // Without its icon Workbench would start the tool as a Shell
+        // command with the default stack (and report a failure to nobody).
+        BPTR dir = exists(tool + ".info") ? Lock((CONST_STRPTR)boxer::fsutil::parent(gamebox).c_str(), SHARED_LOCK) : 0;
+        struct Library *wb = dir ? OpenLibrary((STRPTR) "workbench.library", 44) : nullptr;
+        if (wb) {
+            const std::string name = boxer::fsutil::baseName(gamebox);
+            struct Library *saved = WorkbenchBase;
+            WorkbenchBase = wb;
+            ok = OpenWorkbenchObject((STRPTR)tool.c_str(), WBOPENA_ArgLock, (IPTR)dir, WBOPENA_ArgName,
+                                     (IPTR)name.c_str(), TAG_DONE);
+            WorkbenchBase = saved;
+            CloseLibrary(wb);
+        }
+        if (dir) UnLock(dir);
+    }
+    logf("drop: open gamebox \"%s\" via %s -> %s", gamebox.c_str(), how.c_str(), ok ? "started" : "failed");
+    if (!ok)
+        MUI_Request(ui.app, window, 0, (char *)"Boxer", (char *)"OK",
+                    (char *)"The game could not be started:\n%s\n\nOpen it from its icon in Wanderer.",
+                    (IPTR)gamebox.c_str());
+}
+
+// IS:importFromSourceURL from a drop: into the import window, which opens
+// on a fresh import when it was closed or showed a finished one.
+static void importDroppedFolder(const std::string &folder) {
+    const bool shown = windowOpen(ui.imp);
+    if (!shown || g_imports->stage() == boxer::ImportStage::Finished) {
+        // A name being typed for the finished game is kept first, as
+        // Close does; a refused one keeps the finished panel.
+        if (shown && !commitImportName()) return;
+        if (g_imports->open() != ImportController::Open::Started) {
+            logf("drop: the import could not start fresh; folder not taken");
+            return;
+        }
+        set(ui.impPages, MUIA_Group_ActivePage, 0);
+        set(ui.imp, MUIA_Window_Open, TRUE);
+        logf("import: window opened by a drop");
+    }
+    takeImportSource(folder);
+}
+
+static void handleDrop(const WaitingDrop &w) {
+    std::vector<DropItem> items;
+    for (const auto &a : w.drop.args) items.push_back(DropItem{a.path, a.named});
+    // Beyond the copied names only the count matters: several are refused.
+    while (items.size() < w.drop.count) items.push_back(DropItem{});
+    const DropClass c = withoutVolumeRequesters([&] { return classifyDrop(items); });
+    const DropZone zone = w.window == 1 ? DropZone::ImportWindow
+                                        : welcomeZone(w.drop.mouseX, w.drop.mouseY, objectRect(ui.wb[1]), objectRect(ui.wb[2]));
+    const DropPlan plan = planDrop(c, zone, !g_gamesFolder.empty(), *g_imports);
+    logf("drop: %s \"%s\" on the %s -> %s", dropKindName(c.kind), c.path.c_str(), dropZoneName(zone),
+         plan.action == DropAction::Import ? "import" : plan.action == DropAction::OpenGame ? "open game" : "nothing");
+    switch (plan.action) {
+    case DropAction::Import:
+        importDroppedFolder(plan.path);
+        break;
+    case DropAction::OpenGame:
+        openDroppedGamebox(plan.path, dropWindowObject(w.window));
+        break;
+    case DropAction::None:
+        if (!plan.message.empty()) {
+            logf("drop: refused: %s", plan.message.c_str());
+            MUI_Request(ui.app, dropWindowObject(w.window), 0, (char *)"Boxer", (char *)"OK", (char *)"%s",
+                        (IPTR)plan.message.c_str());
+        }
+        break;
+    }
+}
+
+// The waiting drop, outside Zune's dispatch. A drop that arrives while one
+// is handled (its requester open) waits and is handled right after.
+static void serviceDrops() {
+    if (g_dropBusy) return;
+    g_dropBusy = true;
+    while (g_dropWaiting) {
+        const WaitingDrop w = std::move(g_waitingDrop);
+        g_waitingDrop = WaitingDrop();
+        g_dropWaiting = false;
+        handleDrop(w);
+    }
+    g_dropBusy = false;
+}
+
 // BXCloseAlert closeAlertWhileRunningInstaller. Returns false for Cancel.
 static bool askEndInstaller() {
     const std::string name = g_imports->gameName();
@@ -3077,7 +3272,7 @@ static bool handleId(ULONG id) {
         return false;
     case ID_WELCOME_CLOSE:
         logf("welcome: close");
-        set(ui.welcome, MUIA_Window_Open, FALSE);
+        closeDropWindow(ui.welcome);
         break;
     case ID_BROWSE:
         browseGames();
@@ -3200,7 +3395,7 @@ static bool handleId(ULONG id) {
     }
     case ID_IMPORT_DONE_CLOSE:
         if (!commitImportName()) break;
-        set(ui.imp, MUIA_Window_Open, FALSE);
+        closeDropWindow(ui.imp);
         logf("import: finished window closed");
         break;
     case ID_IMPORT_NAME:
@@ -3233,13 +3428,13 @@ static bool handleId(ULONG id) {
         }
         if (g_imports->stage() == boxer::ImportStage::Finished) {
             if (!commitImportName()) break;
-            set(ui.imp, MUIA_Window_Open, FALSE);
+            closeDropWindow(ui.imp);
             break;
         }
         if (g_imports->copying()) {
             handleId(ID_IMPORT_STOP);
             if (g_imports->copying()) break;      // Cancel: keep copying
-            set(ui.imp, MUIA_Window_Open, FALSE);
+            closeDropWindow(ui.imp);
             break;
         }
         if (g_imports->holdsUnfinishedGamebox()) {
@@ -3258,7 +3453,7 @@ static bool handleId(ULONG id) {
         // Nothing of the import is left on disk now, so closing only forgets
         // the source (IS:311 asks first only once a gamebox exists).
         g_imports->windowClosed();
-        set(ui.imp, MUIA_Window_Open, FALSE);
+        closeDropWindow(ui.imp);
         break;
     case ID_PROMPT: {
         logf("welcome: Open a DOS prompt -> DOS window");
@@ -3635,6 +3830,36 @@ int main(int argc, char **argv) {
         MUI_DisposeObject(ui.app); memcp("app-disposed");
         deleteClasses(); closeFonts(); memcp("end"); memDone(); return 0;
     }
+    // Drops (see g_dropTargets). Zune waits on the ports' signals with its
+    // own; the welcome view is only the handler's target object. On every
+    // way out of main the windows are unregistered before they go (the
+    // guard; the normal end does it before disposing the application).
+    boxer::AppDropTarget dropWelcome, dropImport;
+    struct MUI_InputHandlerNode dropIhn = {};
+    struct DropGuard {
+        struct MUI_InputHandlerNode *ihn = nullptr;
+        ~DropGuard() { release(); }
+        void release() {
+            // The handler first: Zune must stop waiting on the ports' signal
+            // bits before the ports give them back.
+            if (ihn) { DoMethod(ui.app, MUIM_Application_RemInputHandler, (IPTR)ihn); ihn = nullptr; }
+            g_signal = nullptr;
+            for (auto *&t : g_dropTargets)
+                if (t) { t->close(); t = nullptr; }
+        }
+    } dropGuard;
+    if (dropWelcome.create() && dropImport.create()) {
+        g_dropTargets[0] = &dropWelcome;
+        g_dropTargets[1] = &dropImport;
+        g_signal = dropSignal;
+        dropIhn.ihn_Object = ui.welcomeView;
+        dropIhn.ihn_Signals = dropWelcome.signalMask() | dropImport.signalMask();
+        dropIhn.ihn_Method = PGM_Signal;
+        DoMethod(ui.app, MUIM_Application_AddInputHandler, (IPTR)&dropIhn);
+        dropGuard.ihn = &dropIhn;
+    } else {
+        logf("drop: no AppWindow ports (workbench.library?); drops are not taken");
+    }
     g_renderClick = renderClicked;
     g_renderEvents = {sessionKey, sessionMouseMove, sessionButton, sessionCommandKey};
     g_onFullscreenChanged = fullscreenChanged;
@@ -3770,6 +3995,8 @@ int main(int argc, char **argv) {
         if (sigs) g_sigMask |= sigs;
         running = handleId(id);
         if (!running) break;
+        dropSync();
+        serviceDrops();
         // "Open a DOS prompt" opened the window for this session: it closes
         // too if the session cannot be prepared (for example without CONFDIR).
         if (g_args.kind == "dos-pending") { g_args.kind = "dos"; sessionWanted = true; dosWindowForSession = true; }
@@ -3789,7 +4016,7 @@ int main(int argc, char **argv) {
             sigs = 0;
         }
         if (g_imports->installerPending() && g_sigMask && !g_app.ran) {
-            set(ui.imp, MUIA_Window_Open, FALSE);
+            closeDropWindow(ui.imp);
             const SessionResult r = runSession();
             // A failed session ends the import (installerEnded); its error
             // is shown first, while the gamebox is still named in it.
@@ -3839,6 +4066,7 @@ int main(int argc, char **argv) {
     logf("exit");
     dumpGeometry("exit");
     if (g_laterArmed) DoMethod(ui.app, MUIM_Application_RemInputHandler, (IPTR)&g_laterIhn);
+    dropGuard.release();
     memcp("loop-left");
     MUI_DisposeObject(ui.app);
     memcp("app-disposed");

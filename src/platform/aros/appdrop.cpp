@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 Tomasz Staniak
+
+#include "appdrop.h"
+
+#include <dos/dos.h>
+#include <dos/dostags.h>
+#include <exec/tasks.h>
+#include <proto/dos.h>
+#include <proto/exec.h>
+#include <workbench/startup.h>
+#include <workbench/workbench.h>
+
+// A base of its own: main.cpp opens workbench.library only around single
+// calls (openInWanderer) and puts its global back afterwards.
+static struct Library *g_dropWB;
+static int g_dropWBUsers;
+#define __WORKBENCH_LIBBASE g_dropWB
+#include <proto/workbench.h>
+
+namespace boxer {
+
+AppDropTarget::~AppDropTarget() { close(); }
+
+void AppDropTarget::close() {
+    detach();
+    if (port_) {
+        // Detached: no sender can reach the port any more; anything left
+        // is answered before it goes.
+        struct Message *m;
+        while ((m = GetMsg(port_))) ReplyMsg(m);
+        DeleteMsgPort(port_);
+        port_ = nullptr;
+        // The targets share one opening; the last one closes it.
+        if (--g_dropWBUsers == 0) {
+            CloseLibrary(g_dropWB);
+            g_dropWB = nullptr;
+        }
+    }
+}
+
+bool AppDropTarget::create() {
+    if (port_) return true;
+    if (!g_dropWB && !(g_dropWB = OpenLibrary((CONST_STRPTR) "workbench.library", 0))) return false;
+    if (!(port_ = CreateMsgPort())) {
+        if (g_dropWBUsers == 0) {
+            CloseLibrary(g_dropWB);
+            g_dropWB = nullptr;
+        }
+        return false;
+    }
+    ++g_dropWBUsers;
+    return true;
+}
+
+ULONG AppDropTarget::signalMask() const { return port_ ? 1UL << port_->mp_SigBit : 0; }
+
+bool AppDropTarget::attach(struct Window *window) {
+    if (!port_ || !window) return false;
+    if (appWindow_) detach();
+    appWindow_ = AddAppWindowA(0, 0, window, port_, nullptr);
+    window_ = appWindow_ ? window : nullptr;
+    return appWindow_ != nullptr;
+}
+
+// The object's full path: the lock names the drawer it is in, or, for a
+// drawer or a volume, the object itself (with an empty name).
+static AppDrop::Arg argPath(const struct WBArg &a) {
+    AppDrop::Arg out;
+    char buf[1024];
+    out.named = a.wa_Name && *a.wa_Name;
+    if (!a.wa_Lock || !NameFromLock(a.wa_Lock, (STRPTR)buf, sizeof buf)) return out;
+    if (out.named && !AddPart((STRPTR)buf, (CONST_STRPTR)a.wa_Name, sizeof buf)) return out;
+    out.path = buf;
+    return out;
+}
+
+bool AppDropTarget::take(AppDrop &out) {
+    struct AppMessage *m;
+    if (!port_ || !(m = (struct AppMessage *)GetMsg(port_))) return false;
+    out = AppDrop();
+    // Everything is copied before the reply: the sender unlocks the locks
+    // and frees the names once it has its answer.
+    try {
+        if (m->am_Type == AMTYPE_APPWINDOW && m->am_NumArgs > 0 && m->am_ArgList) {
+            out.count = (size_t)m->am_NumArgs;
+            out.mouseX = m->am_MouseX;
+            out.mouseY = m->am_MouseY;
+            for (size_t i = 0; i < out.count && i < AppDrop::kMaxArgs; ++i) out.args.push_back(argPath(m->am_ArgList[i]));
+        }
+    } catch (...) {
+        // No memory for the copy: the drop is answered unread.
+        out = AppDrop();
+    }
+    ReplyMsg((struct Message *)m);
+    return true;
+}
+
+// The answering process: replies to every drop while the task that owns
+// the port waits in RemoveAppWindow. GetMsg and ReplyMsg from another task
+// are exec's ordinary contract. stop_ is read before each drain, so a drop
+// that came before it was set is still answered.
+void AppDropTarget::answer() {
+    AppDropTarget *t = (AppDropTarget *)FindTask(nullptr)->tc_UserData;
+    struct Message *m;
+    int last;
+    Wait(SIGBREAKF_CTRL_F);   // until the parent has its task id
+    do {
+        last = t->stop_;
+        while ((m = GetMsg(t->port_))) {
+            t->answered_ = t->answered_ + 1;
+            ReplyMsg(m);
+        }
+        if (!last) Delay(1);
+    } while (!last);
+}
+
+unsigned AppDropTarget::detach() {
+    if (!appWindow_) return 0;
+    struct Message *m;
+    answered_ = 0;
+    stop_ = 0;
+    while ((m = GetMsg(port_))) {
+        answered_ = answered_ + 1;
+        ReplyMsg(m);
+    }
+    struct Process *p = nullptr;
+    for (int tries = 0; !p && tries < 3; ++tries) {
+        // No home or current directory: a helper must not keep the
+        // program's drawer in use.
+        p = CreateNewProcTags(NP_Entry, (IPTR)&AppDropTarget::answer, NP_UserData, (IPTR)this,
+                              NP_Name, (IPTR) "BoxerUI drop answerer", NP_StackSize, 16384,
+                              NP_NotifyOnDeath, TRUE, NP_Input, 0, NP_Output, 0, NP_Error, 0,
+                              NP_WindowPtr, (IPTR)-1, NP_CurrentDir, 0, NP_HomeDir, 0, TAG_DONE);
+        if (!p) Delay(5);
+    }
+    ULONG child = 0;
+    if (p) {
+        child = GetETaskID(&p->pr_Task);
+        Signal(&p->pr_Task, SIGBREAKF_CTRL_F);
+    } else {
+        // Without a process (no memory) only the narrow old window is
+        // left: a drop sent between this drain and RemoveAppWindow.
+        while ((m = GetMsg(port_))) {
+            answered_ = answered_ + 1;
+            ReplyMsg(m);
+        }
+    }
+    // Waits for every sender to let the semaphore go, which a sender does
+    // only after its reply; after it no sender can find the window.
+    RemoveAppWindow((struct AppWindow *)appWindow_);
+    appWindow_ = nullptr;
+    window_ = nullptr;
+    if (child) {
+        // The port and this object stay until the answerer has exited: its
+        // exit, not a flag it sets, is the proof.
+        stop_ = 1;
+        while (ChildStatus(child) != CHILD_EXITED) Delay(1);
+        ChildFree(child);
+    }
+    while ((m = GetMsg(port_))) {
+        answered_ = answered_ + 1;
+        ReplyMsg(m);
+    }
+    return answered_;
+}
+
+}  // namespace boxer

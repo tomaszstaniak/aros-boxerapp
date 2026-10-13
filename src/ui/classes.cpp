@@ -44,6 +44,7 @@ Fonts g_fonts;
 void (*g_renderClick)(bool) = nullptr;
 volatile bool g_renderResized = false;
 void (*g_tick)() = nullptr;
+void (*g_signal)() = nullptr;
 struct Task *g_mainTask = nullptr;
 
 // ---------------------------------------------------------------- fonts ---
@@ -616,6 +617,9 @@ BOOPSI_DISPATCHER(IPTR, PG_Dispatcher, cl, obj, msg)
         return PG_DrawBackground(cl, obj, (struct MUIP_DrawBackground *)msg);
     case PGM_Tick:
         if (g_tick) g_tick();
+        return 0;
+    case PGM_Signal:
+        if (g_signal) g_signal();
         return 0;
     }
     return DoSuperMethodA(cl, obj, msg);

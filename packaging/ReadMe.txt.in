@@ -42,7 +42,9 @@ Installing
 
 4. Double-click BoxerUI. On the first start Boxer proposes a folder for
    your DOS games and one for their saved games; confirm or choose your
-   own. Then import a game. When the import is finished you can rename
+   own. Then import a game: click "Import a new game" and choose its
+   folder, or drop the folder's icon from Wanderer on that button or on
+   the Import window. When the import is finished you can rename
    the game and choose its cover: a CD case or diskette with the game's
    name, or a picture of your own (click the icon). Each imported game
    gets an icon in the games folder that shows its cover; double-click it
@@ -82,6 +84,9 @@ Limitations
   fixed CPU speed (for example Pentium) for that game in the Inspector.
 - Tested only on x86_64 ABIv11 (AROS One), under QEMU. Game
   compatibility is not yet broadly tested.
+- Dropping icons: nothing is highlighted while you drag over a Boxer
+  window (Wanderer does not tell other programs where an icon is being
+  dragged); only the drop itself is seen.
 - Unfinished: the games folder opens in Wanderer as a normal drawer,
   without Boxer's wooden shelf look, and the cover labels use the
   system's Vera Sans instead of Boxer's own font.

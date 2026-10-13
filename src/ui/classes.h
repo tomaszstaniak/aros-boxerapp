@@ -56,6 +56,8 @@ enum PaintMode { PM_Welcome, PM_BottomBar, PM_Toolbar, PM_Panel, PM_Box, PM_Volu
 #define PGA_Layout BX_TAG(2)        // const AbsLayout *: AppKit-style layout hook
 #define PGM_Tick   BX_TAG(3)        // method: calls g_tick (target of a timer input handler)
 extern void (*g_tick)();
+#define PGM_Signal BX_TAG(4)        // method: calls g_signal (target of a signal input handler)
+extern void (*g_signal)();
 
 // Autoresizing bits with AppKit's meaning, expressed for a top-left origin.
 enum { FlexMinX = 1, FlexW = 2, FlexMaxX = 4, FlexTop = 8, FlexH = 16, FlexBottom = 32 };

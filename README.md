@@ -10,7 +10,12 @@ port; it is not yet the complete Boxer experience.
 ## What this preview can do
 
 - Import a game folder: run its installer or copy a ready-to-play game,
-  then choose its startup program.
+  then choose its startup program. Choose the folder in a requester, or
+  drop its icon from Wanderer on "Import a new game" or on the Import
+  window. One folder at a time; disks, disc images and files are refused
+  with a message.
+- Drop a gamebox's icon on "Import a new game" or "Open a DOS prompt" to
+  play it in a new Boxer window.
 - Give the game a name and a cover. As in Boxer, the cover is a CD case or
   a 3.5" or 5.25" diskette labelled with the game's name, or a picture of
   your own. The game's icon in your games folder shows the cover. You can

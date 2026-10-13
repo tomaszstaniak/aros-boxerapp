@@ -95,9 +95,13 @@ c++ -std=c++17 -Wall -O1 -o "$out/host/session_test" "$src/tests/session_test.cp
 c++ -std=c++17 -Wall -O1 -o "$out/host/import_controller_test" "$src/tests/import_controller_test.cpp" \
   "$src/import_controller.cpp" "$src/session.cpp" "$PROJECT_ROOT"/src/model/*.cpp "$PROJECT_ROOT/src/emulator/filesystem.cpp"
 "$out/host/import_controller_test" "$out/host/import scratch"
+# What a drop is and what it leads to in each window and import state.
+c++ -std=c++17 -Wall -O1 -o "$out/host/drop_logic_test" "$src/tests/drop_logic_test.cpp" "$src/drop_logic.cpp" \
+  "$src/import_controller.cpp" "$src/session.cpp" "$PROJECT_ROOT"/src/model/*.cpp "$PROJECT_ROOT/src/emulator/filesystem.cpp"
+"$out/host/drop_logic_test" "$out/host/drop scratch"
 
 sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp"
-  "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp")
+  "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp" "$src/drop_logic.cpp")
 # The emulator layer and the model as in build-smoke.sh: files that include
 # the core's headers compile as gnu++14 (DOSBox 0.74's dynamic exception
 # specifications), the model and the UI as C++17.
@@ -108,7 +112,7 @@ core14=(src/emulator/emulator.cpp src/emulator/coalface.cpp src/emulator/filesys
 model17=(src/model/fsutil.cpp src/model/plist.cpp src/model/gamebox.cpp
   src/model/datalocations.cpp src/model/shadowfs.cpp src/model/programs.cpp src/model/importsource.cpp src/model/installerscan.cpp src/model/sourcecopy.cpp src/platform/aros/session_setup.cpp
   src/platform/aros/wbopen.cpp src/model/coverart.cpp src/model/coverfont.cpp src/model/gameboxrename.cpp
-  src/platform/aros/coverio.cpp)
+  src/platform/aros/coverio.cpp src/platform/aros/appdrop.cpp)
 # __FILE__ in assertion messages names the build host's directories; map
 # them to project-relative names (GCC tries the last matching map first,
 # so the core tree, which may lie inside the project, comes last).
