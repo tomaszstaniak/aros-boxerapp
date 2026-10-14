@@ -22,12 +22,24 @@ std::string createNumberedLog(const std::string &dir, const std::string &stem, c
     return "";
 }
 
-LogChoice chooseLogFile(const std::string &explicitPath, const std::string &defaultDir,
-                        const std::function<bool(const std::string &)> &inUse) {
+// A numbered file is created exclusively before it is opened, so no
+// other process can have chosen the same name.
+static std::string openNumbered(const std::string &dir, const std::string &stem, const std::string &ext,
+                                const LogOpener &open) {
+    const std::string path = createNumberedLog(dir, stem, ext);
+    return !path.empty() && open && open(path) == LogClaim::Opened ? path : std::string();
+}
+
+LogChoice chooseLogFile(const std::string &explicitPath, const std::string &defaultDir, const LogOpener &open) {
     LogChoice c;
     if (!explicitPath.empty()) {
-        if (!inUse || !inUse(explicitPath)) {
+        const LogClaim claim = open ? open(explicitPath) : LogClaim::Failed;
+        if (claim == LogClaim::Opened) {
             c.path = explicitPath;
+            return c;
+        }
+        if (claim == LogClaim::Failed) {
+            c.note = "LOG \"" + explicitPath + "\" could not be opened; no log";
             return c;
         }
         const std::string base = fu::baseName(explicitPath);
@@ -37,7 +49,7 @@ LogChoice chooseLogFile(const std::string &explicitPath, const std::string &defa
             ext = base.substr(base.size() - ext.size() - 1);   // the original case, with the dot
             stem = base.substr(0, base.size() - ext.size());
         }
-        c.path = createNumberedLog(fu::parent(explicitPath), stem, ext);
+        c.path = openNumbered(fu::parent(explicitPath), stem, ext, open);
         c.note = "LOG \"" + explicitPath + "\" is open in another process; this one logs to \"" +
                  (c.path.empty() ? std::string("(nothing: no free name)") : c.path) + "\"";
         return c;
@@ -47,7 +59,7 @@ LogChoice chooseLogFile(const std::string &explicitPath, const std::string &defa
         c.note = "log drawer \"" + defaultDir + "\" could not be created; logging beside it";
         dir = fu::parent(defaultDir);
     }
-    c.path = createNumberedLog(dir, "boxerui", ".log");
+    c.path = openNumbered(dir, "boxerui", ".log", open);
     return c;
 }
 

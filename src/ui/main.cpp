@@ -3782,18 +3782,20 @@ int main(int argc, char **argv) {
     if (!argsOk) return 20;
     applyDefaults();
     if (!g_args.gamebox.empty() || g_args.kind == "dos") g_screen = "dos";
-    // Another process has the file open when it holds a lock on it: an
-    // exclusive lock is then refused with ERROR_OBJECT_IN_USE.
-    const auto fileInUse = [](const std::string &p) {
-        BPTR l = Lock((CONST_STRPTR)p.c_str(), EXCLUSIVE_LOCK);
-        if (l) { UnLock(l); return false; }
-        return IoErr() == ERROR_OBJECT_IN_USE;
+    // The open is the reservation (logfile.h): fopen "w" is MODE_NEWFILE,
+    // held exclusively while open; refused with ERROR_OBJECT_IN_USE when
+    // another process has the file open.
+    const auto openLog = [](const std::string &p) {
+        if (FILE *f = std::fopen(p.c_str(), "w")) {
+            g_log = f;
+            return LogClaim::Opened;
+        }
+        return IoErr() == ERROR_OBJECT_IN_USE ? LogClaim::InUse : LogClaim::Failed;
     };
     const std::string askedLog = g_logPath;
     const LogChoice logChoice =
-        withoutVolumeRequesters([&] { return chooseLogFile(askedLog, kDefaultLogDir, fileInUse); });
+        withoutVolumeRequesters([&] { return chooseLogFile(askedLog, kDefaultLogDir, openLog); });
     g_logPath = logChoice.path;
-    g_log = g_logPath.empty() ? nullptr : std::fopen(g_logPath.c_str(), "w");
     // The first line names the file, so a log copied elsewhere still says
     // which it was; a Shell start also says it in the Shell.
     logf("log: \"%s\" (%s)", g_logPath.c_str(), askedLog.empty() ? "default" : "LOG");
