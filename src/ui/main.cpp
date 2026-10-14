@@ -1088,8 +1088,11 @@ static void lpSyncToolbar() {
 }
 
 static void lpLogGeometry() {
+    // _window() reads render info that the list has only while the DOS
+    // window is open (as in dumpSlider).
+    if (!st.launchPanel || !windowOpen(ui.dos)) return;
     struct Window *w = _window(ui.lpList);
-    if (!w || !st.launchPanel) return;
+    if (!w) return;
     for (const auto &g : launchPanelGeometry(ui.lpList)) {
         const LPRow &r = g_lp.rows[g.index];
         logf("launch panel: row %d at %d,%d %dx%d%s kind=%d \"%s\"", g.index, g.x, g.y, g.w, g.h,
@@ -1158,7 +1161,14 @@ static void lpRebuild(const char *why, bool rescan) {
 
 // switchToPanel: (no animation, as in 2.0-alpha where it is disabled).
 static void lpShow(bool show, const char *why) {
-    if (show && !(sessionRunning() && g_lp.active)) return;
+    // The panel's list lives in the DOS window, which is closed in full
+    // screen: shown there, it has no render info, and reading its window
+    // (lpLogGeometry) faulted when a program started from the panel ended
+    // in full screen.
+    if (show && !launchPanelAvailable(sessionRunning() && g_lp.active, st.fullscreen)) {
+        logf("launch panel: not shown (%s): %s", why, st.fullscreen ? "full screen" : "no gamebox session");
+        return;
+    }
     if (show == st.launchPanel) { lpSyncToolbar(); return; }
     if (show) {
         // Leaving the DOS view: the input view resigns (keys and buttons
@@ -1287,8 +1297,8 @@ static void lpProgramFinished() {
 static void lpReturnedToShell() {
     if (!g_lp.active) return;
     if (!g_lp.processEnded && !g_lp.loading) return;
-    Completion c = afterReturnToShell(g_lp.completion, true, g_lp.lastInternal, g_lp.lastRun,
-                                      g_lp.loading);
+    Completion c = afterReturnToShell(g_lp.completion, launchPanelAvailable(true, st.fullscreen),
+                                      g_lp.lastInternal, g_lp.lastRun, g_lp.loading);
     logf("launch panel: returned to shell after %.2f s (internal=%d, requested=%d, loading=%d) -> %s",
          g_lp.lastRun, g_lp.lastInternal, (int)g_lp.completion, g_lp.loading,
          c == Completion::ShowLauncher ? "launch panel" : c == Completion::ShowPrompt ? "DOS prompt" : "no change");

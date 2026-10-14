@@ -89,6 +89,12 @@ std::vector<LPRow> displayedRows(const std::vector<LPRow> &favorites, const std:
 // showLaunchPanel flag is set.
 bool startWithLaunchPanel(bool allowsLauncherPanel, bool alwaysShow, bool showOnce);
 
+// The launch panel is a page of the DOS window. In full screen that window
+// is closed (only the render view is shown), so the panel exists only for a
+// gamebox session in the windowed view: everything that would show it in
+// full screen shows the DOS prompt instead.
+bool launchPanelAvailable(bool gameboxSession, bool fullscreen);
+
 enum class Completion { DoNothing, ShowLauncher, ShowPrompt };
 // BXSuccessfulProgramRunningTimeThreshold
 constexpr double kSuccessfulRunSeconds = 3.0;

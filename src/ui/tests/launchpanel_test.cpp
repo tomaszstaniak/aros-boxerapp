@@ -111,6 +111,15 @@ int main(int argc, char **argv) {
     CHECK(afterReturnToShell(Completion::ShowLauncher, true, false, 2.9, false) == Completion::ShowPrompt);
     CHECK(afterReturnToShell(Completion::ShowLauncher, true, false, 3.0, false) == Completion::ShowLauncher);
     CHECK(afterReturnToShell(Completion::ShowLauncher, false, false, 10, false) == Completion::ShowPrompt);
+    // A program started from the panel ends while the session is in full
+    // screen: no panel there (the DOS window is closed), so the prompt.
+    CHECK(launchPanelAvailable(true, false) && !launchPanelAvailable(true, true) && !launchPanelAvailable(false, false));
+    CHECK(afterReturnToShell(Completion::ShowLauncher, launchPanelAvailable(true, true), false, 10, false) ==
+          Completion::ShowPrompt);
+    CHECK(afterReturnToShell(Completion::DoNothing, launchPanelAvailable(true, true), false, 10, true) ==
+          Completion::ShowPrompt);
+    CHECK(afterReturnToShell(Completion::ShowLauncher, launchPanelAvailable(true, false), false, 10, false) ==
+          Completion::ShowLauncher);
     CHECK(afterReturnToShell(Completion::ShowLauncher, true, true, 0.1, false) == Completion::ShowLauncher);
     CHECK(afterReturnToShell(Completion::DoNothing, true, false, 10, true) == Completion::ShowLauncher);
     CHECK(afterReturnToShell(Completion::DoNothing, false, false, 10, true) == Completion::ShowPrompt);

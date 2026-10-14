@@ -176,6 +176,8 @@ bool startWithLaunchPanel(bool allowsLauncherPanel, bool alwaysShow, bool showOn
     return alwaysShow || showOnce;
 }
 
+bool launchPanelAvailable(bool gameboxSession, bool fullscreen) { return gameboxSession && !fullscreen; }
+
 Completion afterReturnToShell(Completion requested, bool allowsLauncherPanel, bool internalProcess,
                               double runSeconds, bool loadingPanel) {
     if (requested == Completion::ShowPrompt) return Completion::ShowPrompt;
