@@ -3783,8 +3783,8 @@ int main(int argc, char **argv) {
     applyDefaults();
     if (!g_args.gamebox.empty() || g_args.kind == "dos") g_screen = "dos";
     // The open is the reservation (logfile.h): fopen "w" is MODE_NEWFILE,
-    // held exclusively while open; refused with ERROR_OBJECT_IN_USE when
-    // another process has the file open.
+    // which the RAM: handler holds exclusively while open and refuses with
+    // ERROR_OBJECT_IN_USE (other file systems not checked).
     const auto openLog = [](const std::string &p) {
         if (FILE *f = std::fopen(p.c_str(), "w")) {
             g_log = f;
