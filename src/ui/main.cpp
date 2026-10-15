@@ -48,6 +48,7 @@
 #include "ui_logic.h"
 #include "session.h"
 #include "drop_logic.h"
+#include "emulation_settings.h"
 #include "import_controller.h"
 #include "launchpanel_logic.h"
 #include "logfile.h"
@@ -942,6 +943,9 @@ struct SessionArgs {
     std::vector<boxer::ConfigFile> confs;
     std::vector<std::string> pre, cmd, then;
     int volume = -1;   // VOLUME: the toolbar volume (0..100) at start
+    // CYCLES (auto or a number) and FRAMESKIP: for this run only, over the
+    // game's saved choice; never saved (emulation_settings.h).
+    std::string cycles, frameskip;
     bool harness = false;   // HARNESS=1: test keys (header comment)
     bool fontCheck = false; // FONTCHECK=1: log the per-glyph font check (openFonts)
     std::string missingGamebox;   // sidecar icon whose gamebox is not there
@@ -1034,6 +1038,9 @@ static struct {
     bool lastInternal = false, processEnded = false;
     double lastRun = 0;
     int pendingRow = -1, pendingAction = 0;
+    // CPU speed and frameskip of this session (emulation_settings.h);
+    // applied once, at the first shell, before any program runs.
+    EmulationSettings emu;
 } g_lp;
 
 static const boxer::BundledDrive *lpDrive(char letter) {
@@ -1360,6 +1367,7 @@ static void setLocked(bool locked, const char *why) {
 
 static void syncInspectorFromCore();
 static void applyVolume();
+static void applyEmulationSettings();
 
 class SessionHost : public boxer::EmulatorDelegate {
 public:
@@ -1417,6 +1425,7 @@ public:
         // The mixer exists now; apply the toolbar volume and the Inspector
         // values the core started with.
         applyVolume();
+        applyEmulationSettings();
         syncInspectorFromCore();
     }
     void runPreflightCommands() override {
@@ -1480,6 +1489,32 @@ private:
     }
 };
 static SessionHost *g_host;
+
+// The first shell of a session: what the core started with is the gamebox's
+// configuration over the defaults; the game's saved choice and a one-run
+// override go over it. Later shells (another program, COMMAND /C) leave the
+// speed as it is.
+static void applyEmulationSettings() {
+    if (g_lp.emu.begun()) return;
+    bool autoSpeed = false;
+    const int cycles = boxer::coreCycles(&autoSpeed);
+    const CPUSpeed base = autoSpeed ? CPUSpeed::autoSpeed() : CPUSpeed::fixed(cycles);
+    const int baseSkip = boxer::coreFrameskip();
+    const EmulationChoice saved =
+        g_lp.active && g_lp.settingsOk ? readEmulationChoice(g_lp.settings.dict()) : EmulationChoice();
+    const EmulationChoice override = parseEmulationOverride(g_args.cycles, g_args.frameskip);
+    g_lp.emu.begin(saved, override, base, baseSkip);
+    const auto speedName = [](const std::optional<CPUSpeed> &s) {
+        return !s ? std::string("-") : s->automatic ? std::string("auto") : std::to_string(s->cycles);
+    };
+    const auto skipName = [](const std::optional<int> &f) { return f ? std::to_string(*f) : std::string("-"); };
+    logf("cpu: base %s/frameskip %d, saved %s/%s, override %s/%s -> %s/frameskip %d",
+         speedName(base).c_str(), baseSkip, speedName(saved.speed).c_str(), skipName(saved.frameskip).c_str(),
+         speedName(override.speed).c_str(), skipName(override.frameskip).c_str(),
+         speedName(g_lp.emu.speed()).c_str(), g_lp.emu.frameskip());
+    if (g_lp.emu.speed() != base) boxer::coreSetSpeed(g_lp.emu.speed().automatic ? -1 : g_lp.emu.speed().cycles);
+    if (g_lp.emu.frameskip() != baseSkip) boxer::coreSetFrameskip(g_lp.emu.frameskip());
+}
 
 static void syncInspectorFromCore() {
     if (!sessionRunning()) return;
@@ -1968,8 +2003,13 @@ static SessionResult prepareAndRunSession() {
         // _saveGameSettings at session close: recent programs (gamebox-
         // relative where possible) and the cleared one-shot flag.
         g_lp.settings.setRecentPrograms(g_lp.recents);
+        g_lp.emu.store(g_lp.settings.dict());
         std::string err;
         bool ok = g_lp.settingsOk && g_lp.settings.save(&err);
+        const EmulationChoice kept = readEmulationChoice(g_lp.settings.dict());
+        logf("cpu: game settings keep speed %s, frameskip %s",
+             !kept.speed ? "(none)" : kept.speed->automatic ? "auto" : std::to_string(kept.speed->cycles).c_str(),
+             kept.frameskip ? std::to_string(*kept.frameskip).c_str() : "(none)");
         logf("launch panel: game settings %s: %u recent programs%s%s", ok ? "saved" : "NOT saved",
              unsigned(g_lp.recents.size()), ok ? "" : ", ", ok ? "" : (g_lp.settingsOk ? err.c_str() : "unreadable at start, not overwritten"));
         for (const auto &r : g_lp.recents) logf("launch panel:   recent %s %s", r.path.c_str(), r.arguments.c_str());
@@ -2070,6 +2110,8 @@ static bool takeArg(const std::string &key, const std::string &value) {
     else if (key == "THEN") g_args.then.push_back(value);
     else if (key == "FONTCHECK") g_args.fontCheck = value == "1" || upper(value) == "YES" || upper(value) == "ON";
     else if (key == "HARNESS") g_args.harness = value == "1" || upper(value) == "YES" || upper(value) == "ON";
+    else if (key == "CYCLES") g_args.cycles = value;
+    else if (key == "FRAMESKIP") g_args.frameskip = value;
     else if (key == "VOLUME") g_args.volume = std::max(0, std::min(100, std::atoi(value.c_str())));
     else return false;
     return true;
@@ -3650,6 +3692,10 @@ static bool handleId(ULONG id) {
             setTurbo(false, "speed change");
             logStats(true);
             boxer::coreSetSpeed(st.speed == kAutoSpeed ? -1 : st.speed);
+            // The user's choice, saved with the game at the end; the cycle
+            // count the core then computes in auto mode is not.
+            if (g_lp.emu.begun())
+                g_lp.emu.userChoseSpeed(st.speed == kAutoSpeed ? CPUSpeed::autoSpeed() : CPUSpeed::fixed(st.speed));
             bool a = false;
             int now = boxer::coreCycles(&a);   // before reading a: argument order is unspecified
             logf("core: speed set, cycles now %d auto=%d", now, a);
@@ -3664,6 +3710,7 @@ static bool handleId(ULONG id) {
         if (sessionRunning()) {
             logStats(true);
             boxer::coreSetFrameskip(st.frameskip);
+            if (g_lp.emu.begun()) g_lp.emu.userChoseFrameskip(st.frameskip);
             logf("core: frameskip now %d", boxer::coreFrameskip());
         }
         break;

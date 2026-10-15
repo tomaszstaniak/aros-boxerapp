@@ -124,7 +124,9 @@ python3 tests/build-tooling/test_package_notices.py # notices; diagnostic packag
 `src/ui/tests/import_controller_test.cpp` (the stages and ends of an import,
 and what each leaves on disk) and `src/ui/tests/drop_logic_test.cpp` (what
 a dropped icon is, and what a drop leads to in each window and import
-state) and `src/ui/tests/logfile_test.cpp` (the log file's name). `tests/fixtures/boxtest/` is a small
+state), `src/ui/tests/logfile_test.cpp` (the log file's name) and
+`src/ui/tests/emulation_settings_test.cpp` (a game's CPU speed and frameskip
+across sessions). `tests/fixtures/boxtest/` is a small
 DOS test program (NASM source and expected logs) for runs on AROS;
 `tests/fixtures/gamebox/` makes synthetic test gameboxes around it. No game
 data is part of this repository.
@@ -139,9 +141,17 @@ BoxerUI                                          ; the welcome window
 BoxerUI GAMEBOX <path> DATA <dir> CONFDIR <dir>  ; open one gamebox
 BoxerUI SESSION dos CONFDIR <dir>                ; a plain DOS prompt
 BoxerUI LOG <file>                               ; log to <file> instead of RAM:BoxerLogs/boxerui-<n>.log
+BoxerUI GAMEBOX <path> CYCLES auto|<n> FRAMESKIP <n> ; this run only, not saved
 ```
 
 The same keys work as ToolTypes (`KEY=value`).
+
+A game's CPU speed (automatic or fixed) and frameskip, as chosen in the
+Inspector, are kept with the game's other settings in
+`<data>/Game Settings/<identifier>.plist` (keys `CPUSpeed`, -1 for
+automatic, and `frameskip`) and restored before its program starts. They
+take precedence over the gamebox's own configuration; `CYCLES` and
+`FRAMESKIP` take precedence over them for one run and are not saved.
 
 Return code: 0 after a normal end or when the user cancelled a session; 10
 (`RETURN_ERROR`) when a session could not be prepared (for example a broken

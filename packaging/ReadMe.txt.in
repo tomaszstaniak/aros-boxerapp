@@ -81,7 +81,8 @@ Limitations
   installer. Closing a session that has stopped responding can crash
   AROS. Save your work in other programs before you test.
 - Automatic CPU speed can be very slow after a game is reopened. Set a
-  fixed CPU speed (for example Pentium) for that game in the Inspector.
+  fixed CPU speed (for example Pentium) for that game in the Inspector;
+  Boxer keeps the speed and frameskip you choose there for that game.
 - Tested only on x86_64 ABIv11 (AROS One), under QEMU. Game
   compatibility is not yet broadly tested.
 - Dropping icons: nothing is highlighted while you drag over a Boxer

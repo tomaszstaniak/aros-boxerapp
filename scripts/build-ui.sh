@@ -103,9 +103,14 @@ c++ -std=c++17 -Wall -O1 -o "$out/host/drop_logic_test" "$src/tests/drop_logic_t
 c++ -std=c++17 -Wall -O1 -o "$out/host/logfile_test" "$src/tests/logfile_test.cpp" "$src/logfile.cpp" \
   "$PROJECT_ROOT/src/model/fsutil.cpp"
 "$out/host/logfile_test" "$out/host/log scratch"
+# A game's CPU speed and frameskip across sessions (the settings file on disk).
+c++ -std=c++17 -Wall -O1 -o "$out/host/emulation_settings_test" "$src/tests/emulation_settings_test.cpp" \
+  "$src/emulation_settings.cpp" "$PROJECT_ROOT"/src/model/*.cpp "$PROJECT_ROOT/src/emulator/filesystem.cpp"
+"$out/host/emulation_settings_test" "$out/host/emulation scratch"
 
 sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp"
-  "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp" "$src/drop_logic.cpp" "$src/logfile.cpp")
+  "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp" "$src/drop_logic.cpp" "$src/logfile.cpp"
+  "$src/emulation_settings.cpp")
 # The emulator layer and the model as in build-smoke.sh: files that include
 # the core's headers compile as gnu++14 (DOSBox 0.74's dynamic exception
 # specifications), the model and the UI as C++17.

@@ -54,7 +54,8 @@ x86_64 ABIv11). Checksums are listed with each release.
   Closing a session that has stopped responding can crash AROS. Save your
   work in other programs before you test.
 - Automatic CPU speed can be very slow after a game is reopened. Set a
-  fixed CPU speed (for example Pentium) for that game in the Inspector.
+  fixed CPU speed (for example Pentium) for that game in the Inspector;
+  the speed and frameskip chosen there are kept for that game.
 - Tested only on AROS x86_64 ABIv11 (AROS One), under QEMU. Game
   compatibility is not yet broadly tested.
 - Unfinished: the games folder opens in Wanderer as a normal drawer, without
