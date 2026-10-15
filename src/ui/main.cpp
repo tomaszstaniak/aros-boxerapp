@@ -103,7 +103,17 @@
 
 using namespace boxer_ui;
 
-static FILE *g_log;
+// The log, written through DOS rather than stdio: posixc's fopen "w" takes
+// only a shared lock (Lock SHARED_LOCK, MODE_READWRITE, then truncate), so a
+// second process could open the same file and cut the first one's log.
+// Open(MODE_NEWFILE) is refused while another process has the file
+// (logfile.h, RAM: handler). One Write per line keeps every line on disk,
+// as the earlier fflush did: a crash must not take the evidence with it.
+static BPTR g_log;
+static void closeLog() {
+    if (g_log) Close(g_log);
+    g_log = 0;
+}
 // Every line starts with the guest time since the first line, in seconds
 // (DateStamp, 1/50 s), so UI actions can be placed inside a recording.
 static long g_logT0 = -1;
@@ -113,13 +123,25 @@ static void logf(const char *fmt, ...) {
     DateStamp(&ds);
     long t = (ds.ds_Days * 1440L + ds.ds_Minute) * 60L * TICKS_PER_SECOND + ds.ds_Tick;
     if (g_logT0 < 0) g_logT0 = t;
-    std::fprintf(g_log, "[%7.2f] ", (t - g_logT0) / (double)TICKS_PER_SECOND);
+    char head[24];
+    const int h = std::snprintf(head, sizeof head, "[%7.2f] ", (t - g_logT0) / (double)TICKS_PER_SECOND);
+    char buf[1024];
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(g_log, fmt, ap);
+    const int n = std::vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
-    std::fputc('\n', g_log);
-    std::fflush(g_log);   // a crash must not take the evidence with it
+    std::string line(head, h > 0 ? size_t(h) : 0);
+    if (n >= 0 && size_t(n) < sizeof buf) {
+        line.append(buf, size_t(n));
+    } else if (n > 0) {
+        std::string big(size_t(n) + 1, '\0');
+        va_start(ap, fmt);
+        std::vsnprintf(&big[0], big.size(), fmt, ap);
+        va_end(ap);
+        line.append(big.c_str(), size_t(n));
+    }
+    line += '\n';
+    Write(g_log, (APTR)line.data(), (LONG)line.size());
 }
 
 // Which GL/SDL/audio/controller libraries are in memory and how often they
@@ -3829,12 +3851,12 @@ int main(int argc, char **argv) {
     if (!argsOk) return 20;
     applyDefaults();
     if (!g_args.gamebox.empty() || g_args.kind == "dos") g_screen = "dos";
-    // The open is the reservation (logfile.h): fopen "w" is MODE_NEWFILE,
-    // which the RAM: handler holds exclusively while open and refuses with
+    // The open is the reservation (logfile.h): MODE_NEWFILE, which the RAM:
+    // handler holds exclusively while open and refuses with
     // ERROR_OBJECT_IN_USE (other file systems not checked).
     const auto openLog = [](const std::string &p) {
-        if (FILE *f = std::fopen(p.c_str(), "w")) {
-            g_log = f;
+        if (BPTR fh = Open((CONST_STRPTR)p.c_str(), MODE_NEWFILE)) {
+            g_log = fh;
             return LogClaim::Opened;
         }
         return IoErr() == ERROR_OBJECT_IN_USE ? LogClaim::InUse : LogClaim::Failed;
@@ -3900,17 +3922,17 @@ int main(int argc, char **argv) {
                                 (STRPTR)"OK"};
         EasyRequest(NULL, &es, NULL, (IPTR)g_args.missingGamebox.c_str());
         logf("exit: rc 10 (missing gamebox)");
-        if (g_log) std::fclose(g_log);
+        closeLog();
         return 10;
     }
     if (!resolveDataDir()) {
         logf("exit: rc 10 (no usable games folder or data directory)");
-        if (g_log) std::fclose(g_log);
+        closeLog();
         return 10;
     }
     if (g_args.prefsOnly) {
         logf("exit: rc 0 (PREFSONLY, data \"%s\")", g_args.data.c_str());
-        if (g_log) std::fclose(g_log);
+        closeLog();
         return 0;
     }
     if (memcp("before-fonts")) { memDone(); return 0; }
@@ -4212,8 +4234,7 @@ int main(int argc, char **argv) {
     memcp("fonts-closed");
     closeInput();
     if (g_blankPointer) FreeVec(g_blankPointer);
-    if (g_log) std::fclose(g_log);
-    g_log = nullptr;   // the import controller's destructor runs after this
+    closeLog();   // the import controller's destructor runs after this
     memcp("end");
     memDone();
     return g_exit.code();

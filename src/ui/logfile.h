@@ -34,12 +34,13 @@ std::string createNumberedLog(const std::string &dir, const std::string &stem, c
 // Opens `path` for writing (restarting it) and keeps it open on Opened.
 // InUse: another process has it open. There is no check before the open,
 // and so no moment between a check and the open: the open is the
-// reservation, as far as the file system makes it exclusive. fopen "w" is
-// Open(MODE_NEWFILE); the RAM: handler (rom/filesys/ram, the only one
-// checked) serves it with an ACCESS_WRITE lock held while the file is
-// open and refuses a second one with ERROR_OBJECT_IN_USE. Other file
-// systems were not checked; where one does not refuse, two processes may
-// share the file, as before this change.
+// reservation, as far as the file system makes it exclusive. BoxerUI opens
+// with DOS Open(MODE_NEWFILE); the RAM: handler (rom/filesys/ram, the only
+// one checked) refuses it with ERROR_OBJECT_IN_USE while another process
+// has the file open, and holds an ACCESS_WRITE lock while it is open.
+// posixc's fopen "w" would not do: it takes a shared lock, opens
+// MODE_READWRITE and truncates, so a second process gets the same file.
+// Other file systems were not checked.
 enum class LogClaim { Opened, InUse, Failed };
 using LogOpener = std::function<LogClaim(const std::string &path)>;
 
