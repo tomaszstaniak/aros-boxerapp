@@ -141,7 +141,7 @@ BoxerUI                                          ; the welcome window
 BoxerUI GAMEBOX <path> DATA <dir> CONFDIR <dir>  ; open one gamebox
 BoxerUI SESSION dos CONFDIR <dir>                ; a plain DOS prompt
 BoxerUI LOG <file>                               ; log to <file> instead of RAM:BoxerLogs/boxerui-<n>.log
-BoxerUI GAMEBOX <path> CYCLES auto|<n> FRAMESKIP <n> ; this run only, not saved
+BoxerUI GAMEBOX <path> CYCLES auto|50..62500 FRAMESKIP 0..9 ; this run only, not saved
 ```
 
 The same keys work as ToolTypes (`KEY=value`).

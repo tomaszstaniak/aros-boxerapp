@@ -31,6 +31,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace boxer {
 class PlistValue;
@@ -58,12 +59,21 @@ struct EmulationChoice {
     std::optional<int> frameskip;
 };
 
-// The saved choice in a game settings dictionary; a key that is missing or
-// not a number is no choice.
-EmulationChoice readEmulationChoice(const boxer::PlistValue &dict);
-// The CYCLES / FRAMESKIP argument values ("" = not given): "auto",
-// or a positive number; anything else is no override.
-EmulationChoice parseEmulationOverride(const std::string &cycles, const std::string &frameskip);
+// The values the core and the Inspector accept (ui_logic.h): fixed cycles
+// kMinSpeed..kMaxSpeed, frameskip 0..kMaxFrameskip.
+bool validCycles(long long cycles);
+bool validFrameskip(long long frameskip);
+
+// The saved choice in a game settings dictionary. A key that is missing is
+// no choice; one that is not a number in range is also no choice (the
+// layers below apply), and a sentence for the log is added to problems.
+EmulationChoice readEmulationChoice(const boxer::PlistValue &dict, std::vector<std::string> *problems = nullptr);
+// The CYCLES / FRAMESKIP argument values ("" = not given): CYCLES is
+// "auto" or a whole number of cycles, FRAMESKIP a whole number, each in
+// range. Anything else is no override, with a sentence for the user in
+// problems (it is never passed to the core).
+EmulationChoice parseEmulationOverride(const std::string &cycles, const std::string &frameskip,
+                                       std::vector<std::string> *problems = nullptr);
 
 // One session of one game.
 class EmulationSettings {

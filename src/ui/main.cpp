@@ -103,13 +103,16 @@
 
 using namespace boxer_ui;
 
-// The log, written through DOS rather than stdio: posixc's fopen "w" takes
-// only a shared lock (Lock SHARED_LOCK, MODE_READWRITE, then truncate), so a
-// second process could open the same file and cut the first one's log.
-// Open(MODE_NEWFILE) is refused while another process has the file
-// (logfile.h, RAM: handler). One Write per line keeps every line on disk,
-// as the earlier fflush did: a crash must not take the evidence with it.
+// The log, written through DOS rather than stdio: posixc's fopen "w" opens
+// with a shared lock (MODE_READWRITE, then truncate), so a second process
+// could open the same file and cut the first one's log. Open(MODE_NEWFILE)
+// is refused while another process has the file (logfile.h, RAM: handler).
+// One Write per line hands each line to the file system at once, with no
+// stdio buffer in between; that is all it promises (not that a line
+// survives a crash or a power loss on every medium).
 static BPTR g_log;
+static bool g_logBroken;   // a Write failed: the log is not written any more
+static bool g_fromWorkbench;
 static void closeLog() {
     if (g_log) Close(g_log);
     g_log = 0;
@@ -118,7 +121,7 @@ static void closeLog() {
 // (DateStamp, 1/50 s), so UI actions can be placed inside a recording.
 static long g_logT0 = -1;
 static void logf(const char *fmt, ...) {
-    if (!g_log) return;
+    if (!g_log || g_logBroken) return;
     struct DateStamp ds;
     DateStamp(&ds);
     long t = (ds.ds_Days * 1440L + ds.ds_Minute) * 60L * TICKS_PER_SECOND + ds.ds_Tick;
@@ -141,7 +144,14 @@ static void logf(const char *fmt, ...) {
         line.append(big.c_str(), size_t(n));
     }
     line += '\n';
-    Write(g_log, (APTR)line.data(), (LONG)line.size());
+    if (g_logBroken) return;
+    if (Write(g_log, (APTR)line.data(), (LONG)line.size()) != (LONG)line.size()) {
+        // Not reported into the same log (it would fail again): the log
+        // stops here, and a Shell start says so once.
+        g_logBroken = true;
+        const LONG err = IoErr();
+        if (!g_fromWorkbench) std::fprintf(stderr, "BoxerUI: the log could not be written (error %ld); it stops here\n", (long)err);
+    }
 }
 
 // Which GL/SDL/audio/controller libraries are in memory and how often they
@@ -1522,8 +1532,12 @@ static void applyEmulationSettings() {
     const int cycles = boxer::coreCycles(&autoSpeed);
     const CPUSpeed base = autoSpeed ? CPUSpeed::autoSpeed() : CPUSpeed::fixed(cycles);
     const int baseSkip = boxer::coreFrameskip();
+    // A stored value out of range is never passed to the core: it is no
+    // choice, the layers below apply (reported at start, not here).
+    std::vector<std::string> bad;
     const EmulationChoice saved =
-        g_lp.active && g_lp.settingsOk ? readEmulationChoice(g_lp.settings.dict()) : EmulationChoice();
+        g_lp.active && g_lp.settingsOk ? readEmulationChoice(g_lp.settings.dict(), &bad) : EmulationChoice();
+    for (const auto &b : bad) logf("cpu: game settings: %s", b.c_str());
     const EmulationChoice override = parseEmulationOverride(g_args.cycles, g_args.frameskip);
     g_lp.emu.begin(saved, override, base, baseSkip);
     const auto speedName = [](const std::optional<CPUSpeed> &s) {
@@ -2167,7 +2181,6 @@ static std::string pathOfLock(BPTR lock, const char *name) {
     return buf;
 }
 
-static bool g_fromWorkbench;
 static std::string g_progDir;   // PROGDIR: expanded (a path with spaces stays one string)
 
 static void readToolTypes(struct WBArg *arg, const char *what) {
@@ -3872,6 +3885,18 @@ int main(int argc, char **argv) {
     if (!g_fromWorkbench && Output()) {
         const std::string line = "BoxerUI: log " + (g_log ? g_logPath : std::string("not written")) + "\n";
         PutStr((CONST_STRPTR)line.c_str());
+    }
+    // CYCLES / FRAMESKIP that cannot be used are said once, where the user
+    // gave them: in the Shell, or in a requester for an icon's ToolType.
+    // The run goes on without them.
+    {
+        std::vector<std::string> bad;
+        parseEmulationOverride(g_args.cycles, g_args.frameskip, &bad);
+        for (const auto &b : bad) {
+            logf("args: %s", b.c_str());
+            if (!g_fromWorkbench) std::fprintf(stderr, "BoxerUI: %s\n", b.c_str());
+            else ask("%s", "OK", b.c_str());
+        }
     }
     const char *screen = g_screen.c_str();   // refreshed if a sidecar lookup changes g_screen
     logf("BoxerUI, built %s %s, abi %s, screen=%s", __DATE__, __TIME__,

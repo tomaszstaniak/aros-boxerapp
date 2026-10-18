@@ -8,47 +8,69 @@
 
 #include "emulation_settings.h"
 
+#include "ui_logic.h"
+
 #include "../model/plist.h"
 
 #include <cctype>
-#include <cstdlib>
 
 namespace boxer_ui {
 
-static bool numberAt(const boxer::PlistValue &dict, const char *key, long long &out) {
-    const boxer::PlistValue *v = dict.get(key);
-    if (!v || v->type() != boxer::PlistValue::Type::Integer) return false;
-    out = v->integer();
-    return true;
+bool validCycles(long long cycles) { return cycles >= kMinSpeed && cycles <= kMaxSpeed; }
+bool validFrameskip(long long frameskip) { return frameskip >= 0 && frameskip <= kMaxFrameskip; }
+
+static void note(std::vector<std::string> *problems, const std::string &text) {
+    if (problems) problems->push_back(text);
 }
 
-EmulationChoice readEmulationChoice(const boxer::PlistValue &dict) {
+EmulationChoice readEmulationChoice(const boxer::PlistValue &dict, std::vector<std::string> *problems) {
     EmulationChoice c;
-    long long n = 0;
-    if (numberAt(dict, kCPUSpeedKey, n)) {
-        if (n == kBXAutoSpeed) c.speed = CPUSpeed::autoSpeed();
-        else if (n > 0) c.speed = CPUSpeed::fixed(int(n));
+    if (const boxer::PlistValue *v = dict.get(kCPUSpeedKey)) {
+        const bool number = v->type() == boxer::PlistValue::Type::Integer;
+        const long long n = number ? (long long)v->integer() : 0;
+        if (number && n == kBXAutoSpeed) c.speed = CPUSpeed::autoSpeed();
+        else if (number && validCycles(n)) c.speed = CPUSpeed::fixed(int(n));
+        else note(problems, std::string("stored ") + kCPUSpeedKey + " is not -1 (automatic) or " +
+                                std::to_string(kMinSpeed) + ".." + std::to_string(kMaxSpeed) + " cycles; ignored");
     }
-    if (numberAt(dict, kFrameskipKey, n) && n >= 0) c.frameskip = int(n);
+    if (const boxer::PlistValue *v = dict.get(kFrameskipKey)) {
+        const bool number = v->type() == boxer::PlistValue::Type::Integer;
+        if (number && validFrameskip(v->integer())) c.frameskip = int(v->integer());
+        else note(problems, std::string("stored ") + kFrameskipKey + " is not 0.." + std::to_string(kMaxFrameskip) +
+                                "; ignored");
+    }
     return c;
 }
 
-static bool plainNumber(const std::string &s, long &out) {
+// A whole number without sign, read digit by digit so that no conversion
+// can overflow: anything past `limit` is out of range, however long.
+static bool wholeNumber(const std::string &s, long long limit, long long &out) {
     if (s.empty()) return false;
-    for (char ch : s)
+    long long n = 0;
+    for (char ch : s) {
         if (!std::isdigit((unsigned char)ch)) return false;
-    out = std::strtol(s.c_str(), nullptr, 10);
+        n = n * 10 + (ch - '0');
+        if (n > limit) return false;
+    }
+    out = n;
     return true;
 }
 
-EmulationChoice parseEmulationOverride(const std::string &cycles, const std::string &frameskip) {
+EmulationChoice parseEmulationOverride(const std::string &cycles, const std::string &frameskip,
+                                       std::vector<std::string> *problems) {
     EmulationChoice c;
-    long n = 0;
+    long long n = 0;
     std::string lc;
     for (char ch : cycles) lc += char(std::tolower((unsigned char)ch));
     if (lc == "auto") c.speed = CPUSpeed::autoSpeed();
-    else if (plainNumber(cycles, n) && n > 0) c.speed = CPUSpeed::fixed(int(n));
-    if (plainNumber(frameskip, n)) c.frameskip = int(n);
+    else if (wholeNumber(cycles, kMaxSpeed, n) && validCycles(n)) c.speed = CPUSpeed::fixed(int(n));
+    else if (!cycles.empty())
+        note(problems, "CYCLES \"" + cycles + "\" is not AUTO or a number of cycles from " + std::to_string(kMinSpeed) +
+                           " to " + std::to_string(kMaxSpeed) + "; it is not used.");
+    if (wholeNumber(frameskip, kMaxFrameskip, n)) c.frameskip = int(n);
+    else if (!frameskip.empty())
+        note(problems, "FRAMESKIP \"" + frameskip + "\" is not a number from 0 to " + std::to_string(kMaxFrameskip) +
+                           "; it is not used.");
     return c;
 }
 

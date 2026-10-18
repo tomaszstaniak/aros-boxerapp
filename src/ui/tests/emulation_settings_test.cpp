@@ -11,6 +11,7 @@
 // across sessions, with the file on disk (round trip, rename).
 // Usage: emulation_settings_test <scratch dir>
 #include "../emulation_settings.h"
+#include "../ui_logic.h"
 
 #include "../../model/datalocations.h"
 #include "../../model/fsutil.h"
@@ -219,6 +220,77 @@ static void testFileRoundTripAndRename(const std::string &scratch) {
     CHECK(s3.s.speed() == fixedSpeed(25000) && s3.s.frameskip() == 3);
 }
 
+// Ranges and overflow: the limits themselves are taken, one past them and
+// huge, negative or malformed values are refused with a sentence, and a
+// refused value is never a choice (the lower layers apply).
+static void testValidation() {
+    std::vector<std::string> p;
+    CHECK(parseEmulationOverride(std::to_string(kMinSpeed), "0", &p).speed == fixedSpeed(kMinSpeed));
+    CHECK(parseEmulationOverride(std::to_string(kMaxSpeed), "", &p).speed == fixedSpeed(kMaxSpeed));
+    CHECK(*parseEmulationOverride("", std::to_string(kMaxFrameskip), &p).frameskip == kMaxFrameskip);
+    CHECK(*parseEmulationOverride("", "0", &p).frameskip == 0);
+    CHECK(p.empty());
+    const char *badCycles[] = {"49", "62501", "0", "-1", "-62500", "2147483648", "4294967346",
+                               "99999999999999999999999999", "1e4", " 3000", "3000 ", "+3000", "0x100", "autox"};
+    for (const char *b : badCycles) {
+        p.clear();
+        const EmulationChoice c = parseEmulationOverride(b, "", &p);
+        CHECK(!c.speed && p.size() == 1 && p[0].find("CYCLES") != std::string::npos);
+    }
+    const char *badSkip[] = {"10", "-1", "4294967296", "18446744073709551617", "99999999999999999999", "1.5", "two"};
+    for (const char *b : badSkip) {
+        p.clear();
+        const EmulationChoice c = parseEmulationOverride("", b, &p);
+        CHECK(!c.frameskip && p.size() == 1 && p[0].find("FRAMESKIP") != std::string::npos);
+    }
+    // A refused override leaves the saved choice and the base in force.
+    boxer::PlistValue d = boxer::PlistValue::dict();
+    d.set(kCPUSpeedKey, boxer::PlistValue::integer(20000));
+    Session s(d, fixedSpeed(10000), 2, parseEmulationOverride("99999999999", "-5"));
+    CHECK(s.s.speed() == fixedSpeed(20000) && s.s.frameskip() == 2);
+
+    // Stored values: the limits are taken, anything else is ignored and
+    // reported, and the gamebox's configuration applies.
+    const struct { long long speed, skip; bool speedOk, skipOk; } stored[] = {
+        {kMinSpeed, 0, true, true}, {kMaxSpeed, kMaxFrameskip, true, true}, {-1, 0, true, true},
+        {kMinSpeed - 1, kMaxFrameskip + 1, false, false}, {kMaxSpeed + 1, -1, false, false},
+        {0, 0, false, true}, {-2, 1, false, true},
+        {2147483648LL, 4294967296LL, false, false}, {-9223372036854775807LL, 9223372036854775807LL, false, false},
+    };
+    for (const auto &t : stored) {
+        boxer::PlistValue e = boxer::PlistValue::dict();
+        e.set(kCPUSpeedKey, boxer::PlistValue::integer(t.speed));
+        e.set(kFrameskipKey, boxer::PlistValue::integer(t.skip));
+        p.clear();
+        const EmulationChoice c = readEmulationChoice(e, &p);
+        CHECK(bool(c.speed) == t.speedOk && bool(c.frameskip) == t.skipOk);
+        CHECK(p.size() == size_t(!t.speedOk) + size_t(!t.skipOk));
+        Session u(e, fixedSpeed(10000), 3);
+        if (!t.speedOk) CHECK(u.s.speed() == fixedSpeed(10000));
+        if (!t.skipOk) CHECK(u.s.frameskip() == 3);
+    }
+    // Wrong types: a string, a real, a boolean.
+    boxer::PlistValue w = boxer::PlistValue::dict();
+    w.set(kCPUSpeedKey, boxer::PlistValue::real(3000.0));
+    w.set(kFrameskipKey, boxer::PlistValue::boolean(true));
+    p.clear();
+    const EmulationChoice wc = readEmulationChoice(w, &p);
+    CHECK(!wc.speed && !wc.frameskip && p.size() == 2);
+    // A bad stored value is no choice, so storing removes it (the lower
+    // layers applied this session and will again).
+    boxer::PlistValue x = boxer::PlistValue::dict();
+    x.set(kCPUSpeedKey, boxer::PlistValue::integer(5000000000LL));
+    Session v(x, fixedSpeed(10000), 0);
+    v.s.store(x);
+    CHECK(!hasKey(x, kCPUSpeedKey));
+    x.set(kCPUSpeedKey, boxer::PlistValue::integer(5000000000LL));
+    // Once the user chooses, the bad value is replaced.
+    Session y(x, fixedSpeed(10000), 0);
+    y.s.userChoseSpeed(fixedSpeed(25000));
+    y.s.store(x);
+    CHECK(num(x, kCPUSpeedKey) == 25000);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: emulation_settings_test <scratch dir>\n"); return 2; }
     const std::string scratch = argv[1];
@@ -231,6 +303,7 @@ int main(int argc, char **argv) {
     testOverrideNotPersisted();
     testAutoCountNeverStored();
     testSecondProgram();
+    testValidation();
     testFileRoundTripAndRename(scratch);
     if (failures) {
         std::printf("emulation_settings_test: %d of %d checks FAILED\n", failures, checks);
