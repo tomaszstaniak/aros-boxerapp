@@ -43,7 +43,7 @@ other.
 
 Get the archive from the
 [releases page](https://github.com/tomaszstaniak/aros-boxerapp/releases)
-(currently [0.1.0 preview 4](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview4),
+(currently [0.1.0 preview 5](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview5),
 x86_64 ABIv11). Checksums are listed with each release.
 
 ## Limitations
