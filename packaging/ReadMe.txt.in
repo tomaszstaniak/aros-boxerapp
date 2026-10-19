@@ -61,7 +61,9 @@ Uninstalling
 ------------
 1. In a Shell: CD to the Boxer drawer, then
      Execute Install-Assign REMOVE
-   This deletes S:Boxer-Assign and removes the Boxer: assign. The block
+   This deletes S:Boxer-Assign and removes the Boxer: assign, when they
+   belong to this Boxer drawer. If either cannot be removed, or belongs
+   to another drawer, it says so and leaves it. The block
    in S:User-Startup then does nothing; to remove it too, open
    S:User-Startup in an editor and delete the lines from ";BEGIN Boxer"
    to ";END Boxer".

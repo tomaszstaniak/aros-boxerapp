@@ -42,6 +42,10 @@ class Shell:
         self.answer = answer
         self.vars = {}
         self.rc = 0
+        # Faults for the REMOVE checks: host paths Delete cannot remove
+        # (protected) and assigns that REMOVE leaves in place.
+        self.undeletable = set()
+        self.sticky = set()
 
     # --- paths -------------------------------------------------------
     def host(self, path):
@@ -169,6 +173,8 @@ class Shell:
                     return 0
                 return 5
             if "REMOVE" in kw:
+                if name in self.sticky:
+                    return 20
                 self.assigns.pop(name, None)
                 return 0
             self.assigns[name] = a[2]
@@ -178,7 +184,7 @@ class Shell:
             return 0
         if c == "delete":
             p = self.host(a[1])
-            if not os.path.exists(p):
+            if not os.path.exists(p) or p in self.undeletable:
                 return 20
             shutil.rmtree(p) if os.path.isdir(p) else os.unlink(p)
             return 0
@@ -320,6 +326,18 @@ class InstallAssign(unittest.TestCase):
         sh = Shell(self.root)
         return sh.execute(SCRIPT, 'DIR "Work:Boxer"', stop_after)
 
+    def remove(self, sh=None):
+        sh = sh or Shell(self.root)
+        sh.assigns.setdefault("Boxer:", "Work:Boxer")
+        rc, out = sh.execute(SCRIPT, 'DIR "Work:Boxer" REMOVE')
+        return rc, out, sh
+
+    def installed_shell(self):
+        sh = Shell(self.root)
+        rc, out = sh.execute(SCRIPT, 'DIR "Work:Boxer"')
+        self.assertEqual(rc, 0, out)
+        return sh
+
     def files(self):
         return sorted(os.listdir(self.path("S")))
 
@@ -375,6 +393,59 @@ class InstallAssign(unittest.TestCase):
         self.assertNotIn("already has the Boxer block", out)
         self.assertNotEqual(rc, 0, out)
         self.assertEqual(self.read("S/User-Startup"), USER + ";BEGIN Boxer\n")
+
+    def test_remove_ours(self):
+        sh = self.installed_shell()
+        self.assertIn("Boxer:", sh.assigns)
+        rc, out, sh = self.remove(sh)
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("Boxer:", sh.assigns)
+        self.assertIsNone(self.read("S/Boxer-Assign"))
+        self.assertIn("removed the Boxer: assign", out)
+
+    def test_remove_reports_a_file_that_stays(self):
+        sh = self.installed_shell()
+        sh.undeletable.add(self.path("S/Boxer-Assign"))
+        rc, out, sh = self.remove(sh)
+        self.assertEqual(rc, 10, out)
+        self.assertIn("FAILED to delete S:Boxer-Assign", out)
+        self.assertIn("REMOVE did not complete", out)
+        self.assertNotIn("now does nothing", out)
+
+    def test_remove_reports_an_assign_that_stays(self):
+        sh = self.installed_shell()
+        sh.sticky.add("Boxer:")
+        rc, out, sh = self.remove(sh)
+        self.assertEqual(rc, 10, out)
+        self.assertIn("FAILED to remove the Boxer: assign", out)
+        self.assertIsNone(self.read("S/Boxer-Assign"))
+
+    def test_remove_leaves_an_assign_to_another_drawer(self):
+        os.makedirs(self.path("Work/Other Boxer"))
+        sh = self.installed_shell()
+        sh.assigns["Boxer:"] = "Work:Other Boxer"
+        rc, out, sh = self.remove(sh)
+        self.assertEqual(rc, 10, out)
+        self.assertEqual(sh.assigns.get("Boxer:"), "Work:Other Boxer")
+        self.assertIn("left as it is", out)
+
+    def test_remove_leaves_another_installations_startup_file(self):
+        self.write("S/Boxer-Assign", 'Assign Boxer: "Work:Other Boxer"\n')
+        sh = Shell(self.root)
+        rc, out, sh = self.remove(sh)
+        self.assertEqual(rc, 10, out)
+        self.assertEqual(self.read("S/Boxer-Assign"), 'Assign Boxer: "Work:Other Boxer"\n')
+        # An empty file is not searched (and not taken for ours).
+        self.write("S/Boxer-Assign", "")
+        rc, out, sh = self.remove(Shell(self.root))
+        self.assertEqual(rc, 10, out)
+        self.assertEqual(self.read("S/Boxer-Assign"), "")
+
+    def test_remove_with_nothing_installed(self):
+        sh = Shell(self.root)
+        rc, out = sh.execute(SCRIPT, 'DIR "Work:Boxer" REMOVE')
+        self.assertEqual(rc, 0, out)
+        self.assertIn("did not exist", out)
 
     def test_reset_at_any_point_never_loses_user_commands(self):
         # A reset after each command in turn, then a normal run: the user's

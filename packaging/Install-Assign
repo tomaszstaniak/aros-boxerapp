@@ -21,9 +21,10 @@
 ; and leaves them to the user instead of using, replacing or deleting them.
 ; When Boxer: already points somewhere else nothing is overwritten: KEEP
 ; leaves it, REPLACE changes it, and with neither a requester asks.
-; REMOVE undoes it: deletes S:Boxer-Assign and the Boxer: assign. The
-; block in S:User-Startup then does nothing; delete its lines by hand if
-; you want it gone.
+; REMOVE undoes it: deletes S:Boxer-Assign and the Boxer: assign, but only
+; when they name this drawer, checks that both are gone, and ends with 10
+; and a message when not. The block in S:User-Startup then does nothing;
+; delete its lines by hand if you want it gone.
 ; STARTUP=<file> writes the block to another file (tests only).
 ;
 ; Why no .def: on AROS a .def default for a /K keyword was not applied,
@@ -51,16 +52,60 @@ EndIf
 Set BxDir `CD`
 CD "$BxOld"
 If NOT "x{REMOVE}" EQ "x"
+  ; Only what this Boxer drawer set up is removed: an S:Boxer-Assign or a
+  ; Boxer: assign that names another drawer belongs to another
+  ; installation and stays. Each removal is checked afterwards; any part
+  ; that did not happen is named and the script ends with 10.
+  Set BxFail 0
   If EXISTS S:Boxer-Assign
-    Delete S:Boxer-Assign QUIET
-    Echo "Install-Assign: deleted S:Boxer-Assign; Boxer: is no longer set at startup."
+    Set BxMine 0
+    Set BxSz `List S:Boxer-Assign LFORMAT "%L"`
+    ; Search is never run on an empty file (it damaged memory on AROS).
+    If NOT "x$BxSz" EQ "x0"
+      Search >NIL: S:Boxer-Assign "Assign Boxer: *"$BxDir*"" QUIET
+      If NOT WARN
+        Set BxMine 1
+      EndIf
+    EndIf
+    If "x$BxMine" EQ "x1"
+      Delete >NIL: S:Boxer-Assign QUIET
+      If EXISTS S:Boxer-Assign
+        Echo "Install-Assign: FAILED to delete S:Boxer-Assign (protected or in use?)."
+        Set BxFail 1
+      Else
+        Echo "Install-Assign: deleted S:Boxer-Assign; Boxer: is no longer set at startup."
+      EndIf
+    Else
+      Echo "Install-Assign: S:Boxer-Assign does not assign Boxer: to *"$BxDir*"; it was left as it is."
+      Set BxFail 1
+    EndIf
   Else
     Echo "Install-Assign: S:Boxer-Assign did not exist."
   EndIf
   Assign >NIL: Boxer: EXISTS
   If NOT WARN
-    Assign Boxer: REMOVE
-    Echo "Install-Assign: removed the Boxer: assign."
+    CD Boxer:
+    Set BxCur `CD`
+    CD "$BxOld"
+    If "x$BxCur" EQ "x$BxDir"
+      Assign >NIL: Boxer: REMOVE
+      Assign >NIL: Boxer: EXISTS
+      If NOT WARN
+        Echo "Install-Assign: FAILED to remove the Boxer: assign."
+        Set BxFail 1
+      Else
+        Echo "Install-Assign: removed the Boxer: assign."
+      EndIf
+    Else
+      Echo "Install-Assign: Boxer: points to *"$BxCur*", not to *"$BxDir*"; it was left as it is."
+      Set BxFail 1
+    EndIf
+  Else
+    Echo "Install-Assign: the Boxer: assign did not exist."
+  EndIf
+  If NOT "x$BxFail" EQ "x0"
+    Echo "Install-Assign: REMOVE did not complete; see above."
+    Quit 10
   EndIf
   Echo "Install-Assign: the Boxer block in $BxSU now does nothing; delete it by hand if you like."
   Quit 0
