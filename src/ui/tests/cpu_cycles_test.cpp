@@ -84,9 +84,83 @@ static void testNoChoice() {
     CHECK(s.autoDetermine == (kDetermineCycles | kDetermineCore));   // ready for the next program
 }
 
+// Explicit Automatic over cycles=auto: stays automatic through a
+// protected-mode program, its end, and the next program.
+static void testAutomaticThroughPmode() {
+    CycleState s = cyclesAuto();
+    setAutomaticCycles(s);
+    CHECK(s.autoAdjust && !(s.autoDetermine & kDetermineCycles) && (s.autoDetermine & kDetermineCore));
+    for (int program = 0; program < 2; ++program) {
+        enterPmode(s);
+        CHECK(s.autoAdjust);
+        programExit(s);
+        CHECK(s.autoAdjust);
+    }
+    // Chosen while the protected-mode program runs (flags shifted).
+    CycleState t = cyclesAuto();
+    enterPmode(t);
+    setFixedCycles(t, 5000);   // the user first picked a fixed speed...
+    setAutomaticCycles(t);     // ...then Automatic
+    programExit(t);
+    CHECK(t.autoAdjust);
+    enterPmode(t);
+    programExit(t);
+    CHECK(t.autoAdjust);
+    // The old setter (flag left set) is what lost it: shown with the model.
+    CycleState old = cyclesAuto();
+    old.oldCycleMax = old.cycleMax;
+    old.autoAdjust = true;   // setAutoSpeed:YES without clearing the flag
+    enterPmode(old);
+    programExit(old);
+    CHECK(!old.autoAdjust && old.cycleMax == 3000);
+}
+
+// Explicit fixed 3000 over cycles=auto: a protected-mode program does not
+// switch to automatic, and the next program still runs at 3000.
+static void testFixed3000ThroughPmode() {
+    CycleState s = cyclesAuto();
+    setFixedCycles(s, 3000);
+    CHECK(cycleConfigOf(s) == CycleConfig::Fixed);
+    for (int program = 0; program < 2; ++program) {
+        enterPmode(s);
+        CHECK(!s.autoAdjust && s.cycleMax == 3000);
+        programExit(s);
+        CHECK(!s.autoAdjust && s.cycleMax == 3000);
+    }
+    // Chosen during the protected-mode phase.
+    CycleState t = cyclesAuto();
+    enterPmode(t);
+    CHECK(t.autoAdjust);
+    setFixedCycles(t, 25000);
+    programExit(t);
+    CHECK(!t.autoAdjust && t.cycleMax == 25000);
+    enterPmode(t);
+    CHECK(!t.autoAdjust && t.cycleMax == 25000);
+    // The core flag survives: core=auto still switches the core.
+    CHECK((t.autoDetermine & ((kDetermineCore << kDetermineShift) | kDetermineCore)) != 0);
+}
+
+// cycles=max and fixed configurations: the setters behave as before.
+static void testOtherConfigs() {
+    CycleState m = cyclesMax();
+    setFixedCycles(m, 10000);
+    enterPmode(m);
+    programExit(m);
+    CHECK(!m.autoAdjust && m.cycleMax == 10000);
+    CycleState f = cyclesFixed(8000);
+    setAutomaticCycles(f);
+    CHECK(f.autoAdjust && f.oldCycleMax == 8000 && f.percUsed == 100);
+    enterPmode(f);
+    programExit(f);
+    CHECK(f.autoAdjust);
+}
+
 int main() {
     testConfig();
     testNoChoice();
+    testAutomaticThroughPmode();
+    testFixed3000ThroughPmode();
+    testOtherConfigs();
     if (failures) {
         std::printf("cpu_cycles_test: %d of %d checks FAILED\n", failures, checks);
         return 1;

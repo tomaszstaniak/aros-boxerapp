@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Derived from Boxer (Boxer/BXEmulator.mm),
+// Derived from Boxer (Boxer/BXEmulator.mm setFixedSpeed:/setAutoSpeed:),
 // https://github.com/alunbestor/Boxer at commit 0062fc18:
 //   Copyright (c) 2013 Alun Bestor and contributors. All rights reserved.
 //   This source file is released under the GNU General Public License 2.0.
@@ -17,7 +17,8 @@
 // (cpu.cpp CPU_SET_CRX), and a program that ends back in real mode
 // shifts them right and restores the fixed cycles (dos_execute.cpp
 // DOS_Terminate). So "3000, fixed" right now may be "auto-determine", and
-// telling the configuration apart needs the flag, not the speed.
+// a choice made by the user must clear both flag positions, or the next
+// program's end undoes it.
 #ifndef BOXER_UI_CPU_CYCLES_H
 #define BOXER_UI_CPU_CYCLES_H
 
@@ -42,6 +43,13 @@ enum class CycleConfig {
     AutoDetermine,  // cycles=auto: fixed in real mode, automatic in protected mode
 };
 CycleConfig cycleConfigOf(const CycleState &s);
+
+// BXEmulator setFixedSpeed: and setAutoSpeed:YES, plus what the original
+// did not do: both clear the cycles auto-determine flag in its current and
+// its shifted position, so the choice stays through protected mode and
+// the end of a program. The core flag is left alone.
+void setFixedCycles(CycleState &s, int cycles);
+void setAutomaticCycles(CycleState &s);
 
 }  // namespace boxer_ui
 #endif

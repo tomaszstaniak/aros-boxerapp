@@ -28,6 +28,8 @@ std::string coreAudioStats();
 
 // BXEmulator setFixedSpeed: / setAutoSpeed: (BXEmulator.mm:396-457).
 // cycles > 0: fixed speed; cycles < 0: automatic throttling ("Max").
+// Either stays in force through protected mode and the end of a program
+// (ui/cpu_cycles.h), where "cycles=auto" would otherwise switch back.
 void coreSetSpeed(int cycles);
 // Current CPU_CycleMax and whether automatic throttling is on.
 int coreCycles(bool *autoSpeed);

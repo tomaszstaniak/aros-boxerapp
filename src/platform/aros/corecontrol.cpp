@@ -58,25 +58,6 @@ std::string coreAudioStats()
 	return std::string(b) + c;
 }
 
-void coreSetSpeed(int cycles)
-{
-	if (cycles > 0) {
-		// setFixedSpeed: turn automatic throttling off, set both maxima,
-		// keep DOSBox from resetting cycles when a program exits, and
-		// drop the queued cycles as DOSBox's own CPU code does.
-		CPU_CycleAutoAdjust = false;
-		CPU_OldCycleMax = CPU_CycleMax = (Bit32s)cycles;
-		CPU_AutoDetermineMode &= ~CPU_AUTODETERMINE_CYCLES;
-		CPU_CycleLeft = 0;
-		CPU_Cycles = 0;
-	} else if (!CPU_CycleAutoAdjust) {
-		// setAutoSpeed:YES records the fixed value and forces 100% usage.
-		CPU_OldCycleMax = CPU_CycleMax;
-		CPU_CyclePercUsed = 100;
-		CPU_CycleAutoAdjust = true;
-	}
-}
-
 // The flag values ui/cpu_cycles models must be DOSBox's own.
 static_assert(boxer_ui::kDetermineCore == CPU_AUTODETERMINE_CORE, "core flag");
 static_assert(boxer_ui::kDetermineCycles == CPU_AUTODETERMINE_CYCLES, "cycles flag");
@@ -91,6 +72,25 @@ boxer_ui::CycleState coreCycleState()
 	s.percUsed = (int)CPU_CyclePercUsed;
 	s.autoDetermine = (unsigned)CPU_AutoDetermineMode;
 	return s;
+}
+
+// setFixedSpeed: / setAutoSpeed:YES through ui/cpu_cycles, which also
+// clears the cycles auto-determine flag in both positions: left set, the
+// end of a protected-mode program would put back the fixed cycles of
+// "cycles=auto" over the user's choice. The queued cycles are dropped
+// whenever the speed changes, as DOSBox's own CPU code does.
+void coreSetSpeed(int cycles)
+{
+	boxer_ui::CycleState s = coreCycleState();
+	if (cycles > 0) boxer_ui::setFixedCycles(s, cycles);
+	else boxer_ui::setAutomaticCycles(s);
+	CPU_CycleAutoAdjust = s.autoAdjust;
+	CPU_CycleMax = (Bit32s)s.cycleMax;
+	CPU_OldCycleMax = (Bit32s)s.oldCycleMax;
+	CPU_CyclePercUsed = (Bit32s)s.percUsed;
+	CPU_AutoDetermineMode = (Bitu)s.autoDetermine;
+	CPU_CycleLeft = 0;
+	CPU_Cycles = 0;
 }
 
 static bool wasAutoSpeed;
