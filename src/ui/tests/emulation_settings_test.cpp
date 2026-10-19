@@ -38,7 +38,7 @@ static CPUSpeed fixedSpeed(int c) { return CPUSpeed::fixed(c); }
 // saved choice, start with the core's base, let the user act, store.
 struct Session {
     EmulationSettings s;
-    Session(const boxer::PlistValue &dict, CPUSpeed base, int baseSkip, const EmulationChoice &ovr = {}) {
+    Session(const boxer::PlistValue &dict, CPUBase base, int baseSkip, const EmulationChoice &ovr = {}) {
         s.begin(readEmulationChoice(dict), ovr, base, baseSkip);
     }
 };
@@ -291,6 +291,53 @@ static void testValidation() {
     CHECK(num(x, kCPUSpeedKey) == 25000);
 }
 
+// A gamebox (or the defaults) with cycles=auto: 3000 fixed cycles at the
+// first shell, but the core switches to automatic in protected mode. Neither
+// a fixed 3000 nor Automatic chosen by the user is that, so both are applied
+// and kept; only "no choice" leaves DOSBox to decide.
+static void testAutoDetermineBase() {
+    const CPUBase autoDet(CycleConfig::AutoDetermine, 3000);
+    boxer::PlistValue d = boxer::PlistValue::dict();
+    Session none(d, autoDet, 0);
+    CHECK(!none.s.speedToApply() && none.s.speed() == fixedSpeed(3000));
+    none.s.store(d);
+    CHECK(!hasKey(d, kCPUSpeedKey));
+
+    Session f(d, autoDet, 0);
+    f.s.userChoseSpeed(fixedSpeed(3000));
+    CHECK(f.s.speedToApply() && *f.s.speedToApply() == fixedSpeed(3000));
+    f.s.store(d);
+    CHECK(num(d, kCPUSpeedKey) == 3000);   // not dropped as "the default"
+    Session f2(d, autoDet, 0);
+    CHECK(f2.s.speedToApply() && *f2.s.speedToApply() == fixedSpeed(3000));
+
+    boxer::PlistValue e = boxer::PlistValue::dict();
+    Session a(e, autoDet, 0);
+    a.s.userChoseSpeed(kAuto);
+    a.s.store(e);
+    CHECK(num(e, kCPUSpeedKey) == kBXAutoSpeed);
+    Session a2(e, autoDet, 0);
+    CHECK(a2.s.speedToApply() && *a2.s.speedToApply() == kAuto);
+    // cycles=auto 5000: a fixed 5000 is still a different thing.
+    const CPUBase autoDet5000(CycleConfig::AutoDetermine, 5000);
+    CHECK(!autoDet5000.sameAs(fixedSpeed(5000)) && !autoDet5000.sameAs(kAuto));
+    // One-run override over cycles=auto: applied, not stored.
+    boxer::PlistValue g = boxer::PlistValue::dict();
+    Session o(g, autoDet, 0, parseEmulationOverride("3000", ""));
+    CHECK(o.s.speedToApply() && *o.s.speedToApply() == fixedSpeed(3000));
+    o.s.store(g);
+    CHECK(!hasKey(g, kCPUSpeedKey));
+
+    // The plain kinds: a choice equal to the base needs nothing.
+    boxer::PlistValue h = boxer::PlistValue::dict();
+    h.set(kCPUSpeedKey, boxer::PlistValue::integer(3000));
+    Session p1(h, CPUBase(CycleConfig::Fixed, 3000), 0);
+    CHECK(!p1.s.speedToApply());
+    Session p2(h, CPUBase(CycleConfig::Max, 0), 0);
+    CHECK(p2.s.speedToApply() && *p2.s.speedToApply() == fixedSpeed(3000));
+    CHECK(CPUBase(CycleConfig::Max, 0).sameAs(kAuto) && !CPUBase(CycleConfig::Fixed, 3000).sameAs(kAuto));
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: emulation_settings_test <scratch dir>\n"); return 2; }
     const std::string scratch = argv[1];
@@ -304,6 +351,7 @@ int main(int argc, char **argv) {
     testAutoCountNeverStored();
     testSecondProgram();
     testValidation();
+    testAutoDetermineBase();
     testFileRoundTripAndRename(scratch);
     if (failures) {
         std::printf("emulation_settings_test: %d of %d checks FAILED\n", failures, checks);

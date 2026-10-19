@@ -77,6 +77,22 @@ void coreSetSpeed(int cycles)
 	}
 }
 
+// The flag values ui/cpu_cycles models must be DOSBox's own.
+static_assert(boxer_ui::kDetermineCore == CPU_AUTODETERMINE_CORE, "core flag");
+static_assert(boxer_ui::kDetermineCycles == CPU_AUTODETERMINE_CYCLES, "cycles flag");
+static_assert(boxer_ui::kDetermineShift == CPU_AUTODETERMINE_SHIFT, "flag shift");
+
+boxer_ui::CycleState coreCycleState()
+{
+	boxer_ui::CycleState s;
+	s.autoAdjust = CPU_CycleAutoAdjust;
+	s.cycleMax = (int)CPU_CycleMax;
+	s.oldCycleMax = (int)CPU_OldCycleMax;
+	s.percUsed = (int)CPU_CyclePercUsed;
+	s.autoDetermine = (unsigned)CPU_AutoDetermineMode;
+	return s;
+}
+
 static bool wasAutoSpeed;
 
 int coreCycles(bool *autoSpeed)

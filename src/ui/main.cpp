@@ -1528,9 +1528,10 @@ static SessionHost *g_host;
 // speed as it is.
 static void applyEmulationSettings() {
     if (g_lp.emu.begun()) return;
-    bool autoSpeed = false;
-    const int cycles = boxer::coreCycles(&autoSpeed);
-    const CPUSpeed base = autoSpeed ? CPUSpeed::autoSpeed() : CPUSpeed::fixed(cycles);
+    // The configuration, not the momentary speed: cycles=auto starts at
+    // fixed 3000 with a flag for a later switch (cpu_cycles.h).
+    const CycleState core = boxer::coreCycleState();
+    const CPUBase base(cycleConfigOf(core), core.cycleMax);
     const int baseSkip = boxer::coreFrameskip();
     // A stored value out of range is never passed to the core: it is no
     // choice, the layers below apply (reported at start, not here).
@@ -1544,11 +1545,13 @@ static void applyEmulationSettings() {
         return !s ? std::string("-") : s->automatic ? std::string("auto") : std::to_string(s->cycles);
     };
     const auto skipName = [](const std::optional<int> &f) { return f ? std::to_string(*f) : std::string("-"); };
-    logf("cpu: base %s/frameskip %d, saved %s/%s, override %s/%s -> %s/frameskip %d",
-         speedName(base).c_str(), baseSkip, speedName(saved.speed).c_str(), skipName(saved.frameskip).c_str(),
+    const char *configName = base.config == CycleConfig::AutoDetermine ? "auto-determine "
+                             : base.config == CycleConfig::Max ? "max " : "fixed ";
+    logf("cpu: base %s%d/frameskip %d, saved %s/%s, override %s/%s -> %s/frameskip %d", configName,
+         base.cycles, baseSkip, speedName(saved.speed).c_str(), skipName(saved.frameskip).c_str(),
          speedName(override.speed).c_str(), skipName(override.frameskip).c_str(),
          speedName(g_lp.emu.speed()).c_str(), g_lp.emu.frameskip());
-    if (g_lp.emu.speed() != base) boxer::coreSetSpeed(g_lp.emu.speed().automatic ? -1 : g_lp.emu.speed().cycles);
+    if (const auto s = g_lp.emu.speedToApply()) boxer::coreSetSpeed(s->automatic ? -1 : s->cycles);
     if (g_lp.emu.frameskip() != baseSkip) boxer::coreSetFrameskip(g_lp.emu.frameskip());
 }
 

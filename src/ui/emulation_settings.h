@@ -29,6 +29,8 @@
 #ifndef BOXER_UI_EMULATION_SETTINGS_H
 #define BOXER_UI_EMULATION_SETTINGS_H
 
+#include "cpu_cycles.h"
+
 #include <optional>
 #include <string>
 #include <vector>
@@ -52,6 +54,25 @@ struct CPUSpeed {
     static CPUSpeed fixed(int c) { return {false, c}; }
     bool operator==(const CPUSpeed &o) const { return automatic == o.automatic && (automatic || cycles == o.cycles); }
     bool operator!=(const CPUSpeed &o) const { return !(*this == o); }
+};
+
+// What the session starts with before any choice: the gamebox's
+// configuration over the defaults, read from the core's configuration
+// (cpu_cycles.h), not from its momentary speed. "cycles=auto" is its own
+// kind: it shows 3000 fixed cycles at the first shell, but neither a fixed
+// 3000 nor Automatic chosen by the user is the same thing.
+struct CPUBase {
+    CycleConfig config = CycleConfig::Max;
+    int cycles = 0;   // Fixed, AutoDetermine: the cycles in real mode
+    CPUBase() = default;
+    CPUBase(CycleConfig c, int n) : config(c), cycles(n) {}
+    // A plain fixed or automatic base (tests, and the core's Fixed/Max).
+    CPUBase(CPUSpeed s) : config(s.automatic ? CycleConfig::Max : CycleConfig::Fixed), cycles(s.cycles) {}
+    // A choice that would leave the core exactly as this base does.
+    bool sameAs(CPUSpeed s) const {
+        if (s.automatic) return config == CycleConfig::Max;
+        return config == CycleConfig::Fixed && cycles == s.cycles;
+    }
 };
 
 struct EmulationChoice {
@@ -81,10 +102,13 @@ public:
     // At the start of the session, before the first program: saved is the
     // file's choice, override the one-run values, base what the core
     // started with from the gamebox's configuration and the defaults.
-    void begin(const EmulationChoice &saved, const EmulationChoice &override, CPUSpeed baseSpeed, int baseFrameskip);
+    void begin(const EmulationChoice &saved, const EmulationChoice &override, CPUBase baseSpeed, int baseFrameskip);
     bool begun() const { return begun_; }
-    // What the core is to run with now.
+    // The speed in force: a choice (override, saved or made now), else the
+    // base as it starts (for "cycles=auto", its real-mode cycles).
     CPUSpeed speed() const { return speed_; }
+    // A choice the core must be told about: one that is not the base.
+    std::optional<CPUSpeed> speedToApply() const;
     int frameskip() const { return frameskip_; }
     // A change made in the Inspector: the user's choice, saved at the end.
     // Nothing else (the core's own auto cycle count, fast forward, pause, a
@@ -101,9 +125,10 @@ public:
 private:
     bool begun_ = false;
     EmulationChoice saved_, chosen_;
-    CPUSpeed baseSpeed_;
+    CPUBase baseSpeed_;
     int baseFrameskip_ = 0;
     CPUSpeed speed_;
+    bool speedChosen_ = false;
     int frameskip_ = 0;
 };
 

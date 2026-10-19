@@ -11,6 +11,7 @@
 // original it reproduces. Call only while Emulator::run() is active.
 #pragma once
 
+#include "../../ui/cpu_cycles.h"
 #include <string>
 
 namespace boxer {
@@ -30,6 +31,10 @@ std::string coreAudioStats();
 void coreSetSpeed(int cycles);
 // Current CPU_CycleMax and whether automatic throttling is on.
 int coreCycles(bool *autoSpeed);
+// The core's CPU speed state (ui/cpu_cycles.h): its configuration
+// (fixed, max, auto-determine) is told apart from the momentary speed
+// with it.
+boxer_ui::CycleState coreCycleState();
 
 // BXEmulator turboSpeed (BXEmulator.mm:460-497): fast forward. Turning it
 // on suppresses automatic throttling (cycles / 3, at least 1000) and lets

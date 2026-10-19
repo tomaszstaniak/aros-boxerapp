@@ -74,20 +74,29 @@ EmulationChoice parseEmulationOverride(const std::string &cycles, const std::str
     return c;
 }
 
-void EmulationSettings::begin(const EmulationChoice &saved, const EmulationChoice &override, CPUSpeed baseSpeed,
+void EmulationSettings::begin(const EmulationChoice &saved, const EmulationChoice &override, CPUBase baseSpeed,
                               int baseFrameskip) {
     begun_ = true;
     saved_ = saved;
     chosen_ = EmulationChoice();
     baseSpeed_ = baseSpeed;
     baseFrameskip_ = baseFrameskip;
-    speed_ = override.speed ? *override.speed : saved.speed ? *saved.speed : baseSpeed;
+    const std::optional<CPUSpeed> choice = override.speed ? override.speed : saved.speed;
+    speedChosen_ = bool(choice);
+    speed_ = choice ? *choice
+                    : baseSpeed.config == CycleConfig::Max ? CPUSpeed::autoSpeed() : CPUSpeed::fixed(baseSpeed.cycles);
     frameskip_ = override.frameskip ? *override.frameskip : saved.frameskip ? *saved.frameskip : baseFrameskip;
+}
+
+std::optional<CPUSpeed> EmulationSettings::speedToApply() const {
+    if (!speedChosen_ || baseSpeed_.sameAs(speed_)) return std::nullopt;
+    return speed_;
 }
 
 void EmulationSettings::userChoseSpeed(CPUSpeed s) {
     chosen_.speed = s;
     speed_ = s;
+    speedChosen_ = true;
 }
 
 void EmulationSettings::userChoseFrameskip(int f) {
@@ -105,7 +114,7 @@ EmulationChoice EmulationSettings::toSave() const {
 void EmulationSettings::store(boxer::PlistValue &dict) const {
     if (!begun_) return;
     const EmulationChoice c = toSave();
-    if (!c.speed || *c.speed == baseSpeed_) dict.remove(kCPUSpeedKey);
+    if (!c.speed || baseSpeed_.sameAs(*c.speed)) dict.remove(kCPUSpeedKey);
     else dict.set(kCPUSpeedKey, boxer::PlistValue::integer(c.speed->automatic ? kBXAutoSpeed : c.speed->cycles));
     if (!c.frameskip || *c.frameskip == baseFrameskip_) dict.remove(kFrameskipKey);
     else dict.set(kFrameskipKey, boxer::PlistValue::integer(*c.frameskip));
