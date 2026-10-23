@@ -27,6 +27,9 @@ port; it is not yet the complete Boxer experience.
 - Open your games folder from the Welcome window with "Browse your games".
   If the folder has been moved or renamed, Boxer helps you find it and its
   saved games again.
+- Reopen one of the last ten games with "Open recent" in the Welcome
+  window or File > Open Recent. If a game has been moved, Boxer asks you
+  where it is now. File > Open... opens any gamebox.
 
 No games are included; bring your own DOS games.
 

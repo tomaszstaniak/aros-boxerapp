@@ -49,7 +49,8 @@ Installing
    name, or a picture of your own (click the icon). Each imported game
    gets an icon in the games folder that shows its cover; double-click it
    to play. "Browse your games" in the Welcome window opens the games
-   folder in Wanderer. While a game runs, the Gamebox tab of the
+   folder in Wanderer, and "Open recent" reopens one of the last ten
+   games (also in the File menu, with Open... for any gamebox). While a game runs, the Gamebox tab of the
    Inspector (Right Amiga+I) changes the cover at once; a new name is
    applied when you close the game.
 

@@ -216,7 +216,8 @@ enum {
     ID_LP_FILTER, ID_LP_ENTER, ID_LP_ACTION, ID_LP_TOGGLE,
     ID_IMPORT_CHOOSE, ID_IMPORT_BACK, ID_IMPORT_CLOSE, ID_IMPORT_SKIP, ID_IMPORT_BACK2,
     ID_IMPORT_LAUNCH, ID_IMPORT_USE, ID_IMPORT_DONE_CLOSE, ID_IMPORT_CREATE, ID_IMPORT_STOP, ID_IMPORT_LAUNCH_GAME,
-    ID_IMPORT_NAME, ID_IMPORT_COVER, ID_IMPORT_WELL, ID_INSP_NAME, ID_INSP_COVER, ID_INSP_WELL
+    ID_IMPORT_NAME, ID_IMPORT_COVER, ID_IMPORT_WELL, ID_INSP_NAME, ID_INSP_COVER, ID_INSP_WELL,
+    ID_FILE_OPEN, ID_RECENT_CLEAR, ID_RECENT_MENU0, ID_RECENT_MENU_END = ID_RECENT_MENU0 + boxer::kMaxRecentGames
 };
 
 // ------------------------------------------------------------- layouts ---
@@ -300,7 +301,7 @@ static const AbsLayout kPlaceholder = {296, 432, 296, 432, 296, 432, kPlaceholde
 // ---------------------------------------------------------------- state ---
 static struct {
     Object *app, *welcome, *dos, *fs, *insp;
-    Object *welcomeView, *wb[3], *recentPop, *recentList, *closeBtn, *recentBtn;
+    Object *welcomeView, *wb[3], *recentPop, *recentList, *recentView, *closeBtn, *recentBtn;
     Object *toolbar, *status, *render, *fsRender, *lockBtn, *statusText;
     Object *programs, *manuals, *seg[3], *volSlider, *volMin, *volMax, *inspBtn, *fsBtn;
     Object *tabbar, *tabs[5], *pages, *speedSlider, *speedDesc, *frameSlider, *frameDesc;
@@ -559,6 +560,38 @@ static void setFullscreen(bool on) {
     if (g_onFullscreenChanged) g_onFullscreenChanged();
 }
 
+// The File menu (MainMenu.xib) on the Welcome and the Import window. The
+// DOS window has none: there Amiga keys belong to the game. Zune returns
+// an item's MUIA_UserData as the ID when it is picked.
+struct FileMenu {
+    Object *recent = nullptr;         // "Open Recent"; its children are rebuilt
+    Object *browse = nullptr, *import = nullptr;
+    char titles[boxer::kMaxRecentGames][128];
+};
+static FileMenu g_fileMenus[2];       // [0] Welcome, [1] Import
+
+static Object *fileMenuItem(const char *title, const char *key, ULONG id) {
+    return MenuitemObject, MUIA_Menuitem_Title, (IPTR)title,
+        key ? MUIA_Menuitem_Shortcut : TAG_IGNORE, (IPTR)key, MUIA_UserData, id, End;
+}
+
+static Object *buildFileMenu(FileMenu &m, ULONG closeId) {
+    m.import = fileMenuItem("Import New Game", "N", ID_IMPORT);
+    m.browse = fileMenuItem("Browse Games Folder", "B", ID_BROWSE);
+    m.recent = MenuitemObject, MUIA_Menuitem_Title, (IPTR)"Open Recent", End;
+    return MenustripObject,
+        MUIA_Family_Child, (IPTR)(MenuObject, MUIA_Menu_Title, (IPTR)"File",
+            MUIA_Family_Child, (IPTR)m.import,
+            MUIA_Family_Child, (IPTR)m.browse,
+            MUIA_Family_Child, (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)NM_BARLABEL, End),
+            MUIA_Family_Child, (IPTR)fileMenuItem("Open...", "O", ID_FILE_OPEN),
+            MUIA_Family_Child, (IPTR)m.recent,
+            MUIA_Family_Child, (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)NM_BARLABEL, End),
+            MUIA_Family_Child, (IPTR)fileMenuItem("Close", "W", closeId),
+            End),
+        End;
+}
+
 static Object *buildWelcome() {
     ui.welcomeView = (Object *)NewObject(mccPaintGroup->mcc_Class, NULL,
         PGA_Mode, PM_Welcome, PGA_Layout, (IPTR)&kWelcomeView, TAG_DONE);
@@ -571,13 +604,15 @@ static Object *buildWelcome() {
     for (Object *b : ui.wb) DoMethod(ui.welcomeView, OM_ADDMEMBER, (IPTR)b);
 
     ui.recentBtn = newTextButton("Open recent", GS_RoundTextured, 115, 25, true);
+    // Filled from the recent games file (showRecentGames): the games, a
+    // rule, Clear Menu, as the original's popup (Welcome.xib).
     ui.recentList = ListObject, MUIA_Frame, MUIV_Frame_InputList,
-        MUIA_List_SourceArray, (IPTR)(new const char *[5]{
-            "BOXTEST (stand-in entry)", "Dune (stand-in entry)", "-----", "Clear Menu", nullptr}),
+        MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
+        MUIA_List_DestructHook, MUIV_List_DestructHook_String,
         End;
     ui.recentPop = PopobjectObject,
         MUIA_Popstring_Button, (IPTR)ui.recentBtn,
-        MUIA_Popobject_Object, (IPTR)(ListviewObject, MUIA_Listview_List, (IPTR)ui.recentList, End),
+        MUIA_Popobject_Object, (IPTR)(ui.recentView = ListviewObject, MUIA_Listview_List, (IPTR)ui.recentList, End),
         End;
     ui.closeBtn = newTextButton("Close", GS_RoundTextured, 70, 25, false);
     Object *bar = (Object *)NewObject(mccPaintGroup->mcc_Class, NULL,
@@ -586,6 +621,7 @@ static Object *buildWelcome() {
 
     return WindowObject,
         MUIA_Window_Title, (IPTR)"Welcome to Boxer",
+        MUIA_Window_Menustrip, (IPTR)buildFileMenu(g_fileMenus[0], ID_WELCOME_CLOSE),
         MUIA_Window_LeftEdge, MUIV_Window_LeftEdge_Centered,
         MUIA_Window_TopEdge, MUIV_Window_TopEdge_Centered,
         MUIA_Window_SizeGadget, FALSE,
@@ -708,6 +744,7 @@ static Object *buildImport() {
         End;
     return WindowObject,
         MUIA_Window_Title, (IPTR)"Import a Game",
+        MUIA_Window_Menustrip, (IPTR)buildFileMenu(g_fileMenus[1], ID_IMPORT_CLOSE),
         MUIA_Window_LeftEdge, MUIV_Window_LeftEdge_Centered,
         MUIA_Window_TopEdge, MUIV_Window_TopEdge_Centered,
         MUIA_Window_Width, 480,
@@ -3427,6 +3464,180 @@ static void handleDrop(const WaitingDrop &w) {
     }
 }
 
+// ------------------------------------------------------ open and recent ---
+// The recent games as last shown (popup rows and menu items index it).
+static std::vector<boxer::RecentGame> g_recentShown;
+
+static std::string recentTitle(const std::string &gamebox) {
+    return boxer::fsutil::stripExtension(boxer::fsutil::baseName(boxer::fsutil::trimTrailingSlash(gamebox)));
+}
+
+// The window a menu pick or a requester belongs to: the active one of the
+// two that carry the File menu.
+static Object *fileMenuWindow() {
+    IPTR active = 0;
+    get(ui.imp, MUIA_Window_Activate, &active);
+    return active ? ui.imp : ui.welcome;
+}
+
+// Reads the file again and shows it: the Welcome popup (games, a rule,
+// Clear Menu) and both File menus' Open Recent. Another BoxerUI may have
+// changed it since (every game notes itself in its own process).
+static void showRecentGames() {
+    g_recentShown = readRecentGames();
+    const size_t n = g_recentShown.size();
+    set(ui.recentList, MUIA_List_Quiet, TRUE);
+    DoMethod(ui.recentList, MUIM_List_Clear);
+    for (const auto &r : g_recentShown) {
+        const std::string t = recentTitle(r.path);
+        DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)t.c_str(), MUIV_List_Insert_Bottom);
+    }
+    if (n) {
+        DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)"\33c----------", MUIV_List_Insert_Bottom);
+        DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)"Clear Menu", MUIV_List_Insert_Bottom);
+    }
+    set(ui.recentList, MUIA_List_Quiet, FALSE);
+    set(ui.recentBtn, MUIA_Disabled, n == 0);
+    for (FileMenu &m : g_fileMenus) {
+        if (!m.recent) continue;
+        // Zune rebuilds the window's menus on each Family change.
+        std::vector<Object *> old;
+        struct MinList *kids = nullptr;
+        get(m.recent, MUIA_Family_List, &kids);
+        if (kids) {
+            Object *cstate = (Object *)kids->mlh_Head, *child;
+            while ((child = (Object *)NextObject(&cstate))) old.push_back(child);
+        }
+        for (Object *o : old) {
+            DoMethod(m.recent, MUIM_Family_Remove, (IPTR)o);
+            MUI_DisposeObject(o);
+        }
+        for (size_t i = 0; i < n; ++i) {
+            // Zune and GadTools keep the title pointer, so it lives in the
+            // menu's own buffer, rewritten only after the old items are gone.
+            char *title = m.titles[i];
+            snprintf(title, sizeof m.titles[i], "%s", recentTitle(g_recentShown[i].path).c_str());
+            DoMethod(m.recent, MUIM_Family_AddTail,
+                     (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)title, MUIA_UserData, ID_RECENT_MENU0 + i, End));
+        }
+        if (n) DoMethod(m.recent, MUIM_Family_AddTail, (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)NM_BARLABEL, End));
+        DoMethod(m.recent, MUIM_Family_AddTail,
+                 (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)"Clear Menu", MUIA_Menuitem_Enabled, n != 0,
+                        MUIA_UserData, ID_RECENT_CLEAR, End));
+    }
+}
+
+static void clearRecentGames() {
+    changeRecentGames("Clear Menu", [](std::vector<boxer::RecentGame> &l) { l.clear(); });
+    showRecentGames();
+}
+
+// A drawer the user chose to play (File > Open..., Open recent, Locate):
+// classified as a drop and started the way a dropped gamebox is, so the
+// import, if any, is not touched.
+static bool openChosenGamebox(const std::string &chosen, Object *win, const char *how) {
+    const DropClass c = withoutVolumeRequesters([&] {
+        return classifyDrop({DropItem{boxer::fsutil::trimTrailingSlash(chosen), false}});
+    });
+    const DropPlan plan = planOpen(c);
+    logf("open (%s): %s \"%s\" -> %s", how, dropKindName(c.kind), chosen.c_str(),
+         plan.action == DropAction::OpenGame ? "open game" : dropRefusalName(plan.refusal));
+    if (plan.action != DropAction::OpenGame) {
+        if (!plan.message.empty())
+            MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)plan.message.c_str());
+        return false;
+    }
+    const GameStart g = startDroppedGame(plan.path, launchGamebox);
+    if (!g.started)
+        MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)g.message.c_str());
+    return g.started;
+}
+
+// File > Open...: a gamebox drawer, starting in the games folder.
+static void openGameFromRequester(Object *win) {
+    const std::string start = g_gamesFolder.empty() ? std::string("SYS:") : g_gamesFolder;
+    const std::string chosen = withoutVolumeRequesters([&] { return pickDrawer(start, "Choose a gamebox to open", false); });
+    if (chosen.empty()) { logf("open (requester): cancelled"); return; }
+    openChosenGamebox(chosen, win, "requester");
+}
+
+// Locate... for a recent game that is gone: the user points to it; the
+// entry follows the gamebox chosen. "" when cancelled or refused.
+static std::string locateRecentGame(const boxer::RecentGame &r, Object *win) {
+    const std::string chosen = withoutVolumeRequesters([&] {
+        return pickDrawer(boxer::fsutil::parent(boxer::fsutil::trimTrailingSlash(r.path)), "Locate the game", false);
+    });
+    if (chosen.empty()) { logf("recent: locate \"%s\" cancelled", r.path.c_str()); return ""; }
+    const DropClass c = withoutVolumeRequesters([&] {
+        return classifyDrop({DropItem{boxer::fsutil::trimTrailingSlash(chosen), false}});
+    });
+    const DropPlan plan = planOpen(c);
+    if (plan.action != DropAction::OpenGame) {
+        logf("recent: locate \"%s\": \"%s\" refused (%s)", r.path.c_str(), chosen.c_str(), dropRefusalName(plan.refusal));
+        if (!plan.message.empty())
+            MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)plan.message.c_str());
+        return "";
+    }
+    if (!r.identifier.empty()) {
+        boxer::Gamebox box;
+        const std::string id = withoutVolumeRequesters([&] { return box.open(plan.path) ? box.identifier() : std::string(); });
+        if (!id.empty() && id != r.identifier) {
+            LONG a = MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"Open|Cancel",
+                (char *)"\"%s\" is a different game from \"%s\" in the list.\n\nOpen it anyway?",
+                (IPTR)recentTitle(plan.path).c_str(), (IPTR)recentTitle(r.path).c_str());
+            logf("recent: locate \"%s\": \"%s\" has another identifier -> %d", r.path.c_str(), plan.path.c_str(), (int)a);
+            if (a != 1) return "";
+        }
+    }
+    renameRecentGamebox(r.path, plan.path);
+    return plan.path;
+}
+
+// An Open recent entry. A gamebox that is gone is looked for once, in its
+// last folder by its identifier (a rename in Wanderer); one match is
+// taken, anything else is the user's choice: Locate, Remove, Cancel.
+static void openRecentGame(size_t index, Object *win) {
+    if (index >= g_recentShown.size()) return;
+    const boxer::RecentGame r = g_recentShown[index];
+    std::string path = r.path;
+    logf("recent: open \"%s\" (entry %u)", path.c_str(), (unsigned)index);
+    const bool there = withoutVolumeRequesters([&] { return boxer::fsutil::isDirectory(path); });
+    if (!there) {
+        const std::string folder = boxer::fsutil::parent(boxer::fsutil::trimTrailingSlash(path));
+        std::vector<std::string> found;
+        if (!r.identifier.empty())
+            found = withoutVolumeRequesters([&] {
+                return boxer::fsutil::isDirectory(folder) ? boxer::gameboxesWithIdentifier(folder, r.identifier)
+                                                          : std::vector<std::string>();
+            });
+        if (found.size() == 1) {
+            logf("recent: \"%s\" is gone; \"%s\" in the same folder has its identifier %s: entry re-pointed",
+                 path.c_str(), found[0].c_str(), r.identifier.c_str());
+            renameRecentGamebox(path, found[0]);
+            path = found[0];
+        } else {
+            LONG a = MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"Locate...|Remove from List|Cancel",
+                (char *)"Boxer can no longer find \"%s\".\n\n"
+                        "Make sure the disk containing it is connected.\n\n%s",
+                (IPTR)recentTitle(path).c_str(), (IPTR)path.c_str());
+            logf("recent: \"%s\" missing (%u found by identifier), prompt -> %d", path.c_str(),
+                 (unsigned)found.size(), (int)a);
+            if (a == 2) {
+                changeRecentGames("removed \"" + path + "\"",
+                                  [&](std::vector<boxer::RecentGame> &l) { boxer::removeRecentGame(l, path); });
+                showRecentGames();
+                return;
+            }
+            if (a != 1) return;
+            path = locateRecentGame(r, win);
+            showRecentGames();
+            if (path.empty()) return;
+        }
+    }
+    openChosenGamebox(path, win, "recent");
+    showRecentGames();
+}
+
 // The waiting drop, outside Zune's dispatch. A drop that arrives while one
 // is handled (its requester open) waits and is handled right after.
 static void serviceDrops() {
@@ -3613,6 +3824,25 @@ static bool handleId(ULONG id) {
                     ui.impName);
         break;
     }
+    case ID_RECENT_PICK: {
+        IPTR active = (IPTR)MUIV_List_Active_Off;
+        get(ui.recentList, MUIA_List_Active, &active);
+        DoMethod(ui.recentPop, MUIM_Popstring_Close, FALSE);
+        const LONG row = (LONG)active;
+        const LONG n = (LONG)g_recentShown.size();
+        if (row >= 0 && row < n) openRecentGame((size_t)row, ui.welcome);
+        else if (n && row == n + 1) clearRecentGames();
+        break;
+    }
+    case ID_RECENT_CLEAR:
+        clearRecentGames();
+        break;
+    case ID_RECENT_MENU0 ... ID_RECENT_MENU_END - 1:
+        openRecentGame(id - ID_RECENT_MENU0, fileMenuWindow());
+        break;
+    case ID_FILE_OPEN:
+        openGameFromRequester(fileMenuWindow());
+        break;
     case ID_INSP_NAME:
         if (!g_args.gamebox.empty()) inspectorRename();
         break;
@@ -3818,6 +4048,13 @@ static bool handleId(ULONG id) {
         logf("harness: emulating=%d", st.emulating);
         break;
     case ID_ACTIVATION:
+        {
+            // Back at the Welcome window, perhaps from a game that noted
+            // itself in its own process: the list as it is now.
+            IPTR welcomeActive = 0;
+            get(ui.welcome, MUIA_Window_Activate, &welcomeActive);
+            if (welcomeActive) showRecentGames();
+        }
         for (Object *w : g_wins) {
             IPTR o = 0, root = 0;
             get(w, MUIA_Window_Open, &o);
@@ -4114,13 +4351,19 @@ int main(int argc, char **argv) {
              MUIM_Application_ReturnID, ID_WELCOME_CLOSE);
     notifyId(ui.closeBtn, MUIA_Pressed, FALSE, ID_WELCOME_CLOSE);
     notifyId(ui.wb[2], MUIA_Pressed, FALSE, ID_PROMPT);
-    // A control is either working or ghosted, never a stub that only logs.
-    // Open recent has no history behind it yet.
-    set(ui.recentBtn, MUIA_Disabled, TRUE);
+    // A control is either working or ghosted, never a stub that only logs:
+    // Open recent is ghosted while the list is empty. A double click (or
+    // Return) on a row picks it.
+    showRecentGames();
+    notifyId(ui.recentView, MUIA_Listview_DoubleClick, TRUE, ID_RECENT_PICK);
     // Browse and Import work from the Welcome window once a games folder is known.
     if (g_gamesFolder.empty()) {
         set(ui.wb[0], MUIA_Disabled, TRUE);
         set(ui.wb[1], MUIA_Disabled, TRUE);
+        for (FileMenu &m : g_fileMenus) {
+            set(m.browse, MUIA_Menuitem_Enabled, FALSE);
+            set(m.import, MUIA_Menuitem_Enabled, FALSE);
+        }
     } else {
         notifyId(ui.wb[0], MUIA_Pressed, FALSE, ID_BROWSE);
         notifyId(ui.wb[1], MUIA_Pressed, FALSE, ID_IMPORT);
