@@ -65,6 +65,7 @@
 #include "../model/fsutil.h"
 #include "../model/gamebox.h"
 #include "../model/programs.h"
+#include "../model/recentgames.h"
 #include "../model/shadowfs.h"
 #include "../platform/aros/appdrop.h"
 #include "../platform/aros/coreinput.h"
@@ -93,6 +94,7 @@
 #include <devices/inputevent.h>
 
 #include <algorithm>
+#include <functional>
 #include <cctype>
 #include <cmath>
 #include <string>
@@ -1027,6 +1029,7 @@ struct SessionState {
 };
 static SessionState *g_session;
 static bool sessionRunning() { return g_session && g_session->running; }
+static void noteRecentGamebox(const std::string &gamebox);
 
 static ULONG g_sigMask;
 static bool handleId(ULONG id);
@@ -1929,6 +1932,8 @@ static SessionResult prepareAndRunSession() {
         confs = layered;
         files = &shadowFiles;
         g_session->title = name;
+        // BXAppController noteNewRecentDocument: only a gamebox that opened.
+        noteRecentGamebox(g_args.gamebox);
         // The gamebox again, now with its identifier persisted by openGamebox.
         g_lp.active = g_lp.box.open(g_args.gamebox);
         if (g_lp.active) {
@@ -2449,6 +2454,49 @@ template <typename F> static auto withoutVolumeRequesters(F f) -> decltype(f()) 
     return r;
 }
 
+// ENVARC:Boxer/RecentGames, or beside the PREFS file of a test start.
+static std::string recentGamesFile() {
+    if (!g_args.prefsPath.empty()) return boxer::fsutil::join(boxer::fsutil::parent(g_args.prefsPath), "RecentGames");
+    return "ENVARC:Boxer/RecentGames";
+}
+
+// The recent games as stored now; unreadable reads as empty (logged).
+static std::vector<boxer::RecentGame> readRecentGames() {
+    std::vector<boxer::RecentGame> games;
+    std::string err;
+    const std::string file = recentGamesFile();
+    const auto r = withoutVolumeRequesters([&] { return boxer::loadRecentGames(file, games, &err); });
+    if (r == boxer::RecentRead::Unreadable)
+        logf("recent: %s unreadable (%s), shown empty; the next change replaces it", file.c_str(), err.c_str());
+    return games;
+}
+
+// Every change reads the file again and writes it whole; Boxer.prefs is
+// never opened here. A failed write is only logged: the history is not
+// worth an interruption, and the previous file stays.
+static void changeRecentGames(const std::string &what, const std::function<void(std::vector<boxer::RecentGame> &)> &edit) {
+    readRecentGames();   // logs an unreadable file before it is replaced
+    std::string err;
+    std::vector<boxer::RecentGame> after;
+    const std::string file = recentGamesFile();
+    const bool ok = withoutVolumeRequesters([&] { return boxer::updateRecentGames(file, edit, &err, &after); });
+    if (ok) logf("recent: %s -> saved, %u entries", what.c_str(), (unsigned)after.size());
+    else logf("recent: %s -> NOT saved to %s: %s", what.c_str(), file.c_str(), err.c_str());
+}
+
+static void noteRecentGamebox(const std::string &gamebox) {
+    boxer::Gamebox box;
+    const std::string id = withoutVolumeRequesters([&] { return box.open(gamebox) ? box.identifier() : std::string(); });
+    changeRecentGames("opened \"" + gamebox + "\"",
+                      [&](std::vector<boxer::RecentGame> &l) { boxer::noteRecentGame(l, {id, gamebox}); });
+}
+
+static void renameRecentGamebox(const std::string &from, const std::string &to) {
+    if (from.empty() || to.empty() || from == to) return;
+    changeRecentGames("renamed \"" + from + "\" to \"" + to + "\"",
+                      [&](std::vector<boxer::RecentGame> &l) { boxer::renameRecentGame(l, from, to); });
+}
+
 enum class MovedDataDirAnswer { Use, ChooseOther, Quit, NotOffered };
 
 // A configured data folder that is gone has most often moved along with the
@@ -2964,6 +3012,7 @@ static std::string renameGamebox(const std::string &gameboxPath, const std::stri
          o.gameboxPath.c_str(), o.message.empty() ? "" : ": ", o.message.c_str());
     if (!o.message.empty())
         MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"OK", (char *)"%s", (IPTR)o.message.c_str());
+    renameRecentGamebox(gameboxPath, o.gameboxPath);
     return o.gameboxPath;
 }
 
@@ -3074,6 +3123,12 @@ static void showImportStage() {
         break;
     }
     case S::Finished: {
+        // BXImportSession.m:1272: a finished import is a recent game.
+        static std::string noted;
+        if (noted != imp.createdGamebox) {
+            noteRecentGamebox(imp.createdGamebox);
+            noted = imp.createdGamebox;
+        }
         std::string line = "\"" + imp.gameName() + "\" is in " + imp.gamesFolder + ".";
         set(ui.impDoneText, MUIA_Text_Contents, (IPTR)line.c_str());
         showCover(ui.impWell, ui.impCover, ui.impName, imp.createdGamebox);
