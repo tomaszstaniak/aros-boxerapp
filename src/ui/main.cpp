@@ -592,6 +592,25 @@ static Object *buildFileMenu(FileMenu &m, ULONG closeId) {
         End;
 }
 
+// The recent games as last shown (popup rows and menu items index it).
+static std::vector<boxer::RecentGame> g_recentShown;
+static void showRecentGames();
+// Popobject's StrObjHook runs just before the popup opens: the list is read
+// again then, so a game that noted itself (or was renamed) after the
+// Welcome window was last activated is shown as it is now.
+AROS_UFH3S(IPTR, recentPopupOpening,
+           AROS_UFHA(struct Hook *, hook, A0),
+           AROS_UFHA(Object *, list, A2),
+           AROS_UFHA(Object *, str, A1))
+{
+    AROS_USERFUNC_INIT
+    (void)hook; (void)list; (void)str;
+    showRecentGames();
+    return !g_recentShown.empty();   // emptied meanwhile: nothing to open
+    AROS_USERFUNC_EXIT
+}
+static struct Hook g_recentPopupHook;
+
 static Object *buildWelcome() {
     ui.welcomeView = (Object *)NewObject(mccPaintGroup->mcc_Class, NULL,
         PGA_Mode, PM_Welcome, PGA_Layout, (IPTR)&kWelcomeView, TAG_DONE);
@@ -610,8 +629,10 @@ static Object *buildWelcome() {
         MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
         MUIA_List_DestructHook, MUIV_List_DestructHook_String,
         End;
+    g_recentPopupHook.h_Entry = (APTR)recentPopupOpening;
     ui.recentPop = PopobjectObject,
         MUIA_Popstring_Button, (IPTR)ui.recentBtn,
+        MUIA_Popobject_StrObjHook, (IPTR)&g_recentPopupHook,
         MUIA_Popobject_Object, (IPTR)(ui.recentView = ListviewObject, MUIA_Listview_List, (IPTR)ui.recentList, End),
         End;
     ui.closeBtn = newTextButton("Close", GS_RoundTextured, 70, 25, false);
@@ -3465,8 +3486,6 @@ static void handleDrop(const WaitingDrop &w) {
 }
 
 // ------------------------------------------------------ open and recent ---
-// The recent games as last shown (popup rows and menu items index it).
-static std::vector<boxer::RecentGame> g_recentShown;
 
 static std::string recentTitle(const std::string &gamebox) {
     return boxer::fsutil::stripExtension(boxer::fsutil::baseName(boxer::fsutil::trimTrailingSlash(gamebox)));
