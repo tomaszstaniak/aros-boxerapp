@@ -105,6 +105,12 @@ struct DropPlan {
 // a gamebox opens whatever the import is doing, since it does not touch it.
 DropPlan planDrop(const DropClass &drop, DropZone zone, bool importAvailable, const ImportController &imports);
 
+// File > Open..., an Open recent entry, or its Locate...: a drawer the user
+// chose to play, classified as a drop. Only a gamebox opens (OpenGame);
+// anything else is refused with a sentence, and a game folder is pointed
+// to Import New Game. The import is never involved.
+DropPlan planOpen(const DropClass &chosen);
+
 // Carries out an OpenGame plan with `launch`, which starts the gamebox in
 // a new process and says whether that process was seen (with a reason when
 // not). The import is not touched either way: a launch that fails only

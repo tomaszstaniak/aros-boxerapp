@@ -183,6 +183,33 @@ DropPlan planDrop(const DropClass &drop, DropZone zone, bool importAvailable, co
     return {};
 }
 
+DropPlan planOpen(const DropClass &chosen) {
+    switch (chosen.kind) {
+    case DropKind::Nothing:
+        return {};
+    case DropKind::Gamebox: {
+        DropPlan p;
+        p.action = DropAction::OpenGame;
+        p.path = chosen.path;
+        return p;
+    }
+    case DropKind::Folder:
+        return refuse(DropRefusal::File, quoted(chosen.path) + " is not a gamebox.\n\n"
+                      "To add the game in this folder to Boxer, use Import New Game.");
+    case DropKind::Missing:
+        return refuse(DropRefusal::Missing, quoted(chosen.path) + " could not be found.");
+    case DropKind::Unreadable:
+        return refuse(DropRefusal::Unreadable, "Boxer could not read the name of the chosen item (its path may be too long).");
+    case DropKind::Volume:
+        return refuse(DropRefusal::Volume, quoted(chosen.path) + " is a whole disk, not a gamebox.");
+    case DropKind::DiscImage:
+    case DropKind::File:
+    case DropKind::Several:
+        return refuse(DropRefusal::File, quoted(chosen.path) + " is not a gamebox.");
+    }
+    return {};
+}
+
 GameStart startDroppedGame(const std::string &gamebox, const GameLauncher &launch) {
     GameStart g;
     std::string why;

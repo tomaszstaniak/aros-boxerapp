@@ -266,6 +266,29 @@ static void testRegistration() {
     CHECK(std::string(dropRegistrationName(DropRegistration::NoResponder)).find("NO") == 0);
 }
 
+// File > Open... and Open recent: only a gamebox opens, the import is
+// never asked, and a game folder is pointed to Import New Game.
+static void testOpen() {
+    Fixture f = makeFixture();
+    DropPlan p = planOpen(classifyDrop({{f.box, false}}));
+    CHECK(p.action == DropAction::OpenGame && p.path == f.box && p.message.empty());
+    p = planOpen(classifyDrop({drawer(f.box)}));
+    CHECK(p.action == DropAction::OpenGame && p.path == f.box);
+    p = planOpen(classifyDrop({{f.folder, false}}));
+    CHECK(p.action == DropAction::None && p.message.find("not a gamebox") != std::string::npos &&
+          p.message.find("Import New Game") != std::string::npos);
+    p = planOpen(classifyDrop({{fu::join(f.base, "Gone.boxer"), false}}));
+    CHECK(p.action == DropAction::None && p.refusal == DropRefusal::Missing && p.message.find("Gone.boxer") != std::string::npos);
+    p = planOpen(classifyDrop({{"Work:", false}}));
+    CHECK(p.action == DropAction::None && p.message.find("whole disk") != std::string::npos);
+    p = planOpen(classifyDrop({named(f.file)}));
+    CHECK(p.action == DropAction::None && p.message.find("not a gamebox") != std::string::npos);
+    CHECK(planOpen(classifyDrop({})).action == DropAction::None);
+    // A gamebox inside a folder being imported still opens, whatever the import does.
+    p = planOpen(classifyDrop({named(fu::join(f.box, "Play"))}));
+    CHECK(p.action == DropAction::OpenGame && p.path == f.box);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: drop_logic_test <scratch dir>\n"); return 2; }
     scratch = argv[1];
@@ -275,6 +298,7 @@ int main(int argc, char **argv) {
     testZones();
     testPlans();
     testRegistration();
+    testOpen();
     if (failures) {
         std::printf("drop_logic_test: %d of %d checks FAILED\n", failures, checks);
         return 1;
