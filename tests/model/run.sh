@@ -22,6 +22,13 @@ scratch="$out/scratch dir with spaces"
 "$out/model_test" "$scratch"
 rm -rf "$scratch"
 
+# The recent games list and its file.
+"$cxx" -std=c++17 -Wall -Wextra -Wno-unused-parameter -O1 -g -o "$out/recentgames_test" \
+  "$here/recentgames_test.cpp" "$root"/src/model/*.cpp "$root/src/emulator/filesystem.cpp"
+scratch="$out/recent scratch with spaces"
+"$out/recentgames_test" "$scratch"
+rm -rf "$scratch"
+
 # Cover art and renaming. The title checks need a TrueType font: the
 # system Vera Sans of an AROS ISO (AROS_ISO_FONTS, see local.env.example),
 # or COVER_TEST_FONT; without one they are skipped and the run says so.

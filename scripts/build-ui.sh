@@ -112,6 +112,10 @@ c++ -std=c++17 -Wall -O1 -o "$out/host/emulation_settings_test" "$src/tests/emul
   "$src/emulation_settings.cpp" "$src/cpu_cycles.cpp" "$PROJECT_ROOT"/src/model/*.cpp \
   "$PROJECT_ROOT/src/emulator/filesystem.cpp"
 "$out/host/emulation_settings_test" "$out/host/emulation scratch"
+# The recent games list and its file (ENVARC:Boxer/RecentGames).
+c++ -std=c++17 -Wall -O1 -o "$out/host/recentgames_test" "$PROJECT_ROOT/tests/model/recentgames_test.cpp" \
+  "$PROJECT_ROOT/src/model/recentgames.cpp" "$PROJECT_ROOT/src/model/fsutil.cpp"
+"$out/host/recentgames_test" "$out/host/recent scratch"
 
 sources=("$src/main.cpp" "$src/classes.cpp" "$src/gfx.cpp" "$src/ui_logic.cpp" "$src/launchpanel_logic.cpp"
   "$src/coverassets.cpp" "$src/session.cpp" "$src/import_controller.cpp" "$src/drop_logic.cpp" "$src/logfile.cpp"
@@ -125,7 +129,7 @@ core14=(src/emulator/emulator.cpp src/emulator/coalface.cpp src/emulator/filesys
   src/platform/aros/rawkeys.cpp src/platform/aros/coreinput.cpp src/platform/aros/corecontrol.cpp)
 model17=(src/model/fsutil.cpp src/model/plist.cpp src/model/gamebox.cpp
   src/model/datalocations.cpp src/model/shadowfs.cpp src/model/programs.cpp src/model/importsource.cpp src/model/installerscan.cpp src/model/sourcecopy.cpp src/platform/aros/session_setup.cpp
-  src/platform/aros/wbopen.cpp src/model/coverart.cpp src/model/coverfont.cpp src/model/gameboxrename.cpp
+  src/platform/aros/wbopen.cpp src/model/coverart.cpp src/model/coverfont.cpp src/model/gameboxrename.cpp src/model/recentgames.cpp
   src/platform/aros/coverio.cpp src/platform/aros/appdrop.cpp)
 # __FILE__ in assertion messages names the build host's directories; map
 # them to project-relative names (GCC tries the last matching map first,
