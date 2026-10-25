@@ -14,6 +14,11 @@
 // the same game when both identifiers are set and equal, or when their
 // paths are equal; a game noted again moves to the top and keeps the path
 // it was opened from.
+//
+// Only an explicit Clear Menu may replace a file that cannot be read; an
+// automatic change leaves it alone, so a newer format or a damaged file is
+// never lost to a game being opened. Every change runs under a guard shared
+// by all processes (RecentGuard).
 #pragma once
 
 #include <functional>
@@ -45,16 +50,41 @@ bool renameRecentGame(std::vector<RecentGame> &games, const std::string &oldPath
 bool removeRecentGame(std::vector<RecentGame> &games, const std::string &path);
 
 enum class RecentRead { Missing, Ok, Unreadable };
-// An interrupted save is finished or rolled back first (fsutil::recoverReplace).
-// Missing and Unreadable leave games empty.
-RecentRead loadRecentGames(const std::string &file, std::vector<RecentGame> &games, std::string *error = nullptr);
-// Reads the file again, applies edit, writes it with fsutil::replaceFile.
-// Reading right before writing keeps what another process wrote meanwhile;
-// two processes writing at the same moment can lose one entry, never the
-// file. An unreadable file counts as empty and is replaced (it holds only
-// history). False if the write failed; the previous file is kept then.
+// recover: finish or roll back an interrupted save of this process first
+// (fsutil::recoverReplace); only while holding the RecentGuard, since it
+// renames files. Missing and Unreadable leave games empty.
+RecentRead loadRecentGames(const std::string &file, std::vector<RecentGame> &games, std::string *error = nullptr,
+                           bool recover = true);
+
+// Exclusion between processes for a whole read-modify-replace of the file,
+// recovery included. acquire waits a bounded time and says whether it got
+// the guard; release is called only after a successful acquire. The AROS
+// one is a named exec semaphore (platform/aros/recentlock).
+struct RecentGuard {
+	std::function<bool()> acquire;
+	std::function<void()> release;
+};
+
+enum class RecentChange {
+	Add,     // automatic (an open, an import, a rename, Remove from List):
+	         // an unreadable file is left exactly as it is
+	Reset,   // the user's explicit choice (Clear Menu): replaces even an
+	         // unreadable file
+};
+enum class RecentUpdate { Saved, Busy, Unreadable, WriteFailed };
+const char *recentUpdateName(RecentUpdate u);
+
+// Under the guard: reads the file (missing = empty), applies edit, writes it
+// with fsutil::replaceFile. Busy: the guard was not free in time, nothing
+// read or written. Unreadable (Add only): nothing written, error says why.
 // *after (optional) gets the list as written.
-bool updateRecentGames(const std::string &file, const std::function<void(std::vector<RecentGame> &)> &edit,
-                       std::string *error = nullptr, std::vector<RecentGame> *after = nullptr);
+RecentUpdate updateRecentGames(const std::string &file, const RecentGuard &guard, RecentChange change,
+                               const std::function<void(std::vector<RecentGame> &)> &edit,
+                               std::string *error = nullptr, std::vector<RecentGame> *after = nullptr);
+
+// For showing the list: under the guard when it is free, else read as it
+// is without recovery (never waits longer than the guard's acquire).
+RecentRead readRecentGames(const std::string &file, const RecentGuard &guard, std::vector<RecentGame> &games,
+                           std::string *error = nullptr);
 
 } // namespace boxer

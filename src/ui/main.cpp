@@ -72,6 +72,7 @@
 #include "../platform/aros/coverio.h"
 #include "../platform/aros/corecontrol.h"
 #include "../platform/aros/exclusivefile.h"
+#include "../platform/aros/recentlock.h"
 #include "../platform/aros/session_setup.h"
 #include "../platform/aros/wbopen.h"
 
@@ -2519,28 +2520,64 @@ static std::string recentGamesFile() {
     return "ENVARC:Boxer/RecentGames";
 }
 
+// Test aid: ENV:BoxerTest/RecentHold (ticks) keeps the recent games guard
+// held that long after it is obtained, so a second BoxerUI can be made to
+// meet it. Read once; unset in normal use.
+static int recentHoldTicks() {
+    static int ticks = -1;
+    if (ticks < 0) {
+        char v[16];
+        ticks = GetVar((CONST_STRPTR)"BoxerTest/RecentHold", (STRPTR)v, sizeof v, GVF_GLOBAL_ONLY) > 0 ? atoi(v) : 0;
+        if (ticks < 0) ticks = 0;
+    }
+    return ticks;
+}
+
+// The guard of every recent games change, shared by all BoxerUI processes
+// (platform/aros/recentlock). At most one second's wait: a game start never
+// waits longer for its history entry.
+static const boxer::RecentGuard &recentGuard() {
+    static const boxer::RecentGuard guard{
+        [] {
+            if (!boxer::recentLockAttempt(50)) return false;
+            if (const int hold = recentHoldTicks()) {
+                logf("recent: guard obtained; holding it %d ticks (BoxerTest/RecentHold)", hold);
+                Delay(hold);
+            }
+            return true;
+        },
+        [] { boxer::recentLockRelease(); }};
+    return guard;
+}
+
 // The recent games as stored now; unreadable reads as empty (logged).
 static std::vector<boxer::RecentGame> readRecentGames() {
     std::vector<boxer::RecentGame> games;
     std::string err;
     const std::string file = recentGamesFile();
-    const auto r = withoutVolumeRequesters([&] { return boxer::loadRecentGames(file, games, &err); });
+    const auto r = withoutVolumeRequesters([&] { return boxer::readRecentGames(file, recentGuard(), games, &err); });
     if (r == boxer::RecentRead::Unreadable)
-        logf("recent: %s unreadable (%s), shown empty; the next change replaces it", file.c_str(), err.c_str());
+        logf("recent: %s unreadable (%s), shown empty; left as it is (Clear Menu replaces it)", file.c_str(),
+             err.c_str());
     return games;
 }
 
-// Every change reads the file again and writes it whole; Boxer.prefs is
-// never opened here. A failed write is only logged: the history is not
-// worth an interruption, and the previous file stays.
-static void changeRecentGames(const std::string &what, const std::function<void(std::vector<boxer::RecentGame> &)> &edit) {
-    readRecentGames();   // logs an unreadable file before it is replaced
+// Every change reads the file again and writes it whole, under the guard;
+// Boxer.prefs is never opened here. Busy, unreadable and failed writes are
+// only logged: the history is not worth an interruption, and the game opens
+// anyway. Only Clear Menu (Reset) replaces an unreadable file.
+static void changeRecentGames(const std::string &what, const std::function<void(std::vector<boxer::RecentGame> &)> &edit,
+                              boxer::RecentChange change = boxer::RecentChange::Add) {
     std::string err;
     std::vector<boxer::RecentGame> after;
     const std::string file = recentGamesFile();
-    const bool ok = withoutVolumeRequesters([&] { return boxer::updateRecentGames(file, edit, &err, &after); });
-    if (ok) logf("recent: %s -> saved, %u entries", what.c_str(), (unsigned)after.size());
-    else logf("recent: %s -> NOT saved to %s: %s", what.c_str(), file.c_str(), err.c_str());
+    const boxer::RecentUpdate u = withoutVolumeRequesters(
+        [&] { return boxer::updateRecentGames(file, recentGuard(), change, edit, &err, &after); });
+    if (u == boxer::RecentUpdate::Saved)
+        logf("recent: %s -> saved, %u entries", what.c_str(), (unsigned)after.size());
+    else
+        logf("recent: %s -> %s (%s)%s%s", what.c_str(), boxer::recentUpdateName(u), file.c_str(),
+             err.empty() ? "" : ": ", err.c_str());
 }
 
 static void noteRecentGamebox(const std::string &gamebox) {
@@ -3548,7 +3585,7 @@ static void showRecentGames() {
 }
 
 static void clearRecentGames() {
-    changeRecentGames("Clear Menu", [](std::vector<boxer::RecentGame> &l) { l.clear(); });
+    changeRecentGames("Clear Menu", [](std::vector<boxer::RecentGame> &l) { l.clear(); }, boxer::RecentChange::Reset);
     showRecentGames();
 }
 

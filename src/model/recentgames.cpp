@@ -93,9 +93,11 @@ bool removeRecentGame(std::vector<RecentGame> &games, const std::string &path) {
 	return games.size() != before;
 }
 
-RecentRead loadRecentGames(const std::string &file, std::vector<RecentGame> &games, std::string *error) {
+RecentRead loadRecentGames(const std::string &file, std::vector<RecentGame> &games, std::string *error,
+                           bool recover) {
 	games.clear();
-	fsutil::recoverReplace(file);
+	if (recover)
+		fsutil::recoverReplace(file);
 	if (!fsutil::exists(file)) {
 		const std::string left = fsutil::describeLeftovers(file);
 		if (left.empty()) return RecentRead::Missing;
@@ -110,16 +112,44 @@ RecentRead loadRecentGames(const std::string &file, std::vector<RecentGame> &gam
 	return parseRecentGames(text, games, error) ? RecentRead::Ok : RecentRead::Unreadable;
 }
 
-bool updateRecentGames(const std::string &file, const std::function<void(std::vector<RecentGame> &)> &edit,
-                       std::string *error, std::vector<RecentGame> *after) {
+const char *recentUpdateName(RecentUpdate u) {
+	switch (u) {
+	case RecentUpdate::Saved: return "saved";
+	case RecentUpdate::Busy: return "busy (another Boxer is changing the list), not changed";
+	case RecentUpdate::Unreadable: return "file unreadable, left as it is";
+	case RecentUpdate::WriteFailed: return "NOT saved";
+	}
+	return "?";
+}
+
+RecentUpdate updateRecentGames(const std::string &file, const RecentGuard &guard, RecentChange change,
+                               const std::function<void(std::vector<RecentGame> &)> &edit,
+                               std::string *error, std::vector<RecentGame> *after) {
+	if (!guard.acquire || !guard.acquire()) return RecentUpdate::Busy;
+	struct Release {
+		const RecentGuard &g;
+		~Release() { if (g.release) g.release(); }
+	} release{guard};
 	std::vector<RecentGame> games;
-	loadRecentGames(file, games);
+	const RecentRead r = loadRecentGames(file, games, error);
+	if (r == RecentRead::Unreadable && change == RecentChange::Add) return RecentUpdate::Unreadable;
+	if (r == RecentRead::Unreadable) games.clear();
 	edit(games);
 	const std::string dir = fsutil::parent(file);
 	if (!dir.empty() && !fsutil::isDirectory(dir)) fsutil::makeDirs(dir);
-	if (!fsutil::replaceFile(file, serializeRecentGames(games), error)) return false;
+	if (!fsutil::replaceFile(file, serializeRecentGames(games), error)) return RecentUpdate::WriteFailed;
 	if (after) *after = games;
-	return true;
+	return RecentUpdate::Saved;
+}
+
+RecentRead readRecentGames(const std::string &file, const RecentGuard &guard, std::vector<RecentGame> &games,
+                           std::string *error) {
+	if (guard.acquire && guard.acquire()) {
+		const RecentRead r = loadRecentGames(file, games, error);
+		if (guard.release) guard.release();
+		return r;
+	}
+	return loadRecentGames(file, games, error, false);
 }
 
 } // namespace boxer

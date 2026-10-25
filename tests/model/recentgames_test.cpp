@@ -2,14 +2,19 @@
 // Copyright (C) 2026 Tomasz Staniak
 
 // Host unit test for src/model/recentgames.{h,cpp}: the file format, the
-// limit, one entry per game, renames, an unreadable file, and two writers
-// interleaving.
+// limit, one entry per game, renames, an unreadable file that only Clear
+// Menu may replace, and two real processes under the guard.
 // Usage: recentgames_test <scratch dir>
 #include "../../src/model/recentgames.h"
 
 #include "../../src/model/fsutil.h"
 
 #include <cstdio>
+#include <fcntl.h>
+#include <memory>
+#include <sys/file.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <string>
 #include <vector>
 
@@ -26,6 +31,103 @@ static std::vector<std::string> paths(const std::vector<RecentGame> &g) {
     return p;
 }
 static std::string get(const std::string &p) { std::string d; return fu::readFile(p, d) ? d : "<missing>"; }
+
+// The host's counterpart of the AROS semaphore: an flock on a lock file,
+// tried for a bounded time. It excludes processes, which is what the test
+// needs to model; the AROS mechanism is in platform/aros/recentlock.
+static RecentGuard flockGuard(const std::string &lockFile) {
+    auto fd = std::make_shared<int>(-1);
+    return RecentGuard{
+        [fd, lockFile] {
+            const int f = ::open(lockFile.c_str(), O_RDWR | O_CREAT, 0644);
+            if (f < 0) return false;
+            for (int i = 0; i < 20; ++i) {   // ~200 ms, then busy
+                if (::flock(f, LOCK_EX | LOCK_NB) == 0) { *fd = f; return true; }
+                ::usleep(10000);
+            }
+            ::close(f);
+            return false;
+        },
+        [fd] {
+            if (*fd >= 0) { ::flock(*fd, LOCK_UN); ::close(*fd); *fd = -1; }
+        }};
+}
+
+static void sendByte(int fd) { char c = 1; (void)!::write(fd, &c, 1); }
+static void waitByte(int fd) { char c; (void)!::read(fd, &c, 1); }
+
+// Two processes. First with controlled overlap: the child holds the guard
+// inside its transaction while the parent tries; the parent gets Busy and
+// the file is not touched; after the child commits, the parent's retry
+// keeps both entries. Then both processes add 30 entries each at full
+// speed, retrying on Busy: nothing is lost, the file is valid at the end.
+static void testTwoProcesses(const std::string &file, const std::string &lockFile) {
+    const RecentGuard guard = flockGuard(lockFile);
+    updateRecentGames(file, guard, RecentChange::Reset, [](std::vector<RecentGame> &l) { l.clear(); });
+    int held[2], go[2];
+    if (::pipe(held) != 0 || ::pipe(go) != 0) { CHECK(!"pipe"); return; }
+    std::fflush(stdout);
+    const pid_t child = ::fork();
+    if (child == 0) {
+        fu::forgetReplaceOwnership();
+        const RecentGuard mine = flockGuard(lockFile);
+        const RecentUpdate u = updateRecentGames(file, mine, RecentChange::Add, [&](std::vector<RecentGame> &l) {
+            sendByte(held[1]);   // inside the transaction, guard held
+            waitByte(go[0]);
+            noteRecentGame(l, {"child", "G:Child.boxer"});
+        });
+        ::_exit(u == RecentUpdate::Saved ? 0 : 1);
+    }
+    waitByte(held[0]);
+    const std::string before = get(file);
+    CHECK(updateRecentGames(file, guard, RecentChange::Add,
+                            [](std::vector<RecentGame> &l) { noteRecentGame(l, {"parent", "G:Parent.boxer"}); })
+          == RecentUpdate::Busy);
+    CHECK(get(file) == before);
+    std::vector<RecentGame> g;
+    CHECK(readRecentGames(file, guard, g) == RecentRead::Ok && g.empty());   // read without the guard
+    sendByte(go[1]);
+    int status = 0;
+    ::waitpid(child, &status, 0);
+    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    CHECK(updateRecentGames(file, guard, RecentChange::Add,
+                            [](std::vector<RecentGame> &l) { noteRecentGame(l, {"parent", "G:Parent.boxer"}); })
+          == RecentUpdate::Saved);
+    CHECK(loadRecentGames(file, g) == RecentRead::Ok &&
+          (paths(g) == std::vector<std::string>{"G:Parent.boxer", "G:Child.boxer"}));
+    for (int fd : {held[0], held[1], go[0], go[1]}) ::close(fd);
+
+    // Free-running: two writers, 5 entries each (the limit is 10), every
+    // change retried until saved. Without the guard one would overwrite the
+    // other's read-modify-write; with it all 10 must be there.
+    updateRecentGames(file, guard, RecentChange::Reset, [](std::vector<RecentGame> &l) { l.clear(); });
+    std::fflush(stdout);
+    pid_t kids[2];
+    for (int k = 0; k < 2; ++k) {
+        kids[k] = ::fork();
+        if (kids[k] == 0) {
+            fu::forgetReplaceOwnership();
+            const RecentGuard mine = flockGuard(lockFile);
+            for (int i = 0; i < 5; ++i) {
+                const std::string name = "G:k" + std::to_string(k) + "-" + std::to_string(i) + ".boxer";
+                for (;;) {
+                    const RecentUpdate u = updateRecentGames(file, mine, RecentChange::Add,
+                        [&](std::vector<RecentGame> &l) { noteRecentGame(l, {"", name}); });
+                    if (u == RecentUpdate::Saved) break;
+                    if (u != RecentUpdate::Busy) ::_exit(2);
+                }
+            }
+            ::_exit(0);
+        }
+    }
+    for (pid_t k : kids) {
+        int st = 0;
+        ::waitpid(k, &st, 0);
+        CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0);
+    }
+    CHECK(loadRecentGames(file, g) == RecentRead::Ok && g.size() == 10);
+    CHECK(fu::leftoversOf(file).empty());
+}
 
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: recentgames_test <scratch dir>\n"); return 2; }
@@ -100,83 +202,120 @@ int main(int argc, char **argv) {
         CHECK(removeRecentGame(g, "G:BEE.boxer") && g.size() == 1);
         CHECK(!removeRecentGame(g, "G:BEE.boxer"));
     }
-    // The file: missing, written, read back, unreadable then replaced.
+    // The file: missing, written, read back.
     const std::string file = fu::join(scratch, "Boxer prefs/RecentGames");
     const std::string prefs = fu::join(scratch, "Boxer prefs/Boxer.prefs");
+    const std::string lockFile = fu::join(scratch, "recent.lock");
+    const RecentGuard guard = flockGuard(lockFile);
+    auto add = [&](const RecentGame &g, std::string *err = nullptr) {
+        return updateRecentGames(file, guard, RecentChange::Add,
+                                 [&](std::vector<RecentGame> &l) { noteRecentGame(l, g); }, err);
+    };
+    auto clearAll = [&](std::string *err = nullptr) {
+        return updateRecentGames(file, guard, RecentChange::Reset, [](std::vector<RecentGame> &l) { l.clear(); }, err);
+    };
     {
         std::vector<RecentGame> g{{"x", "y"}};
         CHECK(loadRecentGames(file, g) == RecentRead::Missing && g.empty());
         std::vector<RecentGame> after;
-        CHECK(updateRecentGames(file, [](std::vector<RecentGame> &l) { noteRecentGame(l, {"a", "G:A.boxer"}); },
-                                nullptr, &after));
-        CHECK(after.size() == 1 && fu::isFile(file));   // its drawer was made
+        CHECK(updateRecentGames(file, guard, RecentChange::Add,
+                                [](std::vector<RecentGame> &l) { noteRecentGame(l, {"a", "G:A.boxer"}); },
+                                nullptr, &after) == RecentUpdate::Saved);
+        CHECK(after.size() == 1 && fu::isFile(file));   // a missing file is created, its drawer too
         CHECK(loadRecentGames(file, g) == RecentRead::Ok && g.size() == 1 && g[0].identifier == "a");
-        // Unreadable: shown empty, the reason given; the settings beside it
-        // are never read or written; the next write replaces the file.
+    }
+    // Unreadable: an automatic change leaves the exact bytes; only Clear
+    // Menu (Reset) replaces the file. The settings beside it are never read
+    // or written.
+    {
         fu::writeFile(prefs, "DataDir=Work:Boxer Data\nGamesFolder=Work:Games\n");
         const std::string prefsBefore = get(prefs);
-        fu::writeFile(file, "garbage\x01\x02 no version\n");
-        std::string err;
-        CHECK(loadRecentGames(file, g, &err) == RecentRead::Unreadable && g.empty() && !err.empty());
-        CHECK(get(file) == "garbage\x01\x02 no version\n");     // reading changes nothing
-        CHECK(updateRecentGames(file, [](std::vector<RecentGame> &l) {
-            CHECK(l.empty());
-            noteRecentGame(l, {"b", "G:B.boxer"});
-        }));
-        CHECK(loadRecentGames(file, g) == RecentRead::Ok && paths(g) == std::vector<std::string>{"G:B.boxer"});
-        CHECK(get(prefs) == prefsBefore);
-        // Clear Menu writes an empty, valid list.
-        CHECK(updateRecentGames(file, [](std::vector<RecentGame> &l) { l.clear(); }));
-        CHECK(loadRecentGames(file, g) == RecentRead::Ok && g.empty());
+        const std::string damaged = std::string("garbage\x01\x02 no version\n", 23);
+        const std::string newer = "# from a newer Boxer\nVersion=2\nid\tG:Z.boxer\tmore\n";
+        for (const std::string &bad : {damaged, newer}) {
+            fu::writeFile(file, bad);
+            std::vector<RecentGame> g;
+            std::string err;
+            CHECK(loadRecentGames(file, g, &err) == RecentRead::Unreadable && g.empty() && !err.empty());
+            CHECK(readRecentGames(file, guard, g, &err) == RecentRead::Unreadable && g.empty());
+            err.clear();
+            CHECK(add({"b", "G:B.boxer"}, &err) == RecentUpdate::Unreadable && !err.empty());
+            CHECK(updateRecentGames(file, guard, RecentChange::Add,
+                                    [](std::vector<RecentGame> &l) { renameRecentGame(l, "G:A.boxer", "G:A2.boxer"); })
+                  == RecentUpdate::Unreadable);
+            CHECK(get(file) == bad);                 // exact bytes kept
+            CHECK(fu::leftoversOf(file).empty());    // and nothing written beside it
+            CHECK(clearAll() == RecentUpdate::Saved);
+            CHECK(loadRecentGames(file, g) == RecentRead::Ok && g.empty());
+        }
+        // Leftovers of someone else's interrupted save with no file: also
+        // unreadable, nothing created over them.
+        fu::removeTree(file);
+        fu::writeFile(fu::tempPathFor(file), "Version=1\n");
+        fu::forgetReplaceOwnership();
+        CHECK(add({"c", "G:C.boxer"}) == RecentUpdate::Unreadable && !fu::exists(file));
+        fu::removeTree(fu::tempPathFor(file));
+        CHECK(add({"c", "G:C.boxer"}) == RecentUpdate::Saved);
         CHECK(get(prefs) == prefsBefore);
     }
-    // Two writers. Each update reads right before it writes, so writes one
-    // after the other keep both entries.
+    // In one process: changes one after the other keep every entry, and a
+    // change attempted while another holds the guard is refused as Busy
+    // without touching the file.
     {
-        updateRecentGames(file, [](std::vector<RecentGame> &l) { l.clear(); });
-        updateRecentGames(file, [](std::vector<RecentGame> &l) { noteRecentGame(l, {"p1", "G:One.boxer"}); });
-        updateRecentGames(file, [](std::vector<RecentGame> &l) { noteRecentGame(l, {"p2", "G:Two.boxer"}); });
+        clearAll();
+        add({"p1", "G:One.boxer"});
+        add({"p2", "G:Two.boxer"});
         std::vector<RecentGame> g;
         CHECK(loadRecentGames(file, g) == RecentRead::Ok &&
               (paths(g) == std::vector<std::string>{"G:Two.boxer", "G:One.boxer"}));
-        // Interleaved: process 2 writes between process 1's read and write.
-        // Process 1's write wins and process 2's entry is lost; the file
-        // stays valid and keeps what process 1 read.
-        CHECK(updateRecentGames(file, [&](std::vector<RecentGame> &l) {
-            CHECK(updateRecentGames(file, [](std::vector<RecentGame> &m) { noteRecentGame(m, {"p3", "G:Three.boxer"}); }));
+        CHECK(updateRecentGames(file, guard, RecentChange::Add, [&](std::vector<RecentGame> &l) {
+            CHECK(add({"p3", "G:Three.boxer"}) == RecentUpdate::Busy);
             noteRecentGame(l, {"p4", "G:Four.boxer"});
-        }));
+        }) == RecentUpdate::Saved);
         CHECK(loadRecentGames(file, g) == RecentRead::Ok &&
               (paths(g) == std::vector<std::string>{"G:Four.boxer", "G:Two.boxer", "G:One.boxer"}));
-        // The other order: the inner (later) writer wins and the outer
-        // entry is the one lost; the file is valid either way.
-        CHECK(updateRecentGames(file, [&](std::vector<RecentGame> &l) {
-            noteRecentGame(l, {"p5", "G:Five.boxer"});
-            CHECK(updateRecentGames(file, [](std::vector<RecentGame> &m) { noteRecentGame(m, {"p6", "G:Six.boxer"}); }));
-        }));
-        CHECK(loadRecentGames(file, g) == RecentRead::Ok && g.size() == 4 && g[0].path == "G:Five.boxer");
-        CHECK(fu::leftoversOf(file).empty());
+        // A guard that cannot be had: nothing read or written.
+        const RecentGuard never{[] { return false; }, [] {}};
+        const std::string before = get(file);
+        CHECK(updateRecentGames(file, never, RecentChange::Reset, [](std::vector<RecentGame> &l) { l.clear(); })
+              == RecentUpdate::Busy && get(file) == before);
+        CHECK(readRecentGames(file, never, g) == RecentRead::Ok && g.size() == 3);
     }
+    // Two real processes.
+    testTwoProcesses(file, lockFile);
     // A write interrupted half-way: the next read finishes or rolls it back
-    // and gets a valid list.
+    // and gets a valid list. A failed write keeps the previous file.
     {
         std::vector<RecentGame> before;
         loadRecentGames(file, before);
         fu::setReplaceFaultHook([](fu::ReplaceStep s) {
             return s == fu::ReplaceStep::RenameTemp ? fu::FaultAction::Crash : fu::FaultAction::Proceed;
         });
-        updateRecentGames(file, [](std::vector<RecentGame> &l) { noteRecentGame(l, {"p7", "G:Seven.boxer"}); });
+        add({"p7", "G:Seven.boxer"});
         fu::setReplaceFaultHook(nullptr);
         std::vector<RecentGame> g;
         CHECK(loadRecentGames(file, g) == RecentRead::Ok && paths(g) == paths(before));
-        // A failed write keeps the previous file and reports it.
         fu::setReplaceFaultHook([](fu::ReplaceStep s) {
             return s == fu::ReplaceStep::WriteTemp ? fu::FaultAction::Fail : fu::FaultAction::Proceed;
         });
         std::string err;
-        CHECK(!updateRecentGames(file, [](std::vector<RecentGame> &l) { l.clear(); }, &err) && !err.empty());
+        CHECK(clearAll(&err) == RecentUpdate::WriteFailed && !err.empty());
         fu::setReplaceFaultHook(nullptr);
         CHECK(loadRecentGames(file, g) == RecentRead::Ok && paths(g) == paths(before));
+    }
+    // The temp name is claimed by an exclusive create: a name another writer
+    // already holds is skipped, never written over.
+    {
+        fu::forgetReplaceOwnership();
+        const std::string foreign = fu::tempPathFor(file);
+        fu::writeFile(foreign, "another writer's temp");
+        CHECK(add({"p8", "G:Eight.boxer"}) == RecentUpdate::Saved);
+        CHECK(get(foreign) == "another writer's temp");
+        std::vector<RecentGame> g;
+        CHECK(loadRecentGames(file, g) == RecentRead::Ok && g[0].path == "G:Eight.boxer");
+        fu::removeTree(foreign);
+        bool existed = false;
+        CHECK(!fu::createNewFile(file, "x", &existed) && existed && get(file) != "x");
     }
 
     std::printf("recentgames_test: %d checks, %d failures\n", checks, failures);
