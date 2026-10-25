@@ -200,9 +200,18 @@ bool writeFile(const std::string &path, const std::string &data)
 	return ok;
 }
 
+static CreateExclusive createExclusive;
+
+void setCreateExclusive(CreateExclusive create)
+{
+	createExclusive = std::move(create);
+}
+
 bool createNewFile(const std::string &path, const std::string &data, bool *existed)
 {
 	if (existed) *existed = false;
+	if (createExclusive)
+		return createExclusive(path, data, existed);
 	const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
 	if (fd < 0) {
 		// As with mkdir, EEXIST is not trusted across C libraries.
@@ -461,19 +470,27 @@ bool replaceFile(const std::string &path, const std::string &data, std::string *
 	retryPendingCleanup();
 	if (!recoverReplace(path))
 		return fail(error, "cannot restore " + path + " from an earlier interrupted save");
-	const std::string tmp = freeName(tempPathFor(path));
-	if (tmp.empty())
-		return fail(error, "cannot write the new version of " + path + ": " + tempPathFor(path) +
-		                       " and its numbered alternatives are all in use");
-
 	FaultAction a = fault(ReplaceStep::WriteTemp);
 	if (a == FaultAction::Crash)
 		return fail(error, "simulated crash");
-	setIn(createdList, tmp, true);
-	if (a == FaultAction::Fail || !writeFile(tmp, data)) {
-		removeOwned(tmp);
-		return fail(error, "cannot write " + tmp);
+	if (a == FaultAction::Fail)
+		return fail(error, "cannot write " + tempPathFor(path));
+	// The temp name is claimed by creating it exclusively, not by looking
+	// for a free name first: between a look and a create another writer
+	// could take the same name.
+	std::string tmp;
+	for (int n = 1; n <= kScratchNames && tmp.empty(); n++) {
+		const std::string candidate = numbered(tempPathFor(path), n);
+		bool existed = false;
+		if (createNewFile(candidate, data, &existed))
+			tmp = candidate;
+		else if (!existed)
+			return fail(error, "cannot write " + candidate);
 	}
+	if (tmp.empty())
+		return fail(error, "cannot write the new version of " + path + ": " + tempPathFor(path) +
+		                       " and its numbered alternatives are all in use");
+	setIn(createdList, tmp, true);
 
 	const bool hadOld = exists(path);
 	std::string bak;

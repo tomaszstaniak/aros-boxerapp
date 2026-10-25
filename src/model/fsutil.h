@@ -49,6 +49,13 @@ bool writeFile(const std::string &path, const std::string &data);
 // False with *existed set when the name is taken; that file is not touched.
 // A file this call created but could not fill is removed again.
 bool createNewFile(const std::string &path, const std::string &data, bool *existed = nullptr);
+// How createNewFile() creates a file exclusively. The default is
+// open(O_CREAT | O_EXCL), which is atomic on POSIX hosts; a C library that
+// checks for the name and then creates it is not, and a platform sets its
+// own here (AROS: a native MODE_NEWFILE open, see platform/aros). Same
+// contract as createNewFile().
+using CreateExclusive = std::function<bool(const std::string &path, const std::string &data, bool *existed)>;
+void setCreateExclusive(CreateExclusive create);
 bool copyFile(const std::string &from, const std::string &to);
 bool copyTree(const std::string &from, const std::string &to);
 bool removeTree(const std::string &path);

@@ -71,6 +71,7 @@
 #include "../platform/aros/coreinput.h"
 #include "../platform/aros/coverio.h"
 #include "../platform/aros/corecontrol.h"
+#include "../platform/aros/exclusivefile.h"
 #include "../platform/aros/session_setup.h"
 #include "../platform/aros/wbopen.h"
 
@@ -4173,6 +4174,9 @@ int main(int argc, char **argv) {
     memInit();
     if (memcp("main-entry")) { memDone(); return 0; }
     g_mainTask = FindTask(NULL);
+    // Every exclusive create of the model (temp names of a file replace)
+    // goes through DOS, not posixc's check-then-open.
+    boxer::fsutil::setCreateExclusive(boxer::createExclusive);
     g_fromWorkbench = argc == 0;
     bool argsOk = argc > 0 ? parseArgs(argc, argv) : (parseToolTypes((struct WBStartup *)argv), true);
     if (!argsOk) return 20;
