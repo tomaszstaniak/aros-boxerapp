@@ -124,5 +124,17 @@ DosIdleView dosIdleView(bool harness);
 enum class PromptAction { StartSession, ShowWindow };
 PromptAction openPromptAction(bool sessionRunning, bool coreRan);
 
+// Open recent (Welcome popup and File > Open Recent) for the list as read.
+// An unreadable file shows no games, but the menu stays usable so that
+// Clear Menu can replace it, after the user confirms that this is a
+// deliberate reset; an empty, readable list has nothing to open or clear.
+struct RecentMenuState {
+    bool popupEnabled;   // the Welcome "Open recent" button
+    bool clearEnabled;   // Clear Menu
+    bool confirmClear;   // ask before clearing
+    bool showUnreadable; // a row saying the list cannot be read
+};
+RecentMenuState recentMenuState(size_t entries, bool unreadable);
+
 }  // namespace boxer_ui
 #endif

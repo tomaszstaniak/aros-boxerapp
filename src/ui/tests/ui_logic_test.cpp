@@ -145,6 +145,16 @@ int main() {
     CHECK(openPromptAction(true, false) == PromptAction::ShowWindow);
     CHECK(openPromptAction(false, true) == PromptAction::ShowWindow);
 
+    // Open recent: an unreadable list keeps Clear Menu (with a confirmation);
+    // an empty readable list disables both; entries enable both.
+    {
+        const RecentMenuState bad = recentMenuState(0, true);
+        CHECK(bad.popupEnabled && bad.clearEnabled && bad.confirmClear && bad.showUnreadable);
+        const RecentMenuState empty = recentMenuState(0, false);
+        CHECK(!empty.popupEnabled && !empty.clearEnabled && !empty.confirmClear && !empty.showUnreadable);
+        const RecentMenuState some = recentMenuState(3, false);
+        CHECK(some.popupEnabled && some.clearEnabled && !some.confirmClear && !some.showUnreadable);
+    }
     if (failures) { std::printf("%d failure(s)\n", failures); return 1; }
     std::printf("ui_logic_test: all checks passed\n");
     return 0;

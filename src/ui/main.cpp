@@ -596,6 +596,10 @@ static Object *buildFileMenu(FileMenu &m, ULONG closeId) {
 
 // The recent games as last shown (popup rows and menu items index it).
 static std::vector<boxer::RecentGame> g_recentShown;
+// Whether the last read found a file it could not read: the menu then
+// offers Clear Menu (with a confirmation) instead of looking empty.
+static bool g_recentUnreadable;
+
 static void showRecentGames();
 // Popobject's StrObjHook runs just before the popup opens: the list is read
 // again then, so a game that noted itself (or was renamed) after the
@@ -608,7 +612,9 @@ AROS_UFH3S(IPTR, recentPopupOpening,
     AROS_USERFUNC_INIT
     (void)hook; (void)list; (void)str;
     showRecentGames();
-    return !g_recentShown.empty();   // emptied meanwhile: nothing to open
+    // Emptied meanwhile: nothing to open (an unreadable list still opens,
+    // for its Clear Menu).
+    return recentMenuState(g_recentShown.size(), g_recentUnreadable).popupEnabled;
     AROS_USERFUNC_EXIT
 }
 static struct Hook g_recentPopupHook;
@@ -2556,6 +2562,7 @@ static std::vector<boxer::RecentGame> readRecentGames() {
     std::string err;
     const std::string file = recentGamesFile();
     const auto r = withoutVolumeRequesters([&] { return boxer::readRecentGames(file, recentGuard(), games, &err); });
+    g_recentUnreadable = r == boxer::RecentRead::Unreadable;
     if (r == boxer::RecentRead::Unreadable)
         logf("recent: %s unreadable (%s), shown empty; left as it is (Clear Menu replaces it)", file.c_str(),
              err.c_str());
@@ -3540,21 +3547,32 @@ static Object *fileMenuWindow() {
 // Reads the file again and shows it: the Welcome popup (games, a rule,
 // Clear Menu) and both File menus' Open Recent. Another BoxerUI may have
 // changed it since (every game notes itself in its own process).
+static const char kRecentUnreadable[] = "List of recent games cannot be read";
+static LONG g_recentClearRow = -1;   // the popup's Clear Menu row, -1 when none
+
 static void showRecentGames() {
     g_recentShown = readRecentGames();
     const size_t n = g_recentShown.size();
+    const RecentMenuState st = recentMenuState(n, g_recentUnreadable);
     set(ui.recentList, MUIA_List_Quiet, TRUE);
     DoMethod(ui.recentList, MUIM_List_Clear);
     for (const auto &r : g_recentShown) {
         const std::string t = recentTitle(r.path);
         DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)t.c_str(), MUIV_List_Insert_Bottom);
     }
-    if (n) {
+    LONG rows = (LONG)n;
+    if (st.showUnreadable) {
+        DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)kRecentUnreadable, MUIV_List_Insert_Bottom);
+        ++rows;
+    }
+    g_recentClearRow = -1;
+    if (st.clearEnabled) {
         DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)"\33c----------", MUIV_List_Insert_Bottom);
         DoMethod(ui.recentList, MUIM_List_InsertSingle, (IPTR)"Clear Menu", MUIV_List_Insert_Bottom);
+        g_recentClearRow = rows + 1;
     }
     set(ui.recentList, MUIA_List_Quiet, FALSE);
-    set(ui.recentBtn, MUIA_Disabled, n == 0);
+    set(ui.recentBtn, MUIA_Disabled, !st.popupEnabled);
     for (FileMenu &m : g_fileMenus) {
         if (!m.recent) continue;
         // Zune rebuilds the window's menus on each Family change.
@@ -3577,14 +3595,29 @@ static void showRecentGames() {
             DoMethod(m.recent, MUIM_Family_AddTail,
                      (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)title, MUIA_UserData, ID_RECENT_MENU0 + i, End));
         }
-        if (n) DoMethod(m.recent, MUIM_Family_AddTail, (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)NM_BARLABEL, End));
+        if (st.showUnreadable)
+            DoMethod(m.recent, MUIM_Family_AddTail,
+                     (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)kRecentUnreadable, MUIA_Menuitem_Enabled, FALSE,
+                            End));
+        if (n || st.showUnreadable)
+            DoMethod(m.recent, MUIM_Family_AddTail, (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)NM_BARLABEL, End));
         DoMethod(m.recent, MUIM_Family_AddTail,
-                 (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)"Clear Menu", MUIA_Menuitem_Enabled, n != 0,
+                 (IPTR)(MenuitemObject, MUIA_Menuitem_Title, (IPTR)"Clear Menu", MUIA_Menuitem_Enabled, st.clearEnabled,
                         MUIA_UserData, ID_RECENT_CLEAR, End));
     }
 }
 
-static void clearRecentGames() {
+// Clear Menu. On a list that cannot be read it replaces the file, so the
+// user confirms that this reset is meant; an ordinary change never does.
+static void clearRecentGames(Object *win) {
+    readRecentGames();
+    if (recentMenuState(0, g_recentUnreadable).confirmClear) {
+        LONG r = MUI_Request(ui.app, win, 0, (char *)"Boxer", (char *)"Clear Menu|Cancel",
+            (char *)"The list of recent games cannot be read.\n\n"
+                    "Clear Menu starts a new, empty list in its place.");
+        logf("recent: Clear Menu on an unreadable list -> %s", r == 1 ? "confirmed" : "cancelled");
+        if (r != 1) return;
+    }
     changeRecentGames("Clear Menu", [](std::vector<boxer::RecentGame> &l) { l.clear(); }, boxer::RecentChange::Reset);
     showRecentGames();
 }
@@ -3888,11 +3921,11 @@ static bool handleId(ULONG id) {
         const LONG row = (LONG)active;
         const LONG n = (LONG)g_recentShown.size();
         if (row >= 0 && row < n) openRecentGame((size_t)row, ui.welcome);
-        else if (n && row == n + 1) clearRecentGames();
+        else if (g_recentClearRow >= 0 && row == g_recentClearRow) clearRecentGames(ui.welcome);
         break;
     }
     case ID_RECENT_CLEAR:
-        clearRecentGames();
+        clearRecentGames(fileMenuWindow());
         break;
     case ID_RECENT_MENU0 ... ID_RECENT_MENU_END - 1:
         openRecentGame(id - ID_RECENT_MENU0, fileMenuWindow());

@@ -229,4 +229,10 @@ PromptAction openPromptAction(bool sessionRunning, bool coreRan) {
     return sessionRunning || coreRan ? PromptAction::ShowWindow : PromptAction::StartSession;
 }
 
+RecentMenuState recentMenuState(size_t entries, bool unreadable) {
+    if (unreadable) return {true, true, true, true};
+    const bool any = entries > 0;
+    return {any, any, false, false};
+}
+
 }  // namespace boxer_ui
