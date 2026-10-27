@@ -21,6 +21,9 @@
 #include <string>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <cerrno>
 #include <unistd.h>
 #include <vector>
 
@@ -1820,6 +1823,115 @@ static void testWritableProbe()
 	CHECK_EQ(names.size(), size_t(1));
 }
 
+// claimNewFile with POSIX stand-ins for the AROS calls: an O_EXCL scratch
+// file named after the process, and link() as the rename that refuses an
+// existing destination (POSIX rename() would replace it).
+static fsutil::ClaimOps posixClaimOps()
+{
+	fsutil::ClaimOps ops;
+	ops.scratchName = [](const std::string &path, int n) {
+		return fsutil::join(fsutil::parent(path), ".bxc" + std::to_string(::getpid()) + "-" + std::to_string(n));
+	};
+	ops.writeScratch = [](const std::string &scratch, const std::string &data, bool *taken) {
+		*taken = false;
+		const int fd = ::open(scratch.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+		if (fd < 0) { *taken = errno == EEXIST; return false; }
+		const bool ok = ::write(fd, data.data(), data.size()) == (ssize_t)data.size();
+		::close(fd);
+		return ok;
+	};
+	ops.renameNoReplace = [](const std::string &from, const std::string &to) {
+		if (::link(from.c_str(), to.c_str()) != 0)
+			return errno == EEXIST ? fsutil::ClaimRename::Exists : fsutil::ClaimRename::Failed;
+		::unlink(from.c_str());
+		return fsutil::ClaimRename::Done;
+	};
+	ops.removeScratch = [](const std::string &scratch) { ::unlink(scratch.c_str()); };
+	return ops;
+}
+
+static size_t scratchFilesIn(const std::string &dir)
+{
+	std::vector<std::string> names;
+	fsutil::list(dir, names);
+	return std::count_if(names.begin(), names.end(), [](const std::string &n) { return n.rfind(".bxc", 0) == 0; });
+}
+
+// The sequence that breaks check-then-create: A looks for the name, B
+// creates and closes a file of that name, then A goes on. A must fail and
+// leave B's file exactly as B wrote it.
+static void testClaimNewFile()
+{
+	const std::string dir = fsutil::join(scratch, "claim dir");
+	fsutil::makeDirs(dir);
+	const std::string target = fsutil::join(dir, "Target.plist");
+	fsutil::ClaimOps ops = posixClaimOps();
+	bool existed = true;
+	CHECK(fsutil::claimNewFile(target, "A1", ops, &existed) && !existed && get(target) == "A1");
+	CHECK(!fsutil::claimNewFile(target, "A2", ops, &existed) && existed && get(target) == "A1");
+	CHECK(scratchFilesIn(dir) == 0);
+	::unlink(target.c_str());
+
+	// In one process: B's file appears between A's check and A's rename.
+	ops.beforeRename = [&](const std::string &p) { fsutil::writeFile(p, "B's file"); };
+	CHECK(!fsutil::claimNewFile(target, "A's data", ops, &existed) && existed);
+	CHECK(get(target) == "B's file" && scratchFilesIn(dir) == 0);
+	::unlink(target.c_str());
+
+	// Two processes: A (child) stops with its scratch file complete; B
+	// (parent) claims the name through the same function and closes it;
+	// then A renames and must be refused.
+	int stopped[2], go[2];
+	if (::pipe(stopped) != 0 || ::pipe(go) != 0) { CHECK(!"pipe"); return; }
+	fflush(stdout);
+	fflush(stderr);
+	const pid_t a = ::fork();
+	if (a == 0) {
+		fsutil::ClaimOps mine = posixClaimOps();
+		mine.beforeRename = [&](const std::string &) {
+			char c = 1;
+			(void)!::write(stopped[1], &c, 1);
+			(void)!::read(go[0], &c, 1);
+		};
+		bool ex = false;
+		const bool got = fsutil::claimNewFile(target, "A's data", mine, &ex);
+		::_exit(!got && ex ? 0 : 1);
+	}
+	char c;
+	(void)!::read(stopped[0], &c, 1);
+	CHECK(!fsutil::exists(target));                 // A checked: nothing there yet
+	CHECK(fsutil::claimNewFile(target, "B's file", posixClaimOps(), &existed) && !existed);
+	const std::string before = get(target);
+	c = 1;
+	(void)!::write(go[1], &c, 1);
+	int status = 0;
+	::waitpid(a, &status, 0);
+	CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);   // A was refused
+	CHECK(before == "B's file" && get(target) == before);
+	CHECK(scratchFilesIn(dir) == 0);
+	for (int fd : {stopped[0], stopped[1], go[0], go[1]}) ::close(fd);
+
+	// A scratch name already in use (another process's, or left by one that
+	// ended) is skipped and left alone.
+	::unlink(target.c_str());
+	ops = posixClaimOps();
+	const std::string busy = ops.scratchName(target, 0);
+	fsutil::writeFile(busy, "someone else's scratch");
+	CHECK(fsutil::claimNewFile(target, "A3", ops, &existed) && get(target) == "A3");
+	CHECK(get(busy) == "someone else's scratch");
+	::unlink(busy.c_str());
+
+	// The default exclusive create and an installed one obey the same contract.
+	::unlink(target.c_str());
+	fsutil::setCreateExclusive([](const std::string &p, const std::string &d, bool *e) {
+		return fsutil::claimNewFile(p, d, posixClaimOps(), e);
+	});
+	CHECK(fsutil::createNewFile(target, "via hook", &existed) && get(target) == "via hook");
+	CHECK(!fsutil::createNewFile(target, "again", &existed) && existed && get(target) == "via hook");
+	fsutil::setCreateExclusive(nullptr);
+	fsutil::removeTree(dir);
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 2) { fprintf(stderr, "usage: model_test <scratch dir>\n"); return 2; }
@@ -1846,6 +1958,7 @@ int main(int argc, char **argv)
 	testSourceCopy();
 	testSourceCopyIncomplete();
 	testWritableProbe();
+	testClaimNewFile();
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;
 }

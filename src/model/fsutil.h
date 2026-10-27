@@ -50,12 +50,36 @@ bool writeFile(const std::string &path, const std::string &data);
 // A file this call created but could not fill is removed again.
 bool createNewFile(const std::string &path, const std::string &data, bool *existed = nullptr);
 // How createNewFile() creates a file exclusively. The default is
-// open(O_CREAT | O_EXCL), which is atomic on POSIX hosts; a C library that
-// checks for the name and then creates it is not, and a platform sets its
-// own here (AROS: a native MODE_NEWFILE open, see platform/aros). Same
-// contract as createNewFile().
+// open(O_CREAT | O_EXCL), atomic on POSIX hosts. AROS has no atomic
+// exclusive create (posixc's O_EXCL and a Lock()-then-MODE_NEWFILE both
+// check first and create afterwards, and MODE_NEWFILE truncates a file that
+// appeared in between), so the platform sets its own here, built on
+// claimNewFile() below (platform/aros/exclusivefile). Same contract as
+// createNewFile().
 using CreateExclusive = std::function<bool(const std::string &path, const std::string &data, bool *existed)>;
 void setCreateExclusive(CreateExclusive create);
+
+// Creates path with data only if nothing has that name, without a
+// check-then-create gap: the data is written completely to a scratch file
+// whose name only this process uses, which is then renamed to path by a
+// rename that refuses an existing destination. A file system handler
+// serves one packet at a time, so its own "destination exists" check and
+// the rename are one step (AROS RAM:, SFS and FAT handlers, both ABIs).
+// A file that took the name meanwhile is never opened, truncated or
+// removed; only the scratch file of this call is removed.
+enum class ClaimRename { Done, Exists, Failed };
+struct ClaimOps {
+	// Scratch name n (0, 1, ...) in path's drawer, unique to this process.
+	std::function<std::string(const std::string &path, int n)> scratchName;
+	// Creates a new scratch file with data; false with *taken set when the
+	// name exists (never written over).
+	std::function<bool(const std::string &scratch, const std::string &data, bool *taken)> writeScratch;
+	std::function<ClaimRename(const std::string &from, const std::string &to)> renameNoReplace;
+	std::function<void(const std::string &scratch)> removeScratch;
+	// Test hook: runs after the scratch file is complete, before the rename.
+	std::function<void(const std::string &path)> beforeRename;
+};
+bool claimNewFile(const std::string &path, const std::string &data, const ClaimOps &ops, bool *existed = nullptr);
 bool copyFile(const std::string &from, const std::string &to);
 bool copyTree(const std::string &from, const std::string &to);
 bool removeTree(const std::string &path);

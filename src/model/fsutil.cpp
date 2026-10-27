@@ -231,6 +231,30 @@ bool createNewFile(const std::string &path, const std::string &data, bool *exist
 	return ok;
 }
 
+bool claimNewFile(const std::string &path, const std::string &data, const ClaimOps &ops, bool *existed)
+{
+	if (existed) *existed = false;
+	std::string scratch;
+	for (int n = 0; n < 16 && scratch.empty(); n++) {
+		const std::string candidate = ops.scratchName(path, n);
+		bool taken = false;
+		if (ops.writeScratch(candidate, data, &taken))
+			scratch = candidate;
+		else if (!taken)
+			return false;
+	}
+	if (scratch.empty())
+		return false;
+	if (ops.beforeRename)
+		ops.beforeRename(path);
+	const ClaimRename r = ops.renameNoReplace(scratch, path);
+	if (r == ClaimRename::Done)
+		return true;
+	ops.removeScratch(scratch);
+	if (r == ClaimRename::Exists && existed) *existed = true;
+	return false;
+}
+
 bool copyFile(const std::string &from, const std::string &to)
 {
 	FILE *in = fopen(from.c_str(), "rb");
