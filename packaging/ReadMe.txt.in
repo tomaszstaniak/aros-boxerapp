@@ -12,7 +12,7 @@ Installing
 ----------
 1. Unpack the archive where you want Boxer to live, for example SYS:
    or Work:. From a Shell:
-     UnZip <archive>.zip -d SYS:      (or: LhA x <archive>.lha SYS:)
+     @UNPACK@
    This makes the drawer "Boxer". You can rename or move it later, but
    then run Install-Assign again (step 3).
    Keep these next to BoxerUI: Fonts/, conf/ and dosbox.msg.

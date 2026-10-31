@@ -5,12 +5,13 @@
 #
 #   [BOXER_HOST=sdl2|sdl3] [BOXER_UI_OUT=dir] scripts/make-package.sh <abiv11|mainline-v1>
 #
-# Packages the BoxerUI of the ABI's default host (env.sh: sdl3 on ABIv11,
-# sdl2 on mainline) from build/<abi>/ui<suffix>, or from BOXER_UI_OUT (a
-# side build). Output in build/<abi>/package<suffix>/
-# (package-sdl3 for SDL3; BOXER_PKG_OUT overrides):
+# Packages the BoxerUI of the ABI's host (env.sh: sdl3) from
+# build/<abi>/ui<suffix>, or from BOXER_UI_OUT (a side build). Output in
+# build/<abi>/package<suffix>/ (package-sdl3 for SDL3; BOXER_PKG_OUT overrides):
 #   Boxer/ + Boxer.info               the AROS drawer (what users install) and its icon
-#   boxer-<ver>.<target>.lha          the drawer packed as arospkg expects
+#   Boxer-<ver>-<target>.zip          the drawer packed for users and arospkg
+#   Boxer-<ver>-<target>.pkg          mainline only: the same files for C:Unpack,
+#                                     which every mainline has, unlike UnZip
 #   MANIFEST-<abi>.sha256             every file in the drawer + the archive
 # Contents and rationale: packaging/README.md. The package is refused when
 # the binary does not match its BUILDINFO, has undefined symbols, or when a
@@ -29,8 +30,10 @@ set +e; . "$here/env.sh" "$1"; rc=$?; set -e
 P="$PROJECT_ROOT"
 ver=$(tr -d ' \n' < "$P/packaging/VERSION")
 case "$BOXER_ABI" in
-  abiv11) target=x86_64-aros-v11; abiname="ABIv11 (AROS One)"; sdkrepo=${AROS_V11_SRC:-} ;;
-  mainline-v1) target=x86_64-aros; abiname="mainline AROS (ABI v1)"; sdkrepo=${AROS_V1_SRC:-} ;;
+  abiv11) target=aros-x86_64-abiv11-pc; abiname="ABIv11 (AROS One)"; sdkrepo=${AROS_V11_SRC:-}
+    unpack='UnZip <archive>.zip -d SYS:' ;;
+  mainline-v1) target=aros-x86_64-abiv1-pc; abiname="mainline AROS (ABI v1)"; sdkrepo=${AROS_V1_SRC:-}
+    unpack='Unpack <archive>.pkg TO SYS:      (or, if you have UnZip: UnZip <archive>.zip -d SYS:)' ;;
 esac
 ui="${BOXER_UI_OUT:-$BUILD_DIR/ui$HOST_SUFFIX}"; info="$ui/BUILDINFO.txt"; bin="$ui/BoxerUI"
 [ -f "$bin" ] && [ -f "$info" ] || die "no build: run scripts/build-ui.sh $BOXER_ABI"
@@ -248,7 +251,13 @@ diagline="DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION: core built from an unverified 
     echo "  note: $BOXER_PKG_SOURCE_NOTE"
   fi
   echo "package date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "AROS link libraries from source: $sdkrepo at $sdkrev (branch $sdkbr)"
+  # A frozen SDK names its own sources; the configured checkout may have moved.
+  if [ -f "$AROS_SDK/../SOURCE.txt" ]; then
+    sed -n 's/^Sources: /AROS SDK from: /p' "$AROS_SDK/../SOURCE.txt"
+    sed -n 's/^ISO sha256: /AROS SDK ISO sha256: /p' "$AROS_SDK/../SOURCE.txt"
+  else
+    echo "AROS link libraries from source: $sdkrepo at $sdkrev (branch $sdkbr)"
+  fi
   echo "Boxer upstream: https://github.com/alinebee/Boxer.git $pin + patches/boxer/series"
   echo "conf: Preflight.conf Launch.conf, unmodified from the pin"
   echo "dosbox.msg: tools/strings2table.py from Resources/Base.lproj/DOSBox.strings"
@@ -263,6 +272,7 @@ diagline="DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION: core built from an unverified 
   [ -z "$uncheckednote" ] || printf '%s\n%s\n\n' "$diagline" \
     "It is for diagnosing a problem only. Do not pass it on or publish it."
   sed -e "s|@VERSION@|$ver|g" -e "s|@ABI_NAME@|$abiname|g" -e "s|@SOURCE_ARCHIVE@|$srcarc|g" \
+      -e "s|@UNPACK@|$unpack|g" \
     "$P/packaging/ReadMe.txt.in"
 } > "$pkg/ReadMe.txt"
 # Visible in Wanderer's default view, opens in MultiView (both ABIs ship it there).
@@ -276,22 +286,13 @@ bad=$(find "$pkg" \( -iname '*.png' -o -iname '*.wav' -o -iname '*.ttf' -o -inam
   -o -iname '*.boxer' -o -ipath '*dune*' \) | head -5)
 [ -z "$bad" ] || die "forbidden files in package: $bad"
 
-# 8. Archive (arospkg guide: LHA, drawer at the top level).
-# Homebrew's lha is Lhasa, which only reads; LHA_WRITER names a classic
-# lha that can create (as aros-micropolis/scripts/package-release.sh).
-# Without one, a ZIP is made, which arospkg also accepts.
-if [ -n "${LHA_WRITER:-}" ] && "$LHA_WRITER" --help 2>&1 | grep -q 'a   Add'; then
-  arc="boxer-$ver.$target.lha"
-  (cd "$out" && "$LHA_WRITER" aq2o51 "$arc" Boxer Boxer.info)
-  lha t "$out/$arc" >/dev/null 2>&1 || "$LHA_WRITER" t "$out/$arc" >/dev/null || die "archive test failed: $arc"
-else
-  echo "make-package: LHA_WRITER unset or not a writing lha; making a ZIP" >&2
-  arc="boxer-$ver.$target.zip"
-  (cd "$out" && zip -qrX "$arc" Boxer Boxer.info)
-  unzip -tq "$out/$arc" >/dev/null || die "archive test failed: $arc"
-fi
+# 8. Archive, drawer at the top level (the ZIP is what arospkg takes too).
+arc="Boxer-$ver-$target.zip"
+(cd "$out" && zip -qrX "$arc" Boxer Boxer.info)
+unzip -tq "$out/$arc" >/dev/null || die "archive test failed: $arc"
+[ "$BOXER_ABI" != mainline-v1 ] || python3 "$P/tools/zip-to-pkg.py" "$out/$arc" || die "could not make the .pkg"
 (cd "$out" && { { (cd Boxer && find . -type f | sed 's|^\./|Boxer/|'); echo Boxer.info; } | LC_ALL=C sort | xargs -I{} shasum -a 256 "{}"; \
-  shasum -a 256 "$arc"; }) > "$out/MANIFEST-$BOXER_ABI.sha256"
+  shasum -a 256 "$arc"; [ ! -f "${arc%.zip}.pkg" ] || shasum -a 256 "${arc%.zip}.pkg"; }) > "$out/MANIFEST-$BOXER_ABI.sha256"
 # A dry-run or diagnostic package passes the notice check only as such;
 # without --diagnostic the same check refuses it as a release.
 notices=()

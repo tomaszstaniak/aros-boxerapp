@@ -39,8 +39,8 @@ No games are included; bring your own DOS games.
   distributions and real hardware have not been tested.
 - **Builds, not tested:** mainline AROS x86_64 (ABI v1), an intended target.
 
-ABIv11 and mainline binaries are different files and do not run on each
-other.
+ABIv11 and mainline binaries are different files, each in its own archive,
+and do not run on each other.
 
 ## Download
 
@@ -67,9 +67,12 @@ x86_64 ABIv11). Checksums are listed with each release.
 
 ## Install
 
-1. Unpack the archive, for example to `SYS:` or `Work:`
-   (`UnZip boxer-<version>.x86_64-aros-v11.zip -d Work:`). This makes the
-   drawer `Boxer`.
+1. Unpack the archive for your system, for example to `SYS:` or `Work:`.
+   With the `.zip`, on a system that has UnZip (AROS One does):
+   `UnZip Boxer-<version>-aros-x86_64-abiv11-pc.zip -d Work:`.
+   With the mainline `.pkg`, on any mainline system:
+   `Unpack Boxer-<version>-aros-x86_64-abiv1-pc.pkg TO Work:`.
+   This makes the drawer `Boxer`.
 2. Open the drawer and double-click `Install-Assign`. It assigns `Boxer:`
    to the drawer and adds a marked block to `S:User-Startup` so the assign
    is set at every boot. Game icons need `Boxer:`.

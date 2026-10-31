@@ -101,13 +101,14 @@ source = this + `patches/boxer/series`. Rebuild steps: `SOURCE-README.txt`.
 ## Running
 
 ```
-LHA_WRITER=/path/to/classic/lha scripts/make-package.sh abiv11
-LHA_WRITER=/path/to/classic/lha scripts/make-package.sh mainline-v1
+scripts/make-package.sh abiv11
+scripts/make-package.sh mainline-v1
 ```
 
-Homebrew's `lha` is Lhasa and cannot create archives; LHa for UNIX 1.14i
-can. Without `LHA_WRITER` the script makes a ZIP. The version
-comes from `packaging/VERSION` (`0.1.0-test`: not a release).
+Each makes `Boxer-<version>-<target>.zip`; mainline also gets a `.pkg` for
+`C:Unpack`, which every mainline system has, while UnZip and lha depend on
+what the system was built with. The version comes from
+`packaging/VERSION` (`0.1.0-test`: not a release).
 
 ## Open points
 

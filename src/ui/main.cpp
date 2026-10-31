@@ -3547,7 +3547,7 @@ static Object *fileMenuWindow() {
 // Reads the file again and shows it: the Welcome popup (games, a rule,
 // Clear Menu) and both File menus' Open Recent. Another BoxerUI may have
 // changed it since (every game notes itself in its own process).
-static const char kRecentUnreadable[] = "List of recent games cannot be read";
+static const char kRecentUnreadable[] = "List unreadable";
 static LONG g_recentClearRow = -1;   // the popup's Clear Menu row, -1 when none
 
 static void showRecentGames() {
