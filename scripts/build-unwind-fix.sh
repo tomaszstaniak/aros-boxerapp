@@ -23,7 +23,7 @@ perl -0pe 's/#ifdef MD_FALLBACK_FRAME_STATE_FOR\n(  __builtin_init_dwarf_reg_siz
 ! grep -B1 '__builtin_init_dwarf_reg_size_table (dwarf' "$out/unwind-dw2.c" | grep -q MD_FALLBACK \
   || { echo "guard not removed" >&2; exit 1; }
 cd "$G/x86_64-aros/libgcc"
-"$G/gcc/xgcc" -B"$G/gcc/" -B"$AROS_TOOLCHAIN/x86_64-aros/bin/" \
+"$G/gcc/xgcc" --sysroot="$AROS_SDK" -B"$G/gcc/" -B"$AROS_TOOLCHAIN/x86_64-aros/bin/" \
   -B"$AROS_TOOLCHAIN/x86_64-aros/lib/" \
   -isystem "$AROS_TOOLCHAIN/x86_64-aros/include" -isystem "$AROS_TOOLCHAIN/x86_64-aros/sys-include" \
   -mcmodel=large -O2 -DIN_GCC -DCROSS_DIRECTORY_STRUCTURE -isystem ./include -g \

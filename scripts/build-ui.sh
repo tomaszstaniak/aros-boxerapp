@@ -175,6 +175,12 @@ if [ $rc -eq 0 ] && [ "$BOXER_ABI" = mainline-v1 ]; then
     rm -f "$out/BoxerUI"
     die "unwind fix not linked: no dwarf_reg_size_table in BoxerUI"
   fi
+  # The reduced SDL3 links neither gl.library nor SDL2; a binary that does has
+  # fallen back to the path mainline must not take.
+  if grep -E '__aros_libset_GLBase|GLBase$|SDL2Base' <<< "$syms" > /dev/null; then
+    rm -f "$out/BoxerUI"
+    die "BoxerUI links gl.library or SDL2"
+  fi
 fi
 set -e
 cat "$log"

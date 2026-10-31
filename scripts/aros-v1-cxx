@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Tomasz Staniak
+# The mainline C++ compiler with the SDK as sysroot; see scripts/env.sh.
+exec "$AROS_TOOLCHAIN/x86_64-aros-g++" --sysroot="$AROS_SDK" "$@"

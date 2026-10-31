@@ -43,6 +43,11 @@ AROS_TOOLCHAIN="${!_tc:-}"; AROS_SDK="${!_sdk:-}"
 [ -d "$AROS_SDK/include" ] || { _env_fail "SDK include dir missing: $AROS_SDK/include (volume not mounted?)"; return 1; }
 AROS_CXX="$AROS_TOOLCHAIN/x86_64-aros-g++"
 [ -x "$AROS_CXX" ] || { _env_fail "compiler not executable: $AROS_CXX"; return 1; }
+# The mainline driver's built-in sysroot is the tree the toolchain was built
+# in, and it is searched first, so -I and -L alone would still mix that tree's
+# headers and libraries in: every mainline compile and link names the SDK as
+# the sysroot (scripts/aros-v1-cxx).
+[ "$BOXER_ABI" = mainline-v1 ] && AROS_CXX="$PROJECT_ROOT/scripts/aros-v1-cxx"
 
 UPSTREAM_DIR="$PROJECT_ROOT/upstream/boxer"
 WORK_DIR="$PROJECT_ROOT/work/boxer"
@@ -52,13 +57,13 @@ BUILD_DIR="$PROJECT_ROOT/build/$BOXER_ABI"
 # build). Each host has its own core/UI/smoke output directories, so both
 # builds exist side by side from one source tree (patch 0004 selects the
 # code with -DBOXER_HOST_SDL3).
-# Default sdl3 on ABIv11, because
-# the SDL2 build hung or corrupted memory at flush, SDL2 pulls in gl.library.
-# Mainline keeps sdl2 until its SDL3 build has been run, not just linked.
-case "$BOXER_ABI" in
-  abiv11) BOXER_HOST="${BOXER_HOST:-sdl3}" ;;
-  *)      BOXER_HOST="${BOXER_HOST:-sdl2}" ;;
-esac
+# Default sdl3: the SDL2 build hung or corrupted memory at flush on ABIv11, and
+# SDL2 pulls in gl.library. Mainline allows nothing else, so a wrong setting
+# stops here and never falls back to the GL path.
+BOXER_HOST="${BOXER_HOST:-sdl3}"
+if [ "$BOXER_ABI" = mainline-v1 ] && [ "$BOXER_HOST" != sdl3 ]; then
+  _env_fail "mainline-v1 builds use the reduced SDL3 only (BOXER_HOST=$BOXER_HOST)"; return 1
+fi
 case "$BOXER_HOST" in
   sdl2) HOST_SUFFIX=""
         HOST_CFLAGS=()
