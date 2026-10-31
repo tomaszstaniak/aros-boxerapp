@@ -7,7 +7,7 @@ How to build Boxer for AROS from a clone of this repository.
 | Target | Status |
 | --- | --- |
 | AROS x86_64 ABIv11 | first target; built, packaged and tested on AROS One under QEMU (other ABIv11 distributions and real hardware not tested) |
-| AROS x86_64 mainline (ABI v1) | builds and links; the package is not tested |
+| AROS x86_64 mainline (ABI v1) | built and packaged; tested in part under QEMU, where games and their sound run seriously slowed down |
 | AROS AArch64 | planned; ABI, toolchain and SDK not selected |
 
 ABIv11 and mainline binaries are different files and do not run on each

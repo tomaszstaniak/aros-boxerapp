@@ -35,9 +35,12 @@ No games are included; bring your own DOS games.
 
 ## Supported system
 
-- **Tested:** AROS x86_64 ABIv11 (AROS One), under QEMU. Other ABIv11
-  distributions and real hardware have not been tested.
-- **Builds, not tested:** mainline AROS x86_64 (ABI v1), an intended target.
+- **AROS One (x86_64 ABIv11):** tested under QEMU.
+- **Mainline AROS (x86_64 ABI v1):** partly tested under QEMU. Boxer's
+  functions work there, but in our QEMU setup games and their sound run
+  seriously slowed down; see Limitations. Do not expect games to play
+  properly yet.
+- Other distributions and real hardware have not been tested.
 
 ABIv11 and mainline binaries are different files, each in its own archive,
 and do not run on each other.
@@ -46,8 +49,8 @@ and do not run on each other.
 
 Get the archive from the
 [releases page](https://github.com/tomaszstaniak/aros-boxerapp/releases)
-(currently [0.1.0 preview 5](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview5),
-x86_64 ABIv11). Checksums are listed with each release.
+(currently [0.1.0 preview 6](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview6),
+x86_64 ABIv11 and x86_64 mainline AROS). Checksums are listed with each release.
 
 ## Limitations
 
@@ -56,11 +59,15 @@ x86_64 ABIv11). Checksums are listed with each release.
 - A game session can freeze, including when you leave a game's installer.
   Closing a session that has stopped responding can crash AROS. Save your
   work in other programs before you test.
-- Automatic CPU speed can be very slow after a game is reopened. Set a
-  fixed CPU speed (for example Pentium) for that game in the Inspector;
-  the speed and frameskip chosen there are kept for that game.
-- Tested only on AROS x86_64 ABIv11 (AROS One), under QEMU. Game
-  compatibility is not yet broadly tested.
+- Automatic CPU speed can be very slow after a game is reopened, and on
+  mainline AROS already at the first start: a game may then seem to stop
+  while loading, and may not find its sound card. Set a fixed CPU speed
+  (for example Pentium) for that game in the Inspector and reopen it; the
+  speed and frameskip chosen there are kept for that game.
+- On mainline AROS, games and their sound run seriously slowed down in our
+  QEMU setup. A fixed CPU speed helps but does not fully remove the slowdown.
+  Physical hardware has not been tried, so it may behave differently there.
+- Tested only under QEMU. Game compatibility is not yet broadly tested.
 - Unfinished: the games folder opens in Wanderer as a normal drawer, without
   Boxer's wooden shelf look, and the cover labels use the system's Vera Sans
   instead of Boxer's own font.

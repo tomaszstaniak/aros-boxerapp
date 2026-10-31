@@ -83,11 +83,17 @@ Limitations
 - A game session can freeze, including when you leave a game's
   installer. Closing a session that has stopped responding can crash
   AROS. Save your work in other programs before you test.
-- Automatic CPU speed can be very slow after a game is reopened. Set a
-  fixed CPU speed (for example Pentium) for that game in the Inspector;
+- Automatic CPU speed can be very slow after a game is reopened, and on
+  mainline AROS already at the first start: a game may then seem to stop
+  while loading, and may not find its sound card. Set a fixed CPU speed
+  (for example Pentium) for that game in the Inspector and reopen it;
   Boxer keeps the speed and frameskip you choose there for that game.
-- Tested only on x86_64 ABIv11 (AROS One), under QEMU. Game
-  compatibility is not yet broadly tested.
+- On mainline AROS, games and their sound run seriously slowed down in
+  our QEMU setup. A fixed CPU speed helps but does not fully remove the
+  slowdown. Physical hardware has not been tried, so it may behave
+  differently there.
+- Tested only under QEMU: on x86_64 AROS One, and in part on x86_64
+  mainline AROS. Game compatibility is not yet broadly tested.
 - Dropping icons: nothing is highlighted while you drag over a Boxer
   window (Wanderer does not tell other programs where an icon is being
   dragged); only the drop itself is seen.
