@@ -116,6 +116,12 @@ on 2026-10-02. This list must be redone when the link line changes.
 | `libpthread.a` | yes (pthreads implementation) | no | ABIv11 pthreads | zlib (Szilard Biro et al.) |
 | `libstdc.a`, `libstdcio.a`, `libposixc.a`, `liblibinit.a` | no | yes | mainline stubs for the system C libraries | AROS APL 1.1 |
 
+The Raspberry Pi target links, on the same terms as the rows above where they
+apply: `libc++.a` (with libc++abi) and `libunwind.a` from
+`scripts/build-cxx-runtime.sh` (Apache-2.0 WITH LLVM-exception), `libpthread.a`
+(pthreads, zlib, Szilard Biro et al.), the system stubs named above, and
+compiler-rt's builtins (Apache-2.0 WITH LLVM-exception).
+
 The GCC Runtime Library Exception lets a program compiled with GCC be
 distributed under its own terms, together with the runtime parts linked into
 it. It places no obligations on this program's licence.
