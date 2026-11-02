@@ -1,0 +1,21 @@
+Required on the target system: AROS for Raspberry Pi (aarch64, ABI v1)
+Derived from the libraries this BoxerUI opens at start (its autoinit sets)
+and the library names in the binary.
+
+Opened at program start (autoinit; BoxerUI does not start without them):
+  exec.library dos.library graphics.library intuition.library
+  utility.library diskfont.library cybergraphics.library
+  muimaster.library (Zune)
+  stdc.library stdcio.library posixc.library
+Opened later by BoxerUI or the SDL code linked into it:
+  workbench.library icon.library asl.library datatypes.library
+  lowlevel.library oop.library
+  timer.device input.device ahi.device (sound)
+  controller.hidd when the system has it (game controllers)
+Not needed: SDL (SDL 3, built without OpenGL) and the C++ runtime are
+  linked statically, so no SDL library and no gl.library is required.
+Built against the AROS for Raspberry Pi nightly of 2026-10-29.
+Fonts: Fonts:TrueType/VeraSans.ttf and VeraSansBold.ttf (the system's
+  Bitstream Vera Sans; Boxer's Fonts/*.otag refer to them). Without them
+  BoxerUI falls back to topaz.font.
+Stack: 65536 bytes (set in BoxerUI.info; type "Stack 65536" in a Shell).

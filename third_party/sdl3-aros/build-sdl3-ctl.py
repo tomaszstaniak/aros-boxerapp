@@ -9,7 +9,7 @@ Headers the backend needs that the SDKs do not carry (see README.md):
   gen/interface/*.h          genmodule writeincludes from that controller.conf
   inc-v11/                   (abiv11 only) hidd/input.h & co copied from the
                              mainline Developer include, ABIv11 SDK has no hidd/
-usage: build-sdl3-ctl.py <abiv11|mainline-v1> <outdir>
+usage: build-sdl3-ctl.py <abiv11|mainline-v1|aros-aarch64-abiv1-raspi> <outdir>
 (normally run through scripts/build-sdl3.sh)
 """
 import hashlib, os, re, subprocess, sys, tarfile, datetime
@@ -18,10 +18,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 here = Path(__file__).resolve().parent
 abi, out = sys.argv[1], Path(sys.argv[2]).resolve()
-if abi not in ('abiv11', 'mainline-v1'):
-    sys.exit('usage: build-sdl3-ctl.py <abiv11|mainline-v1> <outdir>')
+if abi not in ('abiv11', 'mainline-v1', 'aros-aarch64-abiv1-raspi'):
+    sys.exit('usage: build-sdl3-ctl.py <abiv11|mainline-v1|aros-aarch64-abiv1-raspi> <outdir>')
 # Set by scripts/env.sh for the selected ABI; SDL3_TARBALL by scripts/build-sdl3.sh.
-TC, SDK = os.environ['AROS_TOOLCHAIN'], os.environ['AROS_SDK']
+SDK = os.environ['AROS_SDK']
 TARBALL = Path(os.environ['SDL3_TARBALL'])
 TARBALL_SHA = 'f07b958a9ac5020fb7a44cadb957f658b2149c3c8abb4f63145fac9303249db7'
 CONTRIB = here / 'contrib-a3cb9c4700'
@@ -44,6 +44,11 @@ text = cfg.read_text()
 for d in ('SDL_VIDEO_DRIVER_AROS', 'SDL_VIDEO_DRIVER_DUMMY', 'SDL_VIDEO_OPENGL_AGL',
           'SDL_VIDEO_OPENGL', 'SDL_VIDEO_RENDER_OGL'):
     text = re.sub(rf'^#define {d} 1$', f'/* {d} removed */', text, flags=re.M)
+if abi == 'aros-aarch64-abiv1-raspi':
+    # No iconv in the Raspberry Pi SDK: SDL's built-in converter covers the
+    # UTF-8, UTF-16, UTF-32 and Latin-1 cases.
+    for d in ('HAVE_ICONV_H', 'HAVE_ICONV', 'SDL_USE_LIBICONV'):
+        text = re.sub(rf'^#define {d} 1$', f'/* {d} removed */', text, flags=re.M)
 if '/* build-sdl3-ctl.py */' not in text:
     i = text.rstrip().rfind('#endif')
     text = (text[:i] + '/* build-sdl3-ctl.py */\n#define SDL_VIDEO_DISABLED 1\n'
@@ -63,7 +68,7 @@ files = re.findall(r'\$\(ARCHSRCDIR\)/(\S+)', '\n'.join(block))
 files = [f for f in files if not f.startswith(('src/video/aros/', 'src/render/opengl/'))]
 
 objdir = out / 'obj'; objdir.mkdir(parents=True, exist_ok=True)
-cc, ar = Path(TC) / 'x86_64-aros-gcc', Path(TC) / 'x86_64-aros-ar'
+cc, ar = os.environ['AROS_CC'], os.environ['AROS_AR']
 inc = [f'-I{src}/include', f'-I{src}/include/build_config', f'-I{src}', f'-I{src}/src',
        f'-I{here}/inc', f'-I{here}/gen']
 if abi == 'abiv11':
@@ -73,13 +78,16 @@ if Path(SDK, 'SDK/Extras/include').is_dir():
     inc.append(f'-I{SDK}/SDK/Extras/include')
 cflags = ['-std=gnu99', '-O2', '-DSDL3_AROS_STATIC',
           f'-DADATE="{datetime.date.today():%d.%m.%Y}"', '-w']
+if abi == 'aros-aarch64-abiv1-raspi':
+    # SDL's own converter uses ptrdiff_t, which only the iconv path gets via <iconv.h>.
+    cflags += ['-include', 'stddef.h']
 units = [(src / (f + '.c'), objdir / (f.replace('/', '_') + '.o')) for f in files]
 units.append((CONTRIB / 'SDL3_static.c', objdir / 'SDL3_static.o'))
 
 
 def build(u):
     s, o = u
-    r = subprocess.run([str(cc), f'--sysroot={SDK}'] + cflags + inc + ['-c', str(s), '-o', str(o)],
+    r = subprocess.run([cc, f'--sysroot={SDK}'] + cflags + inc + ['-c', str(s), '-o', str(o)],
                        capture_output=True, text=True)
     return s, r.returncode, r.stdout + r.stderr
 
@@ -97,5 +105,5 @@ lib = out / 'lib/libSDL3_ctl.a'
 lib.parent.mkdir(exist_ok=True); lib.unlink(missing_ok=True)
 objs = [str(o) for _, o in units]
 for i in range(0, len(objs), 100):
-    subprocess.run([str(ar), 'rcs', str(lib)] + objs[i:i + 100], check=True)
+    subprocess.run([ar, 'rcs', str(lib)] + objs[i:i + 100], check=True)
 print(f'{lib} {lib.stat().st_size} bytes')

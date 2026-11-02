@@ -4,7 +4,7 @@
 # Build BoxerUI (src/ui, the Zune front end with the embedded core) for one
 # ABI. Needs the core library from build-core.sh for the same ABI.
 #
-#   [BOXER_HOST=sdl2|sdl3] scripts/build-ui.sh <abiv11|mainline-v1>
+#   [BOXER_HOST=sdl2|sdl3] scripts/build-ui.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi>
 #   (sdl3: build/<abi>/ui-sdl3, core from core-sdl3, see scripts/env.sh)
 #
 # Output: build/<abi>/ui-sdl3/BoxerUI (ui/ for sdl2; the default host per ABI
@@ -18,7 +18,7 @@
 # fails at its first OpenLibrary).
 set -euo pipefail
 die() { echo "build-ui: $*" >&2; exit 2; }
-[ $# -eq 1 ] || die "usage: build-ui.sh <abiv11|mainline-v1>"
+[ $# -eq 1 ] || die "usage: build-ui.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi>"
 here=$(cd "$(dirname "$0")" && pwd)
 set +e; . "$here/env.sh" "$1"; rc=$?; set -e
 [ $rc -eq 0 ] || die "environment setup failed"
@@ -168,10 +168,10 @@ if [ $rc -eq 0 ]; then
   "$AROS_CXX" -o "$out/BoxerUI" "${objs[@]}" "${unwind[@]+"${unwind[@]}"}" "$lib" "${HOST_LIBS[@]}" >> "$log" 2>&1
   rc=$?
 fi
-if [ $rc -eq 0 ] && [ "$BOXER_ABI" = mainline-v1 ]; then
+if [ $rc -eq 0 ] && [ "$BOXER_ABI" != abiv11 ]; then
   # Read nm into a variable first: grep -q under pipefail trips on SIGPIPE.
-  syms=$("$AROS_TOOLCHAIN/x86_64-aros-nm" "$out/BoxerUI")
-  if ! grep ' dwarf_reg_size_table$' <<< "$syms" > /dev/null; then
+  syms=$("$AROS_NM" "$out/BoxerUI")
+  if [ "$BOXER_ABI" = mainline-v1 ] && ! grep ' dwarf_reg_size_table$' <<< "$syms" > /dev/null; then
     rm -f "$out/BoxerUI"
     die "unwind fix not linked: no dwarf_reg_size_table in BoxerUI"
   fi
@@ -193,7 +193,7 @@ cat "$log"
 # BOXER_UI_DEFS: extra -D flags for the UI sources only, e.g.
 # -DBOXER_MEMTRACE (memory checkpoints, main.cpp); off by default.
 # BOXER_UI_NM is a test hook only (simulating nm failure or extra symbols).
-nm_tool="${BOXER_UI_NM:-$AROS_TOOLCHAIN/x86_64-aros-nm}"
+nm_tool="${BOXER_UI_NM:-$AROS_NM}"
 set +e
 "$here/check-undefined.sh" "$nm_tool" "$out/BoxerUI" \
   "$here/ui-undefined-allowlist.txt"
@@ -228,10 +228,11 @@ runtime=$(cd "$out/stage" && find . -type f ! -path ./BoxerUI -print0 | LC_ALL=C
   echo "abi: $BOXER_ABI"
   echo "host: $BOXER_HOST"
   [ "$BOXER_HOST" = sdl3 ] && echo "sdl3 library: $(shasum -a 256 "$BUILD_DIR/sdl3/lib/libSDL3_ctl.a" | cut -d' ' -f1) (build/$BOXER_ABI/sdl3/BUILDINFO.txt)"
-  echo "libsets: $("$AROS_TOOLCHAIN/x86_64-aros-nm" "$out/BoxerUI" | grep -oE '__aros_libset_[A-Za-z0-9_]+' | sort -u | sed 's/__aros_libset_//' | tr '\n' ' ')"
+  echo "libsets: $("$AROS_NM" "$out/BoxerUI" | grep -oE '__aros_libset_[A-Za-z0-9_]+' | sort -u | sed 's/__aros_libset_//' | tr '\n' ' ')"
   echo "compiler: $AROS_CXX"
   "$AROS_CXX" --version | head -1
-  echo "sysroot: $("$AROS_CXX" -print-sysroot)"
+  echo "sysroot: $AROS_SYSROOT"
+  [ "$BOXER_ABI" = aros-aarch64-abiv1-raspi ] && sed 's/^/c++ runtime: /' "$AROS_RASPI_CXXRT/BUILDINFO.txt"
   echo "sdk include: $AROS_SDK/include"
   echo "file: $(file -b "$out/BoxerUI")"
   echo "sha256: $(shasum -a 256 "$out/BoxerUI" | cut -d' ' -f1)"

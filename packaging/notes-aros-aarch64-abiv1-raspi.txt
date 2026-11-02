@@ -1,0 +1,5 @@
+
+This Raspberry Pi build is a test build and has not been run on a real
+Raspberry Pi. DOS games run on DOSBox's interpreter core here, which is
+much slower than the x86_64 builds. See "Known limits" below.
+

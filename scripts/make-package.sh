@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Tomasz Staniak
 # Build the binary package of BoxerUI for one ABI from an existing build.
 #
-#   [BOXER_HOST=sdl2|sdl3] [BOXER_UI_OUT=dir] scripts/make-package.sh <abiv11|mainline-v1>
+#   [BOXER_HOST=sdl2|sdl3] [BOXER_UI_OUT=dir] scripts/make-package.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi>
 #
 # Packages the BoxerUI of the ABI's host (env.sh: sdl3) from
 # build/<abi>/ui<suffix>, or from BOXER_UI_OUT (a side build). Output in
@@ -23,7 +23,7 @@
 # not the ones the build recorded.
 set -euo pipefail
 die() { echo "make-package: $*" >&2; exit 2; }
-[ $# -eq 1 ] || die "usage: make-package.sh <abiv11|mainline-v1>"
+[ $# -eq 1 ] || die "usage: make-package.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi>"
 here=$(cd "$(dirname "$0")" && pwd)
 set +e; . "$here/env.sh" "$1"; rc=$?; set -e
 [ $rc -eq 0 ] || die "environment setup failed"
@@ -34,8 +34,11 @@ case "$BOXER_ABI" in
     unpack='UnZip <archive>.zip -d SYS:' ;;
   mainline-v1) target=aros-x86_64-abiv1-pc; abiname="mainline AROS (ABI v1)"; sdkrepo=${AROS_V1_SRC:-}
     unpack='Unpack <archive>.pkg TO SYS:      (or, if you have UnZip: UnZip <archive>.zip -d SYS:)' ;;
+  aros-aarch64-abiv1-raspi) target=aros-aarch64-abiv1-raspi; abiname="AROS for Raspberry Pi"; sdkrepo=${AROS_V1_SRC:-}
+    unpack='Unpack <archive>.pkg TO SYS:      (or, if you have UnZip: UnZip <archive>.zip -d SYS:)' ;;
 esac
 ui="${BOXER_UI_OUT:-$BUILD_DIR/ui$HOST_SUFFIX}"; info="$ui/BUILDINFO.txt"; bin="$ui/BoxerUI"
+arch=x86_64; [ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ] || { arch=aarch64; sdkrepo=; }
 [ -f "$bin" ] && [ -f "$info" ] || die "no build: run scripts/build-ui.sh $BOXER_ABI"
 
 # 1. The binary is the one BUILDINFO describes, was built for this host
@@ -44,7 +47,7 @@ ui="${BOXER_UI_OUT:-$BUILD_DIR/ui$HOST_SUFFIX}"; info="$ui/BUILDINFO.txt"; bin="
 want=$(sed -n 's/^sha256: //p' "$info")
 got=$(shasum -a 256 "$bin" | cut -d' ' -f1)
 [ "$want" = "$got" ] || die "BoxerUI sha256 $got differs from BUILDINFO ($want)"
-"$here/check-undefined.sh" "$AROS_TOOLCHAIN/x86_64-aros-nm" "$bin" "$here/ui-undefined-allowlist.txt" \
+"$here/check-undefined.sh" "$AROS_NM" "$bin" "$here/ui-undefined-allowlist.txt" \
   || die "undefined-symbol check failed"
 # 2. The tree still holds the sources and build inputs that binary was
 # built from (scripts/check-build-inputs.sh: "sources:" and "build inputs:").
@@ -271,8 +274,11 @@ diagline="DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION: core built from an unverified 
 {
   [ -z "$uncheckednote" ] || printf '%s\n%s\n\n' "$diagline" \
     "It is for diagnosing a problem only. Do not pass it on or publish it."
-  sed -e "s|@VERSION@|$ver|g" -e "s|@ABI_NAME@|$abiname|g" -e "s|@SOURCE_ARCHIVE@|$srcarc|g" \
-      -e "s|@UNPACK@|$unpack|g" \
+  # packaging/notes-<abi>.txt, when there is one, says what differs on that target.
+  notes="$P/packaging/notes-$BOXER_ABI.txt"
+  sed -e "s|@VERSION@|$ver|g" -e "s|@ABI_NAME@|$abiname|g" -e "s|@ARCH@|$arch|g" \
+      -e "s|@SOURCE_ARCHIVE@|$srcarc|g" -e "s|@UNPACK@|$unpack|g" \
+      -e "/@TARGET_NOTES@/{r $( [ -f "$notes" ] && echo "$notes" || echo /dev/null )" -e "d;}" \
     "$P/packaging/ReadMe.txt.in"
 } > "$pkg/ReadMe.txt"
 # Visible in Wanderer's default view, opens in MultiView (both ABIs ship it there).
@@ -290,7 +296,7 @@ bad=$(find "$pkg" \( -iname '*.png' -o -iname '*.wav' -o -iname '*.ttf' -o -inam
 arc="Boxer-$ver-$target.zip"
 (cd "$out" && zip -qrX "$arc" Boxer Boxer.info)
 unzip -tq "$out/$arc" >/dev/null || die "archive test failed: $arc"
-[ "$BOXER_ABI" != mainline-v1 ] || python3 "$P/tools/zip-to-pkg.py" "$out/$arc" || die "could not make the .pkg"
+[ "$BOXER_ABI" = abiv11 ] || python3 "$P/tools/zip-to-pkg.py" "$out/$arc" || die "could not make the .pkg"
 (cd "$out" && { { (cd Boxer && find . -type f | sed 's|^\./|Boxer/|'); echo Boxer.info; } | LC_ALL=C sort | xargs -I{} shasum -a 256 "{}"; \
   shasum -a 256 "$arc"; [ ! -f "${arc%.zip}.pkg" ] || shasum -a 256 "${arc%.zip}.pkg"; }) > "$out/MANIFEST-$BOXER_ABI.sha256"
 # A dry-run or diagnostic package passes the notice check only as such;

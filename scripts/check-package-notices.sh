@@ -4,7 +4,7 @@
 #
 # Checks that a staged BoxerUI package directory carries the licence notices
 # that documentation/licenses.md ("Distribution checklist") requires.
-# Usage: scripts/check-package-notices.sh [--diagnostic] <abiv11|mainline-v1> <package dir>
+# Usage: scripts/check-package-notices.sh [--diagnostic] <abiv11|mainline-v1|aros-aarch64-abiv1-raspi> <package dir>
 # Exit 0 when nothing is missing, 1 otherwise. Content of the notices is
 # compared with this repository's copies so that a stale copy is caught too.
 # A package marked not for distribution (diagnostic build from an unverified
@@ -14,7 +14,7 @@ set -u
 diagnostic=0
 [ "${1:-}" = --diagnostic ] && { diagnostic=1; shift; }
 abi=${1:-}; pkg=${2:-}
-case "$abi" in abiv11|mainline-v1) ;; *) echo "usage: $0 <abiv11|mainline-v1> <package dir>" >&2; exit 2;; esac
+case "$abi" in abiv11|mainline-v1|aros-aarch64-abiv1-raspi) ;; *) echo "usage: $0 <abiv11|mainline-v1|aros-aarch64-abiv1-raspi> <package dir>" >&2; exit 2;; esac
 [ -d "$pkg" ] || { echo "not a directory: $pkg" >&2; exit 2; }
 root=$(cd "$(dirname "$0")/.." && pwd)
 missing=0
@@ -37,6 +37,8 @@ case "$host" in
     sdl2|"") need LICENSES/SDL2-zlib.txt "$root/LICENSES/SDL2-zlib.txt" ;;
     *) echo "UNKNOWN  host '$host' in BUILDINFO.txt"; missing=1 ;;
 esac
+# The Raspberry Pi program links libc++, libc++abi and libunwind statically.
+[ "$abi" != aros-aarch64-abiv1-raspi ] || need LICENSES/LLVM-Apache-2.0-with-exception.txt "$root/LICENSES/LLVM-Apache-2.0-with-exception.txt"
 need NOTICE-boxer.txt "$root/assets/NOTICE-boxer.txt"
 need NOTICE-replacements.txt "$root/assets/NOTICE-replacements.txt"
 need licenses.md "$root/documentation/licenses.md"

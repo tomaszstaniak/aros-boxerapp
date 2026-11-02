@@ -18,7 +18,7 @@
 #   <string.h>) to the same effect (e.g. BXCoalfaceDrives.h -> "drives.h");
 # - feature switches for AROS are set in DOSBox/config.h by patches, not here.
 #
-# Usage: [BOXER_HOST=sdl2|sdl3] build-core.sh <abiv11|mainline-v1> [source-root]
+# Usage: [BOXER_HOST=sdl2|sdl3] build-core.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi> [source-root]
 #   BOXER_HOST (scripts/env.sh): sdl2 -> build/<abi>/core, sdl3 -> core-sdl3.
 #   source-root defaults to work/boxer, which must equal the upstream pin plus
 #   the patch series (checked with scripts/reproduce --source-only before any
@@ -28,7 +28,7 @@
 #   configuration faults exit 2.
 set -euo pipefail
 die() { echo "build-core: $*" >&2; exit 2; }
-[ $# -ge 1 ] && [ $# -le 2 ] || die "usage: build-core.sh <abiv11|mainline-v1> [source-root]"
+[ $# -ge 1 ] && [ $# -le 2 ] || die "usage: build-core.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi> [source-root]"
 here=$(cd "$(dirname "$0")" && pwd)
 set +e; . "$here/env.sh" "$1"; rc=$?; set -e
 [ $rc -eq 0 ] || die "environment setup failed"
@@ -53,7 +53,6 @@ elif [ "${BOXER_CORE_UNCHECKED_SOURCE:-}" = 1 ]; then
 else
   die "source root $src is not work/boxer and cannot be checked against pin + series (BOXER_CORE_UNCHECKED_SOURCE=1 builds it anyway)"
 fi
-AROS_AR="$AROS_TOOLCHAIN/x86_64-aros-ar"
 [ -x "$AROS_AR" ] || die "archiver not executable: $AROS_AR"
 
 out="$BUILD_DIR/core$HOST_SUFFIX"
@@ -73,6 +72,9 @@ cxxflags=(-ffile-prefix-map="$(cd "$src" && pwd)/"=boxer/ -O2 -std=gnu++0x -fno-
 cxxflags+=(-iquote "$src/DOSBox/include")
 while IFS= read -r d; do cxxflags+=(-iquote "$d"); done < <(
   find "$src/DOSBox/src" -name '*.h' -exec dirname {} \; | sort -u)
+# Clang refuses "text"MACRO in C++11 unless this is off (int10_vesa.cpp);
+# GCC accepts it. The core stays pin + series.
+[ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ] || cxxflags+=(-Wno-reserved-user-defined-literal)
 jobs=${JOBS:-$(sysctl -n hw.ncpu)}
 
 # Build identity: objects are reused only when they were made from the same

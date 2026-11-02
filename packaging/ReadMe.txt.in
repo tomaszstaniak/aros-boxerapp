@@ -1,4 +1,4 @@
-Boxer for AROS @VERSION@ (@ABI_NAME@, x86_64)
+Boxer for AROS @VERSION@ (@ABI_NAME@, @ARCH@)
 =============================================
 
 This is an experimental preview of the AROS port of Boxer, the DOS game
@@ -7,7 +7,7 @@ not yet the complete Boxer experience. Expect missing features and bugs.
 
 This build only runs on @ABI_NAME@. Binaries for ABIv11 (AROS One) and for
 mainline AROS (ABI v1) are different files and do not run on each other.
-
+@TARGET_NOTES@
 Installing
 ----------
 1. Unpack the archive where you want Boxer to live, for example SYS:

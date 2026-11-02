@@ -1,0 +1,9 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Tomasz Staniak
+# The Raspberry Pi C compiler with the chosen SDK; see scripts/env.sh.
+# RPI_SDK replaces the SDK of the toolchain's own wrapper. -fsigned-char:
+# plain char is unsigned on this target and signed on x86_64, and the core
+# and the UI were only ever run with it signed.
+RPI_SDK="$AROS_SDK"; export RPI_SDK
+exec "$AROS_TOOLCHAIN/aarch64-aros-clang" -fsigned-char "$@"

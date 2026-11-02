@@ -14,10 +14,10 @@
 # SDL3_TARBALL: a local copy of SDL3-3.4.12.tar.gz; default
 # deps/src/SDL3-3.4.12.tar.gz, downloaded from SDL3_URL when missing.
 #
-# Usage: build-sdl3.sh <abiv11|mainline-v1>
+# Usage: build-sdl3.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi>
 set -euo pipefail
 die() { echo "build-sdl3: $*" >&2; exit 2; }
-[ $# -eq 1 ] || die "usage: build-sdl3.sh <abiv11|mainline-v1>"
+[ $# -eq 1 ] || die "usage: build-sdl3.sh <abiv11|mainline-v1|aros-aarch64-abiv1-raspi>"
 here=$(cd "$(dirname "$0")" && pwd)
 set +e; . "$here/env.sh" "$1"; rc=$?; set -e
 [ $rc -eq 0 ] || die "environment setup failed"
@@ -48,13 +48,13 @@ done
 if grep -qE '^#define (SDL_VIDEO_OPENGL|SDL_VIDEO_DRIVER_AROS|SDL_VIDEO_RENDER_OGL) 1' "$cfg"; then
   die "video/GL still enabled in $cfg"
 fi
-undef=$("$AROS_TOOLCHAIN/x86_64-aros-nm" -u "$lib" 2>/dev/null | grep -E ' glA|GLBase' || true)
+undef=$("$AROS_NM" -u "$lib" 2>/dev/null | grep -E ' glA|GLBase' || true)
 [ -z "$undef" ] || die "the SDL3 library references GL: $undef"
 {
   echo "date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "abi: $BOXER_ABI"
-  echo "compiler: $AROS_TOOLCHAIN/x86_64-aros-gcc"
-  "$AROS_TOOLCHAIN/x86_64-aros-gcc" --version | head -1
+  echo "compiler: $AROS_CC"
+  "$AROS_CC" --version | head -1
   echo "sdk: $AROS_SDK"
   echo "upstream: SDL3-3.4.12.tar.gz sha256 f07b958a9ac5020fb7a44cadb957f658b2149c3c8abb4f63145fac9303249db7"
   echo "aros port: aros-development-team/contrib a3cb9c4700a81c9d14ebdc8741c932825c4429f0 (SDL3/main)"

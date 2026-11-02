@@ -1,0 +1,8 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Tomasz Staniak
+# The Raspberry Pi C++ compiler with the chosen SDK and the libc++ of
+# scripts/build-cxx-runtime.sh; see scripts/env.sh and scripts/aros-raspi-cc.
+RPI_SDK="$AROS_SDK"; export RPI_SDK
+exec "$AROS_TOOLCHAIN/aarch64-aros-clang++" -fsigned-char -nostdinc++ \
+  -isystem "$AROS_RASPI_CXXRT/include/c++/v1" -L"$AROS_RASPI_CXXRT/lib" "$@"

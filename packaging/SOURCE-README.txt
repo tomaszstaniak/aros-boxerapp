@@ -30,7 +30,10 @@ Rebuilding
   2. Copy local.env.example to local.env and point it at the toolchain and
      SDK named in BUILDINFO.txt.
   3. scripts/build-core.sh <abi>, then scripts/build-ui.sh <abi>
-     (abi: abiv11 or mainline-v1). On mainline, build-ui.sh first runs
+     (abi: abiv11, mainline-v1 or aros-aarch64-abiv1-raspi). The Raspberry
+     Pi target uses Clang 20.1, the SDK of the nightly it runs on, and
+     needs scripts/build-cxx-runtime.sh first (libc++ 20.1 with the AROS
+     patches). On mainline, build-ui.sh first runs
      scripts/build-unwind-fix.sh, which compiles GCC 10.5's unwind-dw2.c
      from a configured mainline AROS GCC build tree (AROS_V1_GCC_BUILD).
      For the SDL3 host (default on ABIv11) run scripts/build-sdl3.sh <abi>
