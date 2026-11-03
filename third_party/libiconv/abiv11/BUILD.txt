@@ -27,7 +27,13 @@ Rebuilding (gives objects identical byte for byte to the SDK's)
     --libdir=/ssd/deadwood/repo-github-dd-core-release/core-contrib-x86_64/bin/linux-x86_64/AROS/Development/lib
   (cd libcharset && make && make install-lib libdir="$PWD/../lib" includedir="$PWD/../lib")
   make -C lib
-  -> lib/.libs/libiconv.a
+  <tc>/x86_64-aros-ar rc libiconv.a lib/iconv.o lib/localcharset.o lib/relocatable.o
+  <tc>/x86_64-aros-ranlib libiconv.a
+  -> libiconv.a
+
+  libiconv 1.14's libtool archives with the build machine's own "ar"
+  whatever AR says; on a Mac that writes an empty lib/.libs/libiconv.a,
+  hence the archive step with the toolchain's ar.
 
   --build names the machine you build on (configure must see a cross
   build; libiconv 1.14's config.sub does not know aarch64-darwin, so a
