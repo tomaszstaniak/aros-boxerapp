@@ -36,13 +36,10 @@ No games are included; bring your own DOS games.
 ## Supported system
 
 - **AROS One (x86_64 ABIv11):** tested under QEMU.
-- **Mainline AROS (x86_64 ABI v1):** partly tested under QEMU. Boxer's
-  functions work there, but in our QEMU setup games and their sound run
-  seriously slowed down; see Limitations. Do not expect games to play
-  properly yet.
-- **Raspberry Pi (AArch64, AROS for Raspberry Pi):** experimental. It has run
-  only under QEMU, without real sound output; sound and speed on a physical
-  Raspberry Pi need testing. Reports from Raspberry Pi owners are welcome.
+- **Mainline AROS (x86_64 ABI v1):** partly tested under QEMU; see
+  Limitations.
+- **Raspberry Pi (AArch64, AROS for Raspberry Pi):** experimental, tried
+  only under QEMU, without real sound output; see Limitations.
 - Other distributions and real hardware have not been tested.
 
 ABIv11, mainline and Raspberry Pi binaries are different files, each in its
@@ -52,8 +49,8 @@ own archive, and do not run on each other.
 
 Get the archive from the
 [releases page](https://github.com/tomaszstaniak/aros-boxerapp/releases)
-(currently [0.1.0 preview 6](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview6),
-x86_64 ABIv11 and x86_64 mainline AROS, and an experimental Raspberry Pi build).
+(currently [0.2.0 preview 1](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.2.0-preview1),
+for x86_64 ABIv11, x86_64 mainline AROS and Raspberry Pi, all experimental).
 Checksums are listed with each release.
 
 ## Limitations
@@ -63,14 +60,19 @@ Checksums are listed with each release.
 - A game session can freeze, including when you leave a game's installer.
   Closing a session that has stopped responding can crash AROS. Save your
   work in other programs before you test.
-- Automatic CPU speed can be very slow after a game is reopened, and on
-  mainline AROS already at the first start: a game may then seem to stop
-  while loading, and may not find its sound card. Set a fixed CPU speed
-  (for example Pentium) for that game in the Inspector and reopen it; the
-  speed and frameskip chosen there are kept for that game.
-- On mainline AROS, games and their sound run seriously slowed down in our
-  QEMU setup. A fixed CPU speed helps but does not fully remove the slowdown.
-  Physical hardware has not been tried, so it may behave differently there.
+- Automatic CPU speed can drop very low, for example after a game is
+  reopened: a game may then seem to stop while loading, and may not find
+  its sound card. Set a fixed CPU speed (for example Pentium) for that game
+  in the Inspector and reopen it; the speed and frameskip chosen there are
+  kept for that game.
+- Mainline AROS: under QEMU we saw games and their sound slow down
+  seriously when the host ran QEMU at low (background) priority; at normal
+  priority the tested game ran at full speed. A fixed CPU speed does not
+  fully remove the slowdown. Physical hardware has not been tested.
+- Raspberry Pi: tried only under QEMU, without real sound output; sound and
+  speed on a real Raspberry Pi are untested. DOS programs run on DOSBox's
+  interpreter core only. Boxer can crash while you choose the folder of a
+  game to import.
 - Tested only under QEMU. Game compatibility is not yet broadly tested.
 - Unfinished: the games folder opens in Wanderer as a normal drawer, without
   Boxer's wooden shelf look, and the cover labels use the system's Vera Sans
@@ -103,11 +105,7 @@ REMOVE`, then delete the lines from `;BEGIN Boxer` to `;END Boxer` in
 folder, its `Boxer Data` (saved games) and `ENVARC:Boxer` are separate;
 delete them only if you no longer want them.
 
-## Reporting a problem
-
-Report problems through the
-[issue tracker](https://github.com/tomaszstaniak/aros-boxerapp/issues).
-Hardware testing and feedback are welcome.
+## Logs
 
 Each BoxerUI process writes its own log, by default a new file in
 `RAM:BoxerLogs/` (`boxerui-1.log`, `boxerui-2.log`, ...; a game started
@@ -118,16 +116,8 @@ log, start BoxerUI with a log in a writable drawer, for example the ToolType
 (the Boxer drawer itself may be read-only). While that file is open in one
 BoxerUI, another one logs to a numbered file beside it.
 
-Please include:
-
-- which game you tried, what worked, and the steps that led to the problem;
-- the log file;
-- what you did just before the problem (screen, button or key);
-- the AROS version and distribution, and the ABI (ABIv11, mainline or
-  Raspberry Pi);
-- the amount of RAM;
-- real hardware (which) or an emulator (which, and its settings);
-- the BoxerUI sha256 from `SHA256SUMS` in the drawer.
+Problems can be reported through the
+[issue tracker](https://github.com/tomaszstaniak/aros-boxerapp/issues).
 
 ## Building from source
 
@@ -163,6 +153,10 @@ in [documentation/licenses.md](documentation/licenses.md) and `LICENSES/`.
   or later.
 - **SDL** is by Sam Lantinga and SDL contributors (zlib); the AROS SDL3 port
   is by the AROS contributors.
+- **GNU libiconv** (LGPL-2.1-or-later) is linked into the x86_64 programs.
+  Its source as linked and a relink kit are published with each release as
+  `Boxer-<version>-<target>-lgpl-kit.zip`; see
+  [documentation/licenses.md](documentation/licenses.md).
 - Replacement icons: Feather by Cole Bemis (MIT,
   `assets/NOTICE-replacements.txt`). Fonts: Bitstream Vera descriptions
   (`LICENSES/Bitstream-Vera.txt`).

@@ -7,11 +7,11 @@ How to build Boxer for AROS from a clone of this repository.
 | Target | Status |
 | --- | --- |
 | AROS x86_64 ABIv11 | first target; built, packaged and tested on AROS One under QEMU (other ABIv11 distributions and real hardware not tested) |
-| AROS x86_64 mainline (ABI v1) | built and packaged; tested in part under QEMU, where games and their sound run seriously slowed down |
-| AROS AArch64 | planned; ABI, toolchain and SDK not selected |
+| AROS x86_64 mainline (ABI v1) | built and packaged; tested in part under QEMU, where games and their sound slowed down seriously when the host ran QEMU at low priority |
+| AROS for Raspberry Pi (AArch64, ABI v1) | built and packaged (`aros-aarch64-abiv1-raspi`, Clang 20.1); tested only under QEMU, without real sound output |
 
-ABIv11 and mainline binaries are different files and do not run on each
-other. Every build output is kept per ABI under `build/<abi>/`.
+ABIv11, mainline and Raspberry Pi binaries are different files and do not
+run on each other. Every build output is kept per ABI under `build/<abi>/`.
 
 ## Source pins
 
@@ -97,6 +97,11 @@ bytes.
   AROS x86_64 relocations.
 - `build-smoke.sh` builds `boxer-core-smoke`, a Shell program that runs the
   core without the UI.
+- `make-lgpl-kit.sh <abiv11|mainline-v1>` makes the release asset
+  `Boxer-<version>-<target>-lgpl-kit.zip`: the GNU libiconv source as
+  linked, its build recipe (`third_party/libiconv/`) and a relink kit. It
+  repeats the link and checks that the kit links the same BoxerUI. The GNU
+  tarballs are read from `LIBICONV_TARBALLS` (default `deps/src/`).
 - `make-package.sh` refuses to package when the binary does not match its
   `BUILDINFO.txt`, when a source file or build input (embedded art, font
   descriptions, generating scripts, SDL3 headers) has changed since the
@@ -116,7 +121,7 @@ python3 tests/build-tooling/test_build_inputs.py    # build inputs and runtime f
 python3 tests/build-tooling/test_core_provenance.py # the core record and its packaging check
 python3 tests/build-tooling/test_install_assign.py  # packaging/Install-Assign in a Shell model
 python3 tests/build-tooling/test_package_notices.py # notices; diagnostic packages refused as releases
-python3 tests/build-tooling/test_cxx_runtime.py     # Raspberry Pi C++ runtime: output guard, pins
+python3 tests/build-tooling/test_cxx_runtime.py     # Raspberry Pi C++ runtime: output guard, pins, header manifest
 ```
 
 `build-ui.sh` also runs `src/ui/tests/ui_logic_test.cpp`,

@@ -5,8 +5,9 @@ This is an experimental preview of the AROS port of Boxer, the DOS game
 emulator front end by Alun Bestor, with Boxer's DOSBox 0.74 core. It is
 not yet the complete Boxer experience. Expect missing features and bugs.
 
-This build only runs on @ABI_NAME@. Binaries for ABIv11 (AROS One) and for
-mainline AROS (ABI v1) are different files and do not run on each other.
+This build only runs on @ABI_NAME@. Binaries for ABIv11 (AROS One), for
+mainline AROS (ABI v1) and for AROS for Raspberry Pi are different files
+and do not run on each other.
 @TARGET_NOTES@
 Installing
 ----------
@@ -83,17 +84,19 @@ Limitations
 - A game session can freeze, including when you leave a game's
   installer. Closing a session that has stopped responding can crash
   AROS. Save your work in other programs before you test.
-- Automatic CPU speed can be very slow after a game is reopened, and on
-  mainline AROS already at the first start: a game may then seem to stop
-  while loading, and may not find its sound card. Set a fixed CPU speed
-  (for example Pentium) for that game in the Inspector and reopen it;
-  Boxer keeps the speed and frameskip you choose there for that game.
-- On mainline AROS, games and their sound run seriously slowed down in
-  our QEMU setup. A fixed CPU speed helps but does not fully remove the
-  slowdown. Physical hardware has not been tried, so it may behave
-  differently there.
-- Tested only under QEMU: on x86_64 AROS One, and in part on x86_64
-  mainline AROS. Game compatibility is not yet broadly tested.
+- Automatic CPU speed can drop very low, for example after a game is
+  reopened: a game may then seem to stop while loading, and may not find
+  its sound card. Set a fixed CPU speed (for example Pentium) for that
+  game in the Inspector and reopen it; Boxer keeps the speed and
+  frameskip you choose there for that game.
+- Mainline AROS: under QEMU we saw games and their sound slow down
+  seriously when the host ran QEMU at low (background) priority; at
+  normal priority the tested game ran at full speed. A fixed CPU speed
+  does not fully remove the slowdown. Physical hardware has not been
+  tested.
+- Tested only under QEMU: on x86_64 AROS One, in part on x86_64 mainline
+  AROS, and on AROS for Raspberry Pi (see above). Game compatibility is
+  not yet broadly tested.
 - Dropping icons: nothing is highlighted while you drag over a Boxer
   window (Wanderer does not tell other programs where an icon is being
   dragged); only the drop itself is seen.
@@ -137,14 +140,8 @@ If Boxer is still on screen but seems hung:
      Copy RAM:BoxerLogs Work:BoxerLogs-copy ALL
 3. Type Status to list running programs; note whether BoxerUI is there.
 
-Report problems through the issue tracker at
+Problems can be reported through the issue tracker at
   https://github.com/tomaszstaniak/aros-boxerapp/issues
-Please send: which game you tried, the log files, what you did just
-before (which screen, which button or key), the AROS version and
-distribution (Kickstart/Workbench version from the Wanderer "About"
-window), the ABI (ABIv11 or mainline), the amount of RAM, whether it
-runs on real hardware (which) or in an emulator (which, with its
-settings), and the BoxerUI sha256 from SHA256SUMS in this drawer.
 
 What the system must have
 -------------------------
@@ -159,6 +156,7 @@ BoxerUI, is credited in NOTICE-boxer.txt. The complete corresponding source
 of this exact build is in @SOURCE_ARCHIVE@ (see SOURCE-README.txt inside
 it). BUILDINFO.txt identifies the compiler and AROS SDK used, and
 SHA256SUMS lists a checksum for every file.
+@LGPL_NOTE@
 
 Port: Tomasz Staniak. Boxer: Alun Bestor and contributors. DOSBox: the
 DOSBox Team.
