@@ -1,0 +1,14 @@
+# Pins of the Raspberry Pi C++ runtime (see README.md, tools/cxxrt_pins.py).
+# <kind> <sha256> <name>
+# LLVM 20.1.0 release, https://github.com/llvm/llvm-project/releases/tag/llvmorg-20.1.0
+tarball 4579051e3c255fb4bb795d54324f5a7f3ef79bd9181e44293d7ee9a7f62aad9a llvm-project-20.1.0.src.tar.xz
+# AROS tools/crosstools/llvm, commit 7654818bf1acd25b11cd840a713dc97692bfff55 (copies in this directory)
+diff 9c2d5819c3957a70067230a955e835faa703c222f410d4ae7e4dd22a3a19f655 libcxx-20.1.0.src-aros.diff
+diff 8c669809e2d1b9917e2e4263263e937d790a4fc08443c939815612b5e30817eb libcxxabi-20.1.0.src-aros.diff
+diff e5b1f8c3c1d35867df26aefd57cf935a038299b11b44c862cd4d92f06ba2add5 libunwind-20.1.0.src-aros.diff
+# What scripts/build-cxx-runtime.sh produces from the above with the Clang 20.1.0
+# of the Raspberry Pi toolchain and the SDK it names in BUILDINFO.txt
+# (Developer/ of the Raspberry Pi nightly of 2026-10-29).
+archive 4c153551451e222c0da51afde704129dcbd33d5dea753ce3c5f4390bdf2e3da8 libc++.a
+archive 955771094a1b6cfe57b91c930d3cdaf17b982dd54f19e4ca610c3ef43111be22 libc++abi.a
+archive 98683e2c8e11a99e8208a5022949cbd92b983787076235236934b0e2f2d55a67 libunwind.a

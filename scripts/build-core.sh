@@ -54,6 +54,10 @@ else
   die "source root $src is not work/boxer and cannot be checked against pin + series (BOXER_CORE_UNCHECKED_SOURCE=1 builds it anyway)"
 fi
 [ -x "$AROS_AR" ] || die "archiver not executable: $AROS_AR"
+# Raspberry Pi: the core compiles against the headers of the private C++
+# runtime, which must be the pinned build (scripts/check-cxx-runtime.sh).
+[ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ] || "$here/check-cxx-runtime.sh" "$AROS_RASPI_CXXRT" \
+  || die "the C++ runtime in $AROS_RASPI_CXXRT is not the pinned one; run scripts/build-cxx-runtime.sh"
 
 out="$BUILD_DIR/core$HOST_SUFFIX"
 if [ "$BOXER_HOST" = sdl3 ]; then

@@ -35,6 +35,10 @@ out="${BOXER_UI_OUT:-$BUILD_DIR/ui$HOST_SUFFIX}"
 core_src="$WORK_DIR"
 lib="$BUILD_DIR/core$HOST_SUFFIX/libboxer-dosbox.a"
 [ -f "$lib" ] || die "core library missing: $lib (run build-core.sh $1)"
+# Raspberry Pi: BoxerUI links the private C++ runtime statically; it must be
+# the pinned build (scripts/check-cxx-runtime.sh, third_party/llvm-runtimes-aros/PINS).
+[ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ] || "$here/check-cxx-runtime.sh" "$AROS_RASPI_CXXRT" \
+  || die "the C++ runtime in $AROS_RASPI_CXXRT is not the pinned one; run scripts/build-cxx-runtime.sh"
 mkdir -p "$out/host" "$out/stage" "$out/gen" "$out/obj"
 # A stale staged binary from an earlier build must never survive a failed one.
 rm -rf "$out/stage/BoxerUI" "$out/BoxerUI" "$out/stage/Fonts"

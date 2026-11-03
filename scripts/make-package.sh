@@ -10,8 +10,8 @@
 # build/<abi>/package<suffix>/ (package-sdl3 for SDL3; BOXER_PKG_OUT overrides):
 #   Boxer/ + Boxer.info               the AROS drawer (what users install) and its icon
 #   Boxer-<ver>-<target>.zip          the drawer packed for users and arospkg
-#   Boxer-<ver>-<target>.pkg          mainline only: the same files for C:Unpack,
-#                                     which every mainline has, unlike UnZip
+#   Boxer-<ver>-<target>.pkg          mainline and Raspberry Pi: the same files for
+#                                     C:Unpack, which those systems have, unlike UnZip
 #   MANIFEST-<abi>.sha256             every file in the drawer + the archive
 # Contents and rationale: packaging/README.md. The package is refused when
 # the binary does not match its BUILDINFO, has undefined symbols, or when a
@@ -144,6 +144,37 @@ $coredelta"
   *) die "cannot check the core's provenance in $coreinfo (exit $corerc)" ;;
 esac
 
+# 2c. Raspberry Pi: the binary was linked with the pinned C++ runtime (its
+# BUILDINFO's "c++ runtime:" lines), and the runtime and the AROS patches
+# that ship in the source archive are still the pinned ones.
+if [ "$BOXER_ABI" = aros-aarch64-abiv1-raspi ]; then
+  "$here/check-cxx-runtime.sh" "$AROS_RASPI_CXXRT" "$info" \
+    || die "the C++ runtime does not match third_party/llvm-runtimes-aros/PINS"
+fi
+# 2d. Source origin: in a Git checkout the source archive is made from the
+# tracked files, so they must be the committed ones; the commit is recorded
+# in BUILDINFO.txt and in the source archive.
+srcpaths=(.gitignore COPYING README.md upstreams.json upstreams.example.json local.env.example LICENSES documentation src scripts
+  tools patches packaging assets tests third_party)
+if git -C "$P" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  commit=$(git -C "$P" rev-parse HEAD)
+  # Changed tracked files, and untracked files that are not ignored (a build
+  # could read them, but the archive would not carry them).
+  dirty=$(git -C "$P" status --porcelain --untracked-files=all -- "${srcpaths[@]}")
+  if [ -n "$dirty" ]; then
+    echo "$dirty" | sed 's/^/  /' >&2
+    if [ "${BOXER_PKG_ALLOW_STALE:-0}" = 1 ]; then
+      [ $stale = 1 ] || { stale=1; ver="$ver-STALE"; }
+      commit="$commit + uncommitted changes"
+      echo "make-package: WARNING files differ from the commit ($commit); dry run, not distributable" >&2
+    else
+      die "the files above differ from commit $commit or are not tracked; commit them before packaging"
+    fi
+  fi
+else
+  commit="unknown (not a Git checkout)"
+fi
+
 out="${BOXER_PKG_OUT:-$BUILD_DIR/package$HOST_SUFFIX}"; pkg="$out/Boxer"
 [ -d "$out" ] && chmod -R u+w "$out"; rm -rf "$out"; mkdir -p "$pkg/conf" "$pkg/LICENSES"
 
@@ -202,8 +233,6 @@ python3 "$P/tools/mkicon.py" "$pkg/Install-Assign.info" project --default-tool C
 # work/, build/ or local.env (private or machine-specific).
 srcname="boxer-$ver-source"; sx="$out/.src/$srcname"
 mkdir -p "$sx/aros-boxerapp" "$sx/boxer-upstream/Resources/Base.lproj"
-srcpaths=(.gitignore COPYING README.md upstreams.json upstreams.example.json local.env.example LICENSES documentation src scripts
-  tools patches packaging assets tests third_party)
 # In a Git checkout only tracked files go in, so local material in those
 # directories (ignored or untracked) is never published by accident.
 if git -C "$P" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -219,6 +248,7 @@ pin=$(git -C "$UPSTREAM_DIR" rev-parse HEAD)
 cp "$strings" "$sx/boxer-upstream/Resources/Base.lproj/"
 printf 'repository: https://github.com/alinebee/Boxer.git\ncommit: %s\n' "$pin" > "$sx/UPSTREAM-PIN.txt"
 cp "$P/packaging/SOURCE-README.txt" "$sx/"
+printf 'aros-boxerapp commit: %s\n' "$commit" > "$sx/SOURCE-COMMIT.txt"
 # Published copies of BUILDINFO name the configured directories by their
 # variable (see local.env.example), not by this machine's paths.
 pubinfo() {
@@ -242,6 +272,7 @@ diagline="DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION: core built from an unverified 
   pubinfo "$info"
   echo
   echo "package: boxer $ver $target"
+  echo "source commit: $commit (aros-boxerapp)"
   [ $stale = 1 ] && echo "WARNING: NOT CORRESPONDING SOURCE - src/ changed after this binary was built; dry run only, do not distribute"
   if [ -n "$uncheckednote" ]; then
     echo "WARNING: core library built from a source tree not checked against the pin and series:"

@@ -116,6 +116,7 @@ python3 tests/build-tooling/test_build_inputs.py    # build inputs and runtime f
 python3 tests/build-tooling/test_core_provenance.py # the core record and its packaging check
 python3 tests/build-tooling/test_install_assign.py  # packaging/Install-Assign in a Shell model
 python3 tests/build-tooling/test_package_notices.py # notices; diagnostic packages refused as releases
+python3 tests/build-tooling/test_cxx_runtime.py     # Raspberry Pi C++ runtime: output guard, pins
 ```
 
 `build-ui.sh` also runs `src/ui/tests/ui_logic_test.cpp`,
