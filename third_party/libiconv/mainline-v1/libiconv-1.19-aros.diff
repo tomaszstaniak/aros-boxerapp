@@ -1,0 +1,35 @@
+--- libiconv-1.19/srclib/fseterr.c	2026-03-06 13:36:51.000000000 +0000
++++ libiconv-1.19.aros/srclib/fseterr.c	2026-07-27 16:32:41.308610196 +0100
+@@ -21,6 +21,12 @@
+ 
+ #include <errno.h>
+ 
++#ifdef __AROS__
++/* For the portable fallback below. */
++# include <stdlib.h>
++# include <unistd.h>
++#endif
++
+ #include "stdio-impl.h"
+ 
+ /* This file is not used on systems that have the __fseterr function,
+@@ -53,7 +59,7 @@
+ #elif defined EPLAN9                /* Plan9 */
+   if (fp->state != 0 /* CLOSED */)
+     fp->state = 5 /* ERR */;
+-#elif 0                             /* unknown  */
++#elif defined __AROS__
+   /* Portable fallback, based on an idea by Rich Felker.
+      Wow! 6 system calls for something that is just a bit operation!
+      Not activated on any system, because there is no way to repair FP when
+--- libiconv-1.19/srclib/getprogname.c	2026-03-06 13:36:51.000000000 +0000
++++ libiconv-1.19.aros/srclib/getprogname.c	2026-07-27 16:32:15.674926191 +0100
+@@ -251,6 +251,8 @@
+       close (fd);
+     }
+   return "?";
++# elif defined __AROS__
++  return "";
+ # else
+ #  error "getprogname module not ported to this OS"
+ # endif

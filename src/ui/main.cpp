@@ -105,6 +105,11 @@
 #include <cstdio>
 #include <cstring>
 
+// packaging/VERSION, passed by scripts/build-ui.sh.
+#ifndef BOXER_VERSION
+#define BOXER_VERSION "unknown"
+#endif
+
 using namespace boxer_ui;
 
 // The log, written through DOS rather than stdio: posixc's fopen "w" opens
@@ -4287,7 +4292,7 @@ int main(int argc, char **argv) {
         }
     }
     const char *screen = g_screen.c_str();   // refreshed if a sidecar lookup changes g_screen
-    logf("BoxerUI, built %s %s, abi %s, screen=%s", __DATE__, __TIME__,
+    logf("BoxerUI " BOXER_VERSION ", built %s %s, abi %s, screen=%s", __DATE__, __TIME__,
 #ifdef BOXER_ABI
          BOXER_ABI,
 #else
@@ -4387,7 +4392,7 @@ int main(int argc, char **argv) {
     ui.app = ApplicationObject,
         MUIA_Application_Title, (IPTR)"BoxerUI",
         MUIA_Application_Base, (IPTR)"BOXERUI",
-        MUIA_Application_Version, (IPTR)"$VER: BoxerUI 0.2 (1.10.2026) UI and core slice",
+        MUIA_Application_Version, (IPTR)"$VER: BoxerUI 0.2 (3.11.2026) " BOXER_VERSION,
         MUIA_Application_Description, (IPTR)"Boxer for AROS (prototype)",
         SubWindow, (IPTR)ui.welcome, SubWindow, (IPTR)ui.dos,
         SubWindow, (IPTR)ui.fs, SubWindow, (IPTR)ui.insp, SubWindow, (IPTR)ui.imp,

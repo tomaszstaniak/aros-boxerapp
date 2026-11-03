@@ -1,0 +1,38 @@
+GNU libiconv 1.19 as linked into the x86_64 mainline (ABI v1) BoxerUI
+======================================================================
+
+Library: SDK/Extras/lib/libiconv.a of the mainline AROS SDK (AROS 87266168,
+  contrib 45327d2c, ports 98c8fd1, nightly ISO of 2026-10-26)
+  sha256 47a7143ca4998c3960fb4b476efccd9a939177a9053bf866666cfebe6e63457b
+  members iconv.o, localcharset.o, compat.o
+Source: libiconv-1.19.tar.gz (GNU)
+  sha256 88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6
+  with libiconv-1.19-aros.diff (aros-development-team/contrib 45327d2c,
+  development/libs/libiconv; sha256 8511387230138865a27facc7549b354caa7273d0d53c9308eca9bb2b5b307212).
+  The diff changes srclib/fseterr.c and srclib/getprogname.c (gnulib, for
+  the iconv program); no file compiled into libiconv.a is changed.
+AROS recipe: mmakefile.src (same commit and directory): the AROS build
+  system's %fetch_and_build_gnu_development with patch=yes, libdir and
+  include directory in the SDK's Extras, -std=gnu11.
+
+Rebuilding (gives objects identical byte for byte to the SDK's)
+  Compiler: x86_64-aros-gcc 10.5.0 of a mainline AROS build
+  (aros-development-team/AROS). <tc> is the directory holding it, <sdk>
+  the SDK's Developer directory.
+
+  tar xzf libiconv-1.19.tar.gz
+  (cd libiconv-1.19 && patch -p1 < ../libiconv-1.19-aros.diff)
+  mkdir build && cd build
+  CC="<tc>/x86_64-aros-gcc --sysroot <sdk>" AR=<tc>/x86_64-aros-ar RANLIB=<tc>/x86_64-aros-ranlib \
+  CFLAGS='-m64 -mcmodel=large -mno-red-zone -mno-ms-bitfields -fno-asynchronous-unwind-tables -fno-omit-frame-pointer -Wno-pointer-sign -Wno-parentheses -std=gnu11 -nix -O2' \
+  CPPFLAGS='-DAROS_BUILD_TYPE=AROS_BUILD_TYPE_PERSONAL -DAROS_USE_LOGRES' \
+  LDFLAGS="-m64 -mcmodel=large -mno-red-zone -mno-ms-bitfields -L<sdk>/lib -nix -s" \
+  ../libiconv-1.19/configure --prefix=/Developer --target=x86_64-aros --build=aarch64-darwin \
+    --host=x86_64-aros --without-pic --disable-shared --disable-nls --without-x
+  (cd libcharset && make && make install-lib libdir="$PWD/../lib" includedir="$PWD/../lib")
+  make -C lib
+  -> lib/.libs/libiconv.a
+
+  These are the compiler flags and configure options the AROS build
+  recorded for that SDK (its config.log), with the build directories
+  replaced by <tc> and <sdk>. Nothing is installed by the commands above.

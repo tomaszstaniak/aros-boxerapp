@@ -39,6 +39,12 @@ case "$host" in
 esac
 # The Raspberry Pi program links libc++, libc++abi and libunwind statically.
 [ "$abi" != aros-aarch64-abiv1-raspi ] || need LICENSES/LLVM-Apache-2.0-with-exception.txt "$root/LICENSES/LLVM-Apache-2.0-with-exception.txt"
+# The x86_64 programs link GNU libiconv (LGPL-2.1): the ReadMe must name the
+# release asset with its source and the relink kit (scripts/make-lgpl-kit.sh).
+if [ "$abi" != aros-aarch64-abiv1-raspi ]; then
+    if grep -q -E 'Boxer-[^ ]+-lgpl-kit\.zip' "$pkg/ReadMe.txt" 2>/dev/null; then echo "ok       ReadMe.txt names the LGPL kit"
+    else echo "MISSING  ReadMe.txt does not name Boxer-<version>-<target>-lgpl-kit.zip (GNU libiconv, LGPL)"; missing=1; fi
+fi
 need NOTICE-boxer.txt "$root/assets/NOTICE-boxer.txt"
 need NOTICE-replacements.txt "$root/assets/NOTICE-replacements.txt"
 need licenses.md "$root/documentation/licenses.md"

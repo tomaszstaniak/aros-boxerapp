@@ -12,3 +12,6 @@ diff e5b1f8c3c1d35867df26aefd57cf935a038299b11b44c862cd4d92f06ba2add5 libunwind-
 archive 4c153551451e222c0da51afde704129dcbd33d5dea753ce3c5f4390bdf2e3da8 libc++.a
 archive 955771094a1b6cfe57b91c930d3cdaf17b982dd54f19e4ca610c3ef43111be22 libc++abi.a
 archive 98683e2c8e11a99e8208a5022949cbd92b983787076235236934b0e2f2d55a67 libunwind.a
+# The headers it installs below include/: the sha256 of their manifest
+# HEADERS.sha256 ("<sha256>  <path>" per file, sorted; tools/cxxrt_pins.py manifest).
+headers 1c0199ad5db503f896ada86b270d2683217b0bf5167ce70a8fe427fe52797d27 HEADERS.sha256

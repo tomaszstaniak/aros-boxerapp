@@ -1,0 +1,37 @@
+GNU libiconv 1.14 as linked into the x86_64 ABIv11 BoxerUI
+===========================================================
+
+Library: lib/libiconv.a of the AROS One 1.3 SDK
+  sha256 b6f1bf1c1a3ee1874b18a9308e72a9bf6c79dd387dd506abfe49622bc8704343
+  members iconv.o, localcharset.o, relocatable.o
+Source: libiconv-1.14.tar.gz (GNU), unmodified
+  sha256 72b24ded17d687193c3366d0ebe7cde1e6b18f0df8c55438ac95be39e8a30613
+AROS recipe: mmakefile.src (deadwood2/contrib, development/libs/libiconv,
+  commit ddbc21eb8b4dd324f82caa69304ef4f827371178): the AROS build system's
+  %fetch_and_build_gnu_development with patch=no, configure options
+  --bindir and --libdir of the AROS development directory, and -std=gnu11.
+  Which commit of that recipe the AROS One 1.3 SDK was built from is not
+  recorded; its text has been the same since 2025-08-15.
+
+Rebuilding (gives objects identical byte for byte to the SDK's)
+  Compiler: x86_64-aros-gcc 10.5.0 for ABIv11 (an AROS ABIv11 cross
+  toolchain from deadwood2/AROS). <tc> is the directory holding it.
+
+  tar xzf libiconv-1.14.tar.gz
+  mkdir build && cd build
+  CC=<tc>/x86_64-aros-gcc AR=<tc>/x86_64-aros-ar RANLIB=<tc>/x86_64-aros-ranlib \
+  CFLAGS='-m64 -mcmodel=large -mno-red-zone -mno-ms-bitfields -fno-omit-frame-pointer -Wno-pointer-sign -Wno-parentheses -std=gnu11 -nix -O2' \
+  CPPFLAGS='-DAROS_BUILD_TYPE=AROS_BUILD_TYPE_PERSONAL -DAROS_USE_LOGRES' \
+  ../libiconv-1.14/configure --prefix=/Developer --build=x86_64-apple-darwin \
+    --host=x86_64-aros --without-pic --disable-shared --disable-nls --without-x \
+    --libdir=/ssd/deadwood/repo-github-dd-core-release/core-contrib-x86_64/bin/linux-x86_64/AROS/Development/lib
+  (cd libcharset && make && make install-lib libdir="$PWD/../lib" includedir="$PWD/../lib")
+  make -C lib
+  -> lib/.libs/libiconv.a
+
+  --build names the machine you build on (configure must see a cross
+  build; libiconv 1.14's config.sub does not know aarch64-darwin, so a
+  Mac with Apple silicon is given as x86_64-apple-darwin). --libdir only
+  sets the charset.alias directory compiled into localcharset.o; that
+  value is the one in the SDK's object, so it is kept here for an
+  identical result. Nothing is installed by the commands above.

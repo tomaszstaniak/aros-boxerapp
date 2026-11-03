@@ -27,7 +27,7 @@ class PackageNotices(unittest.TestCase):
         shutil.copy(os.path.join(ROOT, "documentation", "licenses.md"), self.pkg)
         write_text(os.path.join(self.pkg, "boxer-x-source.tar.gz"), "archive")
         self.buildinfo = "host: sdl3\npackage: boxer x x86_64-aros-v11\n"
-        self.readme = "Boxer for AROS x\n"
+        self.readme = "Boxer for AROS x\nlibiconv: Boxer-x-aros-x86_64-abiv11-pc-lgpl-kit.zip\n"
         self.write()
 
     def tearDown(self):
@@ -43,6 +43,13 @@ class PackageNotices(unittest.TestCase):
 
     def test_release_package_passes(self):
         self.assertEqual(self.check()[0], 0)
+
+    def test_x86_readme_must_name_the_lgpl_kit(self):
+        self.readme = "Boxer for AROS x\n"
+        self.write()
+        rc, out = self.check()
+        self.assertEqual(rc, 1)
+        self.assertIn("lgpl-kit.zip", out)
 
     def test_diagnostic_package_is_refused_as_release(self):
         self.buildinfo = DIAG + "\n" + self.buildinfo

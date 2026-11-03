@@ -2,7 +2,9 @@
 """Tests for the Raspberry Pi C++ runtime: the output-directory guard of
 scripts/build-cxx-runtime.sh, the pin checks of tools/cxxrt_pins.py and
 scripts/check-cxx-runtime.sh (what build-core.sh, build-ui.sh and
-make-package.sh run):
+make-package.sh run), including the manifest of the installed headers,
+and that those three scripts refuse a changed, added or removed header
+before they compile or package anything:
 python3 tests/build-tooling/test_cxx_runtime.py
 No toolchain is needed: the build script is run in a copy of the project
 with a stub compiler, and every case stops before anything is built."""
@@ -37,7 +39,8 @@ class Fixture(unittest.TestCase):
         self.tmp = os.path.realpath(tempfile.mkdtemp(prefix="cxxrt test "))
         self.root = os.path.join(self.tmp, "project")
         for f in ("scripts/env.sh", "scripts/build-cxx-runtime.sh", "scripts/check-cxx-runtime.sh",
-                  "tools/cxxrt_pins.py"):
+                  "scripts/build-core.sh", "scripts/build-ui.sh", "scripts/make-package.sh",
+                  "scripts/aros-raspi-cxx", "scripts/aros-raspi-cc", "tools/cxxrt_pins.py"):
             os.makedirs(os.path.dirname(os.path.join(self.root, f)), exist_ok=True)
             shutil.copy(os.path.join(TOP, f), os.path.join(self.root, f))
             os.chmod(os.path.join(self.root, f), 0o755)
@@ -50,15 +53,24 @@ class Fixture(unittest.TestCase):
             self.diffs[name] = ("patch for " + c + "\n").encode()
             write(os.path.join(self.third, name), self.diffs[name])
         self.archives = {n: ("archive " + n).encode() for n in ("libc++.a", "libc++abi.a", "libunwind.a")}
+        self.headers = {"include/c++/v1/__config_site": b"#define _LIBCPP_ABI_VERSION 1\n",
+                        "include/c++/v1/vector": b"// vector\n",
+                        "include/c++/v1/__memory/allocator.h": b"// allocator\n"}
+        self.manifest = "".join("%s  %s\n" % (sha(d), n) for n, d in sorted(self.headers.items()))
         self.pins = os.path.join(self.third, "PINS")
         lines = ["# test pins", "tarball %s llvm-project-20.1.0.src.tar.xz" % sha(b"tarball")]
         lines += ["diff %s %s" % (sha(d), n) for n, d in sorted(self.diffs.items())]
         lines += ["archive %s %s" % (sha(d), n) for n, d in sorted(self.archives.items())]
+        lines += ["headers %s HEADERS.sha256" % sha(self.manifest.encode())]
         write(self.pins, "\n".join(lines) + "\n")
         self.pin_lines = [l for l in lines if not l.startswith("#")]
         self.tc = os.path.join(self.tmp, "toolchain")
-        for t in ("aarch64-aros-g++", "aarch64-aros-gcc", "aarch64-aros-clang", "aarch64-aros-clang++"):
-            write(os.path.join(self.tc, t), "#!/bin/sh\nexit 0\n")
+        # Every stub tool notes its call: a refused build must not have
+        # compiled, linked or archived anything.
+        self.calls = os.path.join(self.tmp, "tool-calls.log")
+        for t in ("aarch64-aros-g++", "aarch64-aros-gcc", "aarch64-aros-clang", "aarch64-aros-clang++",
+                  "aarch64-aros-ar", "aarch64-aros-nm"):
+            write(os.path.join(self.tc, t), "#!/bin/sh\necho \"$0 $*\" >> '%s'\nexit 0\n" % self.calls)
             os.chmod(os.path.join(self.tc, t), 0o755)
         self.sdk = os.path.join(self.tmp, "sdk")
         os.makedirs(os.path.join(self.sdk, "include"))
@@ -85,6 +97,9 @@ class Fixture(unittest.TestCase):
         """A built runtime directory as build-cxx-runtime.sh leaves it."""
         for n, d in (archives or self.archives).items():
             write(os.path.join(where, "lib", n), d)
+        for n, d in self.headers.items():
+            write(os.path.join(where, n), d)
+        write(os.path.join(where, "HEADERS.sha256"), self.manifest)
         write(os.path.join(where, MARKER), MARKER_TEXT)
         write(os.path.join(where, "BUILDINFO.txt"),
               "built: now\npins: x\n" + "\n".join(record if record is not None else self.pin_lines) + "\n")
@@ -320,6 +335,113 @@ class CheckRuntime(Fixture):
         rc, out = self.check(d)
         self.assertEqual(rc, 1, out)
         self.assertIn("MISMATCH diff libcxx-20.1.0.src-aros.diff", out)
+
+
+class Headers(Fixture):
+    """The installed libc++ headers are read by every compile (-isystem in
+    scripts/aros-raspi-cxx); a change to them must stop a build or a package
+    before it is accepted."""
+
+    def setUp(self):
+        super().setUp()
+        self.rt = os.path.join(self.deps, "aros-aarch64-abiv1-raspi", "cxxrt")
+        self.runtime(self.rt)
+
+    def check(self):
+        e = {k: v for k, v in os.environ.items() if not k.startswith("AROS_")}
+        return run([os.path.join(self.root, "scripts", "check-cxx-runtime.sh"), self.rt], e)
+
+    def change(self):
+        write(os.path.join(self.rt, "include/c++/v1/vector"), b"// vector, edited\n")
+        return "CHANGED  header include/c++/v1/vector"
+
+    def add(self):
+        write(os.path.join(self.rt, "include/c++/v1/extra.h"), b"// new\n")
+        return "ADDED    header include/c++/v1/extra.h"
+
+    def remove(self):
+        os.remove(os.path.join(self.rt, "include/c++/v1/__memory/allocator.h"))
+        return "REMOVED  header include/c++/v1/__memory/allocator.h"
+
+    def test_unchanged_passes(self):
+        rc, out = self.check()
+        self.assertEqual(rc, 0, out)
+
+    def test_manifest_lists_every_file(self):
+        rc, out = run(["python3", PINS_TOOL, "manifest", self.rt])
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out, self.manifest)
+
+    def test_changed_added_removed(self):
+        for how in (self.change, self.add, self.remove):
+            self.setUp()
+            want = how()
+            rc, out = self.check()
+            self.assertEqual(rc, 1, out)
+            self.assertIn(want, out)
+
+    def test_manifest_edited_to_match(self):
+        """Rewriting the manifest after a header change does not help: its
+        own sha256 is pinned."""
+        self.change()
+        rc, out = run(["python3", PINS_TOOL, "manifest", self.rt])
+        write(os.path.join(self.rt, "HEADERS.sha256"), out)
+        rc, out = self.check()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("MISMATCH headers HEADERS.sha256", out)
+
+    def test_manifest_missing(self):
+        os.remove(os.path.join(self.rt, "HEADERS.sha256"))
+        rc, out = self.check()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("MISSING  headers HEADERS.sha256", out)
+
+    def test_symlink_refused(self):
+        os.symlink("/etc", os.path.join(self.rt, "include", "elsewhere"))
+        rc, out = self.check()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("not a plain file or directory", out)
+
+    def script(self, name, *args):
+        e = {k: v for k, v in os.environ.items() if not k.startswith(("AROS_", "BOXER_"))}
+        e.update(AROS_RASPI_TOOLCHAIN=self.tc, AROS_RASPI_SDK=self.sdk, AROS_RASPI_CXXRT=self.rt,
+                 HOME=self.home)
+        return run([os.path.join(self.root, "scripts", name), "aros-aarch64-abiv1-raspi"] + list(args), e)
+
+    def prepare_trees(self):
+        """Just enough of a project for each script to reach its runtime check."""
+        b = os.path.join(self.root, "build", "aros-aarch64-abiv1-raspi")
+        write(os.path.join(self.root, "work", "boxer", "DOSBox", "include", "dosbox.h"), "")
+        write(os.path.join(self.root, "packaging", "VERSION"), "0.0.0-test\n")
+        write(os.path.join(b, "core-sdl3", "libboxer-dosbox.a"), b"core")
+        write(os.path.join(b, "ui-sdl3", "BoxerUI"), b"binary")
+        write(os.path.join(b, "ui-sdl3", "BUILDINFO.txt"),
+              "version: 0.0.0-test\nhost: sdl3\n" + "".join("c++ runtime: %s\n" % l for l in self.pin_lines))
+
+    def test_scripts_refuse_before_working(self):
+        for how in (self.change, self.add, self.remove):
+            for name in ("build-core.sh", "build-ui.sh", "make-package.sh"):
+                self.setUp()
+                self.prepare_trees()
+                want = how()
+                rc, out = self.script(name)
+                self.assertEqual(rc, 2, "%s %s: %s" % (name, how.__name__, out))
+                self.assertIn(want, out, name)
+                self.assertIn("C++ runtime", out, name)
+                self.assertFalse(os.path.exists(self.calls),
+                                 "%s ran a tool before refusing: %s" % (name, open(self.calls).read()
+                                                                        if os.path.exists(self.calls) else ""))
+                self.tearDown()
+        self.setUp()
+
+    def test_scripts_pass_the_check_when_unchanged(self):
+        """With the pinned headers each script gets past the runtime check
+        (and then stops later, for lack of a real project)."""
+        self.prepare_trees()
+        for name in ("build-core.sh", "build-ui.sh", "make-package.sh"):
+            rc, out = self.script(name)
+            self.assertNotIn("C++ runtime", out, name)
+            self.assertNotIn("header", out, name)
 
 
 class RealPins(unittest.TestCase):

@@ -10,8 +10,9 @@
 # AROS patches of tools/crosstools/llvm, copied in third_party/llvm-runtimes-aros/;
 # options after that AROS directory's mmakefile.src, through the runtimes/ build.
 #   AROS_RASPI_LLVM_TARBALL  llvm-project-20.1.0.src.tar.xz
-# Every input and the resulting archives must match
-# third_party/llvm-runtimes-aros/PINS (tools/cxxrt_pins.py).
+# Every input, the resulting archives and the installed headers (their
+# manifest HEADERS.sha256) must match third_party/llvm-runtimes-aros/PINS
+# (tools/cxxrt_pins.py).
 #
 # The output directory and its work directory (<output>-work) are deleted and
 # rebuilt. They must resolve to a directory below the project's ignored deps/
@@ -103,10 +104,18 @@ cmake -G Ninja -S "$work/src/runtimes" -B "$work/build" \
 ninja -C "$work/build" install-unwind install-cxxabi install-cxx > "$work/build.log" 2>&1 \
   || { tail -20 "$work/build.log" >&2; die "build failed"; }
 
-# 4. The archives against the pins. A different result is never left usable.
+# 4. The archives and the installed headers against the pins. A different
+# result is never left usable. The compiles of the core and of BoxerUI read
+# these headers (-isystem, scripts/aros-raspi-cxx); HEADERS.sha256 lists every
+# file below include/ with its sha256, and its own sha256 is the headers pin.
 if ! check archives "$pins" "$out/lib"; then
   rm -rf "$out/lib"
   die "the built archives differ from $pins (removed $out/lib); if the change is intended, update the archive pins"
+fi
+check manifest "$out" > "$out/HEADERS.sha256" || { rm -rf "$out/lib"; die "could not list the installed headers"; }
+if ! check headers "$pins" "$out"; then
+  rm -rf "$out/lib"
+  die "the installed headers differ from $pins (removed $out/lib); if the change is intended, update the headers pin"
 fi
 {
   echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ) by scripts/build-cxx-runtime.sh"

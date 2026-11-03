@@ -12,7 +12,11 @@ Contents
                           conversions), tests/, third_party/sdl3-aros/
                           (SDL3 build inputs), third_party/llvm-runtimes-aros/
                           (AROS patches for the Raspberry Pi C++ runtime,
-                          with their pins), packaging/,
+                          with their pins), third_party/libiconv/ (origin,
+                          hashes and build recipe of the GNU libiconv the
+                          x86_64 programs link; its source and a relink kit
+                          are the release asset
+                          Boxer-<version>-<target>-lgpl-kit.zip), packaging/,
                           documentation/, COPYING, LICENSES/
   SOURCE-COMMIT.txt       the aros-boxerapp commit this archive was made from
   boxer-upstream/         the parts of Boxer (https://github.com/alinebee/Boxer,

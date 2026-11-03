@@ -40,6 +40,14 @@ esac
 ui="${BOXER_UI_OUT:-$BUILD_DIR/ui$HOST_SUFFIX}"; info="$ui/BUILDINFO.txt"; bin="$ui/BoxerUI"
 arch=x86_64; [ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ] || { arch=aarch64; sdkrepo=; }
 [ -f "$bin" ] && [ -f "$info" ] || die "no build: run scripts/build-ui.sh $BOXER_ABI"
+# 0. Raspberry Pi: the binary was linked with the pinned C++ runtime (its
+# BUILDINFO's "c++ runtime:" lines), and the runtime, its installed headers
+# (HEADERS.sha256) and the AROS patches that ship in the source archive are
+# still the pinned ones.
+if [ "$BOXER_ABI" = aros-aarch64-abiv1-raspi ]; then
+  "$here/check-cxx-runtime.sh" "$AROS_RASPI_CXXRT" "$info" \
+    || die "the C++ runtime does not match third_party/llvm-runtimes-aros/PINS"
+fi
 
 # 1. The binary is the one BUILDINFO describes, was built for this host
 # (an SDL2 binary must not ship as the SDL3 package), and links completely.
@@ -47,6 +55,10 @@ arch=x86_64; [ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ] || { arch=aarch64; sdk
 want=$(sed -n 's/^sha256: //p' "$info")
 got=$(shasum -a 256 "$bin" | cut -d' ' -f1)
 [ "$want" = "$got" ] || die "BoxerUI sha256 $got differs from BUILDINFO ($want)"
+# The package version is the one compiled into the binary (build-ui.sh,
+# BOXER_VERSION from packaging/VERSION).
+[ "$(sed -n 's/^version: //p' "$info")" = "$ver" ] || die "$info is not a build of version $ver (packaging/VERSION)"
+LC_ALL=C grep -a -q -F "BoxerUI $ver, built" "$bin" || die "BoxerUI does not carry version $ver"
 "$here/check-undefined.sh" "$AROS_NM" "$bin" "$here/ui-undefined-allowlist.txt" \
   || die "undefined-symbol check failed"
 # 2. The tree still holds the sources and build inputs that binary was
@@ -144,13 +156,6 @@ $coredelta"
   *) die "cannot check the core's provenance in $coreinfo (exit $corerc)" ;;
 esac
 
-# 2c. Raspberry Pi: the binary was linked with the pinned C++ runtime (its
-# BUILDINFO's "c++ runtime:" lines), and the runtime and the AROS patches
-# that ship in the source archive are still the pinned ones.
-if [ "$BOXER_ABI" = aros-aarch64-abiv1-raspi ]; then
-  "$here/check-cxx-runtime.sh" "$AROS_RASPI_CXXRT" "$info" \
-    || die "the C++ runtime does not match third_party/llvm-runtimes-aros/PINS"
-fi
 # 2d. Source origin: in a Git checkout the source archive is made from the
 # tracked files, so they must be the committed ones; the commit is recorded
 # in BUILDINFO.txt and in the source archive.
@@ -307,11 +312,22 @@ diagline="DIAGNOSTIC BUILD, NOT FOR DISTRIBUTION: core built from an unverified 
     "It is for diagnosing a problem only. Do not pass it on or publish it."
   # packaging/notes-<abi>.txt, when there is one, says what differs on that target.
   notes="$P/packaging/notes-$BOXER_ABI.txt"
+  # The x86_64 programs link GNU libiconv (LGPL): the ReadMe names the
+  # release asset of scripts/make-lgpl-kit.sh for this version and target.
+  lgpl=/dev/null
+  if [ "$BOXER_ABI" != aros-aarch64-abiv1-raspi ]; then
+    lgpl="$out/.lgpl-note.txt"
+    sed -e "s|@LGPL_KIT@|Boxer-$ver-$target-lgpl-kit.zip|g" \
+        -e "s|@RELEASE_URL@|https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v$ver|g" \
+      "$P/packaging/lgpl-note.txt" > "$lgpl"
+  fi
   sed -e "s|@VERSION@|$ver|g" -e "s|@ABI_NAME@|$abiname|g" -e "s|@ARCH@|$arch|g" \
       -e "s|@SOURCE_ARCHIVE@|$srcarc|g" -e "s|@UNPACK@|$unpack|g" \
       -e "/@TARGET_NOTES@/{r $( [ -f "$notes" ] && echo "$notes" || echo /dev/null )" -e "d;}" \
+      -e "/@LGPL_NOTE@/{r $lgpl" -e "d;}" \
     "$P/packaging/ReadMe.txt.in"
 } > "$pkg/ReadMe.txt"
+rm -f "$out/.lgpl-note.txt"
 # Visible in Wanderer's default view, opens in MultiView (both ABIs ship it there).
 python3 "$P/tools/mkicon.py" "$pkg/ReadMe.txt.info" project --image builtin:page \
   --default-tool SYS:Utilities/MultiView >/dev/null

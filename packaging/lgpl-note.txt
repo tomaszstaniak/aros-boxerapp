@@ -1,0 +1,5 @@
+BoxerUI contains GNU libiconv, which is under the GNU Lesser General
+Public License version 2.1 or later (LICENSES/LGPL-2.1.txt). Its source
+as linked, and a kit to link BoxerUI again with a changed libiconv, are in
+@LGPL_KIT@, published next to this archive on the release page
+  @RELEASE_URL@

@@ -82,8 +82,12 @@ python3 "$PROJECT_ROOT/tools/make-fonts.py" --inputs "$out/gen/fonts.inputs" "$A
 cp "$PROJECT_ROOT/LICENSES/Bitstream-Vera.txt" "$out/stage/Fonts/"
 # This script and env.sh choose the generators' inputs and the compile
 # flags; the licence is the one copied above.
+# packaging/VERSION is compiled into BoxerUI (BOXER_VERSION); on mainline
+# build-unwind-fix.sh makes an object that is linked in.
+ver=$(tr -d ' \n' < "$PROJECT_ROOT/packaging/VERSION")
+[ -n "$ver" ] || die "packaging/VERSION is empty"
 shasum -a 256 "$here/$(basename "$0")" "$here/env.sh" "$PROJECT_ROOT/LICENSES/Bitstream-Vera.txt" \
-  > "$out/gen/build-ui.inputs"
+  "$PROJECT_ROOT/packaging/VERSION" "$here/build-unwind-fix.sh" > "$out/gen/build-ui.inputs"
 
 c++ -std=c++17 -Wall -O1 -o "$out/host/ui_logic_test" "$src/tests/ui_logic_test.cpp" "$src/ui_logic.cpp"
 "$out/host/ui_logic_test"
@@ -156,7 +160,7 @@ done
 for f in "${sources[@]}"; do
   o="$out/obj/ui-$(basename "$f").o"; objs+=("$o")
   "$AROS_CXX" "${pmap[@]}" -std=c++17 -O2 -Wall -Wno-narrowing -I"$AROS_SDK/include" -I"$out/gen" \
-    -DBOXER_ABI="\"$BOXER_ABI\"" ${BOXER_UI_DEFS:-} -MMD -MF "$o.d" -c "$f" -o "$o" >> "$log" 2>&1 || rc=1
+    -DBOXER_ABI="\"$BOXER_ABI\"" -DBOXER_VERSION="\"$ver\"" ${BOXER_UI_DEFS:-} -MMD -MF "$o.d" -c "$f" -o "$o" >> "$log" 2>&1 || rc=1
 done
 # Mainline's libgcc never fills dwarf_reg_size_table, so every C++ throw
 # aborts (scripts/build-unwind-fix.sh). Link a rebuilt unwind-dw2.o first,
@@ -164,13 +168,16 @@ done
 unwind=()
 if [ "$BOXER_ABI" = mainline-v1 ]; then
   fix="$BUILD_DIR/unwind-fix/unwind-dw2.o"
-  [ -f "$fix" ] || "$here/build-unwind-fix.sh" >&2 \
-    || die "could not build the unwind fix"
+  # Rebuilt every time (one file), so the object always follows the script.
+  "$here/build-unwind-fix.sh" >&2 || die "could not build the unwind fix"
   unwind=("$fix")
 fi
 if [ $rc -eq 0 ]; then
   "$AROS_CXX" -o "$out/BoxerUI" "${objs[@]}" "${unwind[@]+"${unwind[@]}"}" "$lib" "${HOST_LIBS[@]}" >> "$log" 2>&1
   rc=$?
+  # The link's inputs in order, one per line (scripts/make-lgpl-kit.sh
+  # repeats this link from them).
+  printf '%s\n' "${objs[@]}" "${unwind[@]+"${unwind[@]}"}" "$lib" "${HOST_LIBS[@]}" > "$out/link-inputs.txt"
 fi
 if [ $rc -eq 0 ] && [ "$BOXER_ABI" != abiv11 ]; then
   # Read nm into a variable first: grep -q under pipefail trips on SIGPIPE.
@@ -230,6 +237,7 @@ runtime=$(cd "$out/stage" && find . -type f ! -path ./BoxerUI -print0 | LC_ALL=C
 {
   echo "date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "abi: $BOXER_ABI"
+  echo "version: $ver"
   echo "host: $BOXER_HOST"
   [ "$BOXER_HOST" = sdl3 ] && echo "sdl3 library: $(shasum -a 256 "$BUILD_DIR/sdl3/lib/libSDL3_ctl.a" | cut -d' ' -f1) (build/$BOXER_ABI/sdl3/BUILDINFO.txt)"
   echo "libsets: $("$AROS_NM" "$out/BoxerUI" | grep -oE '__aros_libset_[A-Za-z0-9_]+' | sort -u | sed 's/__aros_libset_//' | tr '\n' ' ')"

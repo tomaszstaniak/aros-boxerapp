@@ -22,8 +22,16 @@ perl -0pe 's/#ifdef MD_FALLBACK_FRAME_STATE_FOR\n(  __builtin_init_dwarf_reg_siz
   "$P/unwind-dw2.c" > "$out/unwind-dw2.c"
 ! grep -B1 '__builtin_init_dwarf_reg_size_table (dwarf' "$out/unwind-dw2.c" | grep -q MD_FALLBACK \
   || { echo "guard not removed" >&2; exit 1; }
+# The debug information (-g, as libgcc is built) names the source, the
+# include directories and the working directory; map this machine's
+# directories to neutral names so the program carries no build-host path.
+# GCC tries the last matching map first, so the narrower ones come last.
+pmap=(-ffile-prefix-map="$B/"=aros-gcc-build/ -ffile-prefix-map="$G/"=gcc-build/
+  -ffile-prefix-map="$B/Ports/host/gcc/gcc-10.5.0/"=gcc-10.5.0/
+  -ffile-prefix-map="$AROS_TOOLCHAIN/"=aros-toolchain/ -ffile-prefix-map="$PROJECT_ROOT/"=
+  -ffile-prefix-map="$AROS_SDK"=aros-sdk -ffile-prefix-map="$out/"=unwind-fix/)
 cd "$G/x86_64-aros/libgcc"
-"$G/gcc/xgcc" --sysroot="$AROS_SDK" -B"$G/gcc/" -B"$AROS_TOOLCHAIN/x86_64-aros/bin/" \
+"$G/gcc/xgcc" "${pmap[@]}" --sysroot="$AROS_SDK" -B"$G/gcc/" -B"$AROS_TOOLCHAIN/x86_64-aros/bin/" \
   -B"$AROS_TOOLCHAIN/x86_64-aros/lib/" \
   -isystem "$AROS_TOOLCHAIN/x86_64-aros/include" -isystem "$AROS_TOOLCHAIN/x86_64-aros/sys-include" \
   -mcmodel=large -O2 -DIN_GCC -DCROSS_DIRECTORY_STRUCTURE -isystem ./include -g \
@@ -34,4 +42,10 @@ cd "$G/x86_64-aros/libgcc"
 # (its init is a bare ret); the fixed one must define it.
 "$AROS_TOOLCHAIN/x86_64-aros-nm" "$out/unwind-dw2.o" | grep -q ' dwarf_reg_size_table$' \
   || { echo "dwarf_reg_size_table missing: fix not effective" >&2; exit 1; }
+# No directory of this machine may remain in the object.
+for d in "$B" "$AROS_TOOLCHAIN" "$AROS_SDK" "$PROJECT_ROOT" "$HOME"; do
+  if LC_ALL=C grep -a -q -F "$d" "$out/unwind-dw2.o"; then
+    rm -f "$out/unwind-dw2.o"; echo "unwind-dw2.o still names $d" >&2; exit 1
+  fi
+done
 echo "built $out/unwind-dw2.o"
