@@ -13,18 +13,20 @@ derived from ADBToolkit stay BSD-2-Clause.
 
 | Component | Authors | Licence | In the binary | Text |
 | --- | --- | --- | --- | --- |
-| This port's own code | Tomasz Staniak | GPL-2.0-or-later; Boxer-derived files GPL-2.0-only (per-file SPDX headers) | both ABIs | `COPYING` |
-| `src/model/shadowfs.*` (derived from ADBToolkit's ADBShadowedFilesystem) | Alun Bestor; modified by Tomasz Staniak | BSD-2-Clause | both ABIs | `LICENSES/BSD-2-Clause-ADBToolkit.txt` |
-| pthread link library (`libpthread.a`) | Szilard Biro, Harry Sintonen, Stefan Franke | zlib | ABIv11 only, statically linked | (no notice required in binaries) |
-| Boxer (alunbestor/Boxer at `0062fc18`): DOSBox integration hooks, behaviour and file formats that the port follows, artwork | Alun Bestor and contributors | GPL-2.0 | both ABIs (core, artwork) | `COPYING`, `assets/NOTICE-boxer.txt` |
-| DOSBox 0.74 as included in Boxer | The DOSBox Team (below) | GPL-2.0-or-later; `opl.cpp` LGPL-2.1-or-later | both ABIs | `COPYING`, `LICENSES/LGPL-2.1.txt` |
-| SDL 2.32.10 | Sam Lantinga and SDL contributors | zlib | Only in an SDL2 build (`BOXER_HOST=sdl2`; on ABIv11 the comparison build). ABIv11: statically linked. Mainline: only a link stub; `sdl2.library` is part of the system and not shipped | `LICENSES/SDL2-zlib.txt` |
-| libc++, libc++abi, libunwind 20.1.0 with the AROS patches of mainline `tools/crosstools/llvm` | LLVM project contributors; AROS patches by the AROS contributors | Apache-2.0 WITH LLVM-exception | Raspberry Pi target only, statically linked (`scripts/build-cxx-runtime.sh`) | `LICENSES/LLVM-Apache-2.0-with-exception.txt` |
-| SDL 3.4.12, reduced (audio, timer, threads, joystick; no video or OpenGL), with the AROS port from aros-development-team/contrib a3cb9c4700 | Sam Lantinga and SDL contributors; AROS port by the AROS contributors | zlib | default host layer on ABIv11, statically linked (`scripts/build-sdl3.sh`); not shipped for mainline v1 | `LICENSES/SDL3-zlib.txt` |
-| GCC runtime (libstdc++, libgcc) | Free Software Foundation | GPL-3.0 with GCC Runtime Library Exception 3.1 | both ABIs, statically linked | `LICENSES/GCC-exception-3.1.txt` |
-| AROS startup code and link libraries | The AROS Development Team | AROS Public License 1.1 | both ABIs (see list below) | `LICENSES/AROS-APL-1.1.txt` |
-| Replacement icons (`assets/runtime/replacements/`) | Cole Bemis (Feather: search, maximize-2, lock, unlock) | MIT | both ABIs, embedded in BoxerUI | `LICENSES/Tango-Public-Domain.txt`, `LICENSES/MIT-Feather.txt`, `assets/NOTICE-replacements.txt` |
-| stb_truetype 1.26 (`third_party/stb/`) | Sean Barrett | MIT (dual MIT / public domain; MIT chosen) | both ABIs, compiled into BoxerUI (draws the titles of generated cover art) | `LICENSES/MIT-stb.txt` |
+| This port's own code | Tomasz Staniak | GPL-2.0-or-later; Boxer-derived files GPL-2.0-only (per-file SPDX headers) | every target | `COPYING` |
+| `src/model/shadowfs.*` (derived from ADBToolkit's ADBShadowedFilesystem) | Alun Bestor; modified by Tomasz Staniak | BSD-2-Clause | every target | `LICENSES/BSD-2-Clause-ADBToolkit.txt` |
+| pthread link library (`libpthread.a`) | Szilard Biro, Harry Sintonen, Stefan Franke | zlib | every target, statically linked | (no notice required in binaries) |
+| Boxer (alunbestor/Boxer at `0062fc18`): DOSBox integration hooks, behaviour and file formats that the port follows, artwork | Alun Bestor and contributors | GPL-2.0 | every target (core, artwork) | `COPYING`, `assets/NOTICE-boxer.txt` |
+| DOSBox 0.74 as included in Boxer | The DOSBox Team (below) | GPL-2.0-or-later; `opl.cpp` LGPL-2.1-or-later | every target | `COPYING`, `LICENSES/LGPL-2.1.txt` |
+| SDL 2.32.10 | Sam Lantinga and SDL contributors | zlib | Only in an SDL2 build (`BOXER_HOST=sdl2`), which exists for ABIv11 only, as a comparison build; statically linked there. Not used by any package | `LICENSES/SDL2-zlib.txt` |
+| libc++, libc++abi, libunwind 20.1.0 with the AROS patches of `tools/crosstools/llvm` (copies and origin in `third_party/llvm-runtimes-aros/`) | LLVM project contributors; AROS patches by the AROS contributors | Apache-2.0 WITH LLVM-exception | Raspberry Pi only, statically linked (`scripts/build-cxx-runtime.sh`) | `LICENSES/LLVM-Apache-2.0-with-exception.txt` |
+| compiler-rt builtins (`libclang_rt.builtins-aarch64.a` of the Raspberry Pi toolchain) | LLVM project contributors | Apache-2.0 WITH LLVM-exception | Raspberry Pi only, on the link line | `LICENSES/LLVM-Apache-2.0-with-exception.txt` |
+| SDL 3.4.12, reduced (audio, timer, threads, joystick; no video or OpenGL), with the AROS port from aros-development-team/contrib a3cb9c4700 | Sam Lantinga and SDL contributors; AROS port by the AROS contributors | zlib | every target, statically linked (`scripts/build-sdl3.sh`): the default host layer on ABIv11 and the only one on mainline and the Raspberry Pi. The same SDL release and contrib revision on every target; the Raspberry Pi build has no iconv (see "SDL 3") | `LICENSES/SDL3-zlib.txt` |
+| GNU libiconv (the SDK's `libiconv.a`: 1.14 in the ABIv11 SDK, 1.19 in `SDK/Extras` of the mainline SDK) | Free Software Foundation, Bruno Haible | LGPL (GNU Library/Lesser General Public License, version 2 or 2.1, or later) | x86_64 ABIv11 and mainline, statically linked as SDL3's character-set converter; not on the Raspberry Pi | `LICENSES/LGPL-2.1.txt` |
+| GCC runtime (libstdc++, libgcc) | Free Software Foundation | GPL-3.0 with GCC Runtime Library Exception 3.1 | x86_64 ABIv11 and mainline, statically linked; not on the Raspberry Pi (Clang, libc++) | `LICENSES/GCC-exception-3.1.txt` |
+| AROS startup code and link libraries | The AROS Development Team | AROS Public License 1.1 | every target (see list below) | `LICENSES/AROS-APL-1.1.txt` |
+| Replacement icons (`assets/runtime/replacements/`) | Cole Bemis (Feather: search, maximize-2, lock, unlock) | MIT | every target, embedded in BoxerUI | `LICENSES/Tango-Public-Domain.txt`, `LICENSES/MIT-Feather.txt`, `assets/NOTICE-replacements.txt` |
+| stb_truetype 1.26 (`third_party/stb/`) | Sean Barrett | MIT (dual MIT / public domain; MIT chosen) | every target, compiled into BoxerUI (draws the titles of generated cover art) | `LICENSES/MIT-stb.txt` |
 | BoxerSans font descriptions | Bitstream, Inc. (Vera); description files from AROS; metric value and family name changed by this project | Bitstream Vera Fonts licence | shipped as `Fonts/BoxerSans*.otag`, `.font`; the font outlines are **not** shipped | `LICENSES/Bitstream-Vera.txt` |
 | BOXTEST (`tests/fixtures/boxtest`) | Tomasz Staniak | as the project's own code | not in BoxerUI; test fixture only | `COPYING` |
 
@@ -32,7 +34,8 @@ derived from ADBToolkit stay BSD-2-Clause.
 
 `src/`, `scripts/`, `tools/`, `tests/`, `patches/`,
 `third_party/sdl3-aros/build-sdl3-ctl.py` and the documentation are written
-for this project. Some files reproduce the
+for this project. The patches in `third_party/llvm-runtimes-aros/` are the
+AROS project's (see the libc++ row above). Some files reproduce the
 behaviour of Boxer classes and follow their structure, for example the
 write-shadowing filesystem (after Boxer's `ADBShadowedFilesystem`) and the
 emulator run sequence (after `BXEmulator`). Such files are derived from
@@ -91,36 +94,61 @@ Files under another licence in the compiled set:
 - `src/hardware/parport/` (printer emulation added by Boxer, based on
   gulikoza's DOSBox megabuild): GPL-2.0-or-later headers.
 
+## SDL 3
+
+Every package links SDL 3.4.12 (release tarball sha256 `f07b958a...249db7`)
+with the AROS port of aros-development-team/contrib at
+`a3cb9c4700a81c9d14ebdc8741c932825c4429f0` and one local patch
+(`third_party/sdl3-aros/`), reduced to audio, timer, threads and joystick
+(`scripts/build-sdl3.sh`). Copyright (C) 1997-2025 Sam Lantinga. zlib
+licence, text in `LICENSES/SDL3-zlib.txt`. Each build records the exact
+inputs in `build/<abi>/sdl3/BUILDINFO.txt`, copied into the package's
+`BUILDINFO.txt` by reference.
+- x86_64 ABIv11 and mainline: built with GCC 10.5 against each SDK, with
+  SDL's iconv path, so the SDK's GNU libiconv is linked in.
+- Raspberry Pi: built with Clang 20.1 against the Developer/ directory of the
+  nightly of 2026-10-29. That SDK has no iconv, so `HAVE_ICONV` and
+  `SDL_USE_LIBICONV` are removed from the configuration and SDL's own
+  converter (UTF-8, UTF-16, UTF-32, Latin-1) is used; no iconv code is in
+  the program.
+
 ## SDL 2
 
-Version 2.32.10 (`SDL_version.h` in both SDKs). Copyright (C) 1997-2025
-Sam Lantinga. zlib licence, text in `LICENSES/SDL2-zlib.txt`.
-- ABIv11: the SDK's `libSDL2.a` is linked statically into BoxerUI.
-- Mainline v1: the SDK's `libSDL2.a` is a link stub that opens the system's
-  `sdl2.library` at start. No SDL code is in the binary, and the library is
-  not shipped with BoxerUI.
+Version 2.32.10 (`SDL_version.h` in the SDKs). Copyright (C) 1997-2025
+Sam Lantinga. zlib licence, text in `LICENSES/SDL2-zlib.txt`. Only the
+ABIv11 comparison build (`BOXER_HOST=sdl2`) links it, statically; the
+mainline and Raspberry Pi builds refuse the SDL2 host, and no package
+contains it.
 
 ## Libraries linked into the binary
 
-Determined from the link (`-Wl,-t,-t`) of the current `scripts/build-ui.sh`
-on 2026-10-02. This list must be redone when the link line changes.
+Determined from the link (`-Wl,-t,-t`) of `scripts/build-ui.sh` on
+2026-10-02, when both x86_64 targets still had an SDL2 build; the SDL rows
+follow the SDL3 builds of today. This list must be redone when the link
+line changes.
 
 | Archive | ABIv11 | Mainline v1 | What it is | Licence |
 | --- | --- | --- | --- | --- |
-| `libSDL2.a` | 94 objects (the library) | 14 objects (stub for `sdl2.library`) | SDL 2.32.10 | zlib |
-| `libGL.a` | 7 objects (stub for `gl.library`) | not linked in | link stub only, no Mesa code | AROS APL 1.1 |
+| `libSDL3_ctl.a` (`build/<abi>/sdl3/`) | yes | yes | reduced SDL 3.4.12 | zlib |
+| `libiconv.a` | yes (SDK) | yes (`SDK/Extras`) | GNU libiconv, SDL3's converter | LGPL |
+| `libSDL2.a` | SDL2 comparison build only, 94 objects | not linked in | SDL 2.32.10 | zlib |
+| `libGL.a` | SDL2 comparison build only, 7 objects (stub for `gl.library`) | not linked in | link stub only, no Mesa code | AROS APL 1.1 |
 | `libstdc++.a`, `libgcc.a` | yes | yes | GCC 10.5 runtime | GPL-3.0 + GCC RLE 3.1 |
 | `startup.o`, `libautoinit.a`, `libamiga.a`, `libmui.a`, per-library stubs (exec, graphics, intuition, diskfont, utility, …) | yes | yes | AROS start-up code and library stubs | AROS APL 1.1 |
 | `libcrt.a`, `libstdlib.a`, `libm.a` | stubs for `crt.library` (+ ctype table) | no | ABIv11 C runtime interface; the runtime itself is a shared system library | AROS APL 1.1 |
 | `libcrtprog.a` | yes (`_exit`, abort, atexit, startup) | no | ABIv11 program glue | AROS APL 1.1 |
-| `libpthread.a` | yes (pthreads implementation) | no | ABIv11 pthreads | zlib (Szilard Biro et al.) |
+| `libpthread.a` | yes (pthreads implementation) | yes (since the SDL3 build) | pthreads | zlib (Szilard Biro et al.) |
 | `libstdc.a`, `libstdcio.a`, `libposixc.a`, `liblibinit.a` | no | yes | mainline stubs for the system C libraries | AROS APL 1.1 |
 
-The Raspberry Pi target links, on the same terms as the rows above where they
-apply: `libc++.a` (with libc++abi) and `libunwind.a` from
-`scripts/build-cxx-runtime.sh` (Apache-2.0 WITH LLVM-exception), `libpthread.a`
-(pthreads, zlib, Szilard Biro et al.), the system stubs named above, and
-compiler-rt's builtins (Apache-2.0 WITH LLVM-exception).
+The Raspberry Pi target links (link trace of 2026-11-02): `libSDL3_ctl.a`
+(zlib), `libc++.a` (with libc++abi) and `libunwind.a` from
+`scripts/build-cxx-runtime.sh` (Apache-2.0 WITH LLVM-exception; their
+sha256 are pinned in `third_party/llvm-runtimes-aros/PINS`), `libpthread.a`
+(pthreads, zlib, Szilard Biro et al.), the mainline system stubs named above
+(`libstdc.a`, `libstdcio.a`, `libposixc.a`, `liblibinit.a`, start-up code,
+`libautoinit.a`, `libamiga.a`, `libmui.a` and the per-library stubs), and
+compiler-rt's builtins library (Apache-2.0 WITH LLVM-exception). No GCC
+runtime, no iconv and no SDL2.
 
 The GCC Runtime Library Exception lets a program compiled with GCC be
 distributed under its own terms, together with the runtime parts linked into
@@ -157,7 +185,7 @@ a trademark of Bitstream, Inc. The licence text is in
 
 ## Distribution checklist
 
-For every binary package, per ABI:
+For every binary package, per target:
 
 1. Include `COPYING`, the whole `LICENSES/` directory (including
    `BSD-2-Clause-ADBToolkit.txt`, which the BSD licence requires in the
@@ -181,18 +209,25 @@ For every binary package, per ABI:
      `BUILDINFO.txt`.
    If the archive is not shipped with the binary, a written offer valid for
    three years is needed instead (section 3(b)), as `SOURCE-OFFER.txt`.
-3. ABIv11 (SDL linked statically): keep the zlib notice of the SDL the
-   binary links, `LICENSES/SDL3-zlib.txt` for the default SDL3 build or
-   `LICENSES/SDL2-zlib.txt` for an SDL2 build (`check-package-notices.sh`
-   reads the host from the package's `BUILDINFO.txt`). Do not present SDL as
+3. SDL is linked statically on every target: keep the zlib notice of the
+   SDL the binary links, `LICENSES/SDL3-zlib.txt` for the SDL3 build (every
+   package) or `LICENSES/SDL2-zlib.txt` for the ABIv11 SDL2 comparison build
+   (`check-package-notices.sh` reads the host from the package's
+   `BUILDINFO.txt`). Do not present SDL as
    our work. The SDL3 build carries the AROS port and a local patch
    (`third_party/sdl3-aros/`, recorded in `build/<abi>/sdl3/BUILDINFO.txt`);
    if that altered source is ever distributed,
    mark it as altered. The zlib licence does not
    require shipping SDL's source.
 4. LGPL code (`opl.cpp`) is conveyed under the GPL as part of the program.
-   Its source is in the source archive. No other LGPL library is linked
-   (SDL 1.2, SDL_net, SDL_sound and Munt from Boxer's build are not used).
+   Its source is in the source archive. On the x86_64 targets the SDK's GNU
+   libiconv (LGPL) is also linked, through SDL3; the Raspberry Pi build has
+   none. No other LGPL library is linked (SDL 1.2, SDL_net, SDL_sound and
+   Munt from Boxer's build are not used).
+4a. Raspberry Pi: ship `LICENSES/LLVM-Apache-2.0-with-exception.txt` for
+   libc++, libc++abi, libunwind and compiler-rt (`check-package-notices.sh`
+   requires it for that target). The AROS patches applied to them are in the
+   source archive (`third_party/llvm-runtimes-aros/`).
 5. AROS link code: unmodified. Name the AROS release or SDK in the package
    notes. The AROS sources are public.
 6. Fonts: ship `LICENSES/Bitstream-Vera.txt` with `Fonts/`. Never ship the

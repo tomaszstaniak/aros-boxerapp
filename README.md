@@ -40,17 +40,21 @@ No games are included; bring your own DOS games.
   functions work there, but in our QEMU setup games and their sound run
   seriously slowed down; see Limitations. Do not expect games to play
   properly yet.
+- **Raspberry Pi (AArch64, AROS for Raspberry Pi):** experimental. It has run
+  only under QEMU, without real sound output; sound and speed on a physical
+  Raspberry Pi need testing. Reports from Raspberry Pi owners are welcome.
 - Other distributions and real hardware have not been tested.
 
-ABIv11 and mainline binaries are different files, each in its own archive,
-and do not run on each other.
+ABIv11, mainline and Raspberry Pi binaries are different files, each in its
+own archive, and do not run on each other.
 
 ## Download
 
 Get the archive from the
 [releases page](https://github.com/tomaszstaniak/aros-boxerapp/releases)
 (currently [0.1.0 preview 6](https://github.com/tomaszstaniak/aros-boxerapp/releases/tag/v0.1.0-preview6),
-x86_64 ABIv11 and x86_64 mainline AROS). Checksums are listed with each release.
+x86_64 ABIv11 and x86_64 mainline AROS, and an experimental Raspberry Pi build).
+Checksums are listed with each release.
 
 ## Limitations
 
@@ -79,6 +83,8 @@ x86_64 ABIv11 and x86_64 mainline AROS). Checksums are listed with each release.
    `UnZip Boxer-<version>-aros-x86_64-abiv11-pc.zip -d Work:`.
    With the mainline `.pkg`, on any mainline system:
    `Unpack Boxer-<version>-aros-x86_64-abiv1-pc.pkg TO Work:`.
+   On the Raspberry Pi, which has no UnZip:
+   `Unpack Boxer-<version>-aros-aarch64-abiv1-raspi.pkg TO Work:`.
    This makes the drawer `Boxer`.
 2. Open the drawer and double-click `Install-Assign`. It assigns `Boxer:`
    to the drawer and adds a marked block to `S:User-Startup` so the assign
@@ -117,15 +123,16 @@ Please include:
 - which game you tried, what worked, and the steps that led to the problem;
 - the log file;
 - what you did just before the problem (screen, button or key);
-- the AROS version and distribution, and the ABI (ABIv11 or mainline);
+- the AROS version and distribution, and the ABI (ABIv11, mainline or
+  Raspberry Pi);
 - the amount of RAM;
 - real hardware (which) or an emulator (which, and its settings);
 - the BoxerUI sha256 from `SHA256SUMS` in the drawer.
 
 ## Building from source
 
-The build runs on a macOS host with an AROS cross toolchain (GCC 10.5) and
-SDK for each ABI. In short:
+The build runs on a macOS host with an AROS cross toolchain (GCC 10.5 for
+x86_64, Clang 20.1 for the Raspberry Pi) and SDK for each ABI. In short:
 
 ```sh
 cp local.env.example local.env     # fill in toolchain and SDK paths

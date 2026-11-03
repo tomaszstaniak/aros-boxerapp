@@ -1,11 +1,19 @@
 
-This Raspberry Pi build is a test build. It was tried only under QEMU
-(raspi3b, without SMP) on the nightly of 2026-10-29, not on a real
-Raspberry Pi. DOS programs run on DOSBox's interpreter core, because the
-faster dynamic core does not exist for this processor.
+Raspberry Pi
+------------
+This Raspberry Pi build is experimental. It has run only under QEMU
+(raspi3b, without SMP, AROS for Raspberry Pi nightly of 2026-10-29), not
+on a real Raspberry Pi, and without real sound output: the test used
+AHI's VOID driver, which discards the sound, because under QEMU the HDMI
+sound driver hangs the emulator. Sound and speed on a physical Raspberry
+Pi still need testing. DOS programs run on DOSBox's interpreter core,
+because the faster dynamic core does not exist for this processor.
 
-Sound was not heard. Under QEMU, opening the HDMI sound driver hangs the
-emulator, so the test used AHI's VOID driver, which discards the sound.
-Sound output on a real Raspberry Pi is untested. UnZip is not part of
-this system: use the .pkg archive with Unpack.
+If you try it on a Raspberry Pi, please report what you saw, also when it
+works (the logs are described under "When something goes wrong" below):
+the Pi model, the AROS version, the AHI driver and mode, the game, whether
+music and sound effects play, how smoothly it runs, whether saving and
+loading in the game work, and whether quitting works.
+
+UnZip is not part of this system: use the .pkg archive with Unpack.
 

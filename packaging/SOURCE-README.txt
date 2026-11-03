@@ -10,8 +10,11 @@ Contents
   aros-boxerapp/          the port: src/, scripts/, tools/, patches/,
                           assets/ (Boxer artwork originals and their
                           conversions), tests/, third_party/sdl3-aros/
-                          (SDL3 build inputs), packaging/,
+                          (SDL3 build inputs), third_party/llvm-runtimes-aros/
+                          (AROS patches for the Raspberry Pi C++ runtime,
+                          with their pins), packaging/,
                           documentation/, COPYING, LICENSES/
+  SOURCE-COMMIT.txt       the aros-boxerapp commit this archive was made from
   boxer-upstream/         the parts of Boxer (https://github.com/alinebee/Boxer,
                           commit in UPSTREAM-PIN.txt) the build uses:
                           Boxer/ and DOSBox/ (source code),
@@ -32,8 +35,10 @@ Rebuilding
   3. scripts/build-core.sh <abi>, then scripts/build-ui.sh <abi>
      (abi: abiv11, mainline-v1 or aros-aarch64-abiv1-raspi). The Raspberry
      Pi target uses Clang 20.1, the SDK of the nightly it runs on, and
-     needs scripts/build-cxx-runtime.sh first (libc++ 20.1 with the AROS
-     patches). On mainline, build-ui.sh first runs
+     needs scripts/build-cxx-runtime.sh first: libc++, libc++abi and
+     libunwind 20.1 from llvm-project-20.1.0.src.tar.xz with the AROS
+     patches in third_party/llvm-runtimes-aros/; the tarball, the patches
+     and the resulting archives must match the sha256 in its PINS. On mainline, build-ui.sh first runs
      scripts/build-unwind-fix.sh, which compiles GCC 10.5's unwind-dw2.c
      from a configured mainline AROS GCC build tree (AROS_V1_GCC_BUILD).
      For the SDL3 host (default on ABIv11) run scripts/build-sdl3.sh <abi>
@@ -41,7 +46,8 @@ Rebuilding
      sha256.
   4. scripts/make-package.sh <abi> rebuilds the binary package.
 
-The compiler (GCC 10.5) and the AROS SDK link libraries are components of
-the AROS development system; their source is public at
+The compilers (GCC 10.5 for x86_64, Clang 20.1 with the AROS patches of
+tools/crosstools/llvm for the Raspberry Pi) and the AROS SDK link libraries
+are components of the AROS development system; their source is public at
 https://github.com/aros-development-team/AROS (mainline) and
 https://github.com/deadwood2/AROS (ABIv11), at the revisions in BUILDINFO.txt.
