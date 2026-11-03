@@ -15,7 +15,9 @@
 # The GNU tarballs are read from LIBICONV_TARBALLS (a directory; default
 # deps/src) and checked against third_party/libiconv/PINS.
 # BOXER_KIT_VERSION: the version in the kit's name (default: BUILDINFO's
-# "version:", else packaging/VERSION).
+# "version:", else packaging/VERSION). For a kit made later for an earlier
+# release: BOXER_KIT_NAME (the asset's name without .zip) and
+# BOXER_KIT_SOURCE_COMMIT (the commit that build was made from).
 #
 # The link is repeated with -Wl,-t from link-inputs.txt; it must give the
 # same BoxerUI, and every file it opens is taken into the kit, except the
@@ -40,7 +42,7 @@ want=$(shasum -a 256 "$bin" | cut -d' ' -f1)
 ver=${BOXER_KIT_VERSION:-$(sed -n 's/^version: //p' "$info")}
 [ -n "$ver" ] || ver=$(tr -d ' \n' < "$P/packaging/VERSION")
 case "$BOXER_ABI" in abiv11) target=aros-x86_64-abiv11-pc;; mainline-v1) target=aros-x86_64-abiv1-pc;; esac
-name="Boxer-$ver-$target-lgpl-kit"
+name=${BOXER_KIT_NAME:-Boxer-$ver-$target-lgpl-kit}
 out="${BOXER_KIT_OUT:-$BUILD_DIR/lgpl-kit}"
 pins="$P/third_party/libiconv/PINS"
 tarballs="${LIBICONV_TARBALLS:-$P/deps/src}"
@@ -137,7 +139,7 @@ EOF
 chmod 755 "$kit/relink/link.sh"
 printf '%s  BoxerUI\n' "$want" > "$kit/relink/BoxerUI.sha256"
 printf '%s' "$toolchain_libs" > "$kit/relink/TOOLCHAIN-LIBS.sha256"
-srccommit=$(sed -n 's/^source commit: //p' "$info" | head -1)
+srccommit=${BOXER_KIT_SOURCE_COMMIT:-$(sed -n 's/^source commit: //p' "$info" | head -1)}
 [ -n "$srccommit" ] || srccommit="see BUILDINFO.txt of the package"
 title="GNU libiconv source and relink kit for Boxer for AROS $ver ($target)"
 rule=$(printf '%s' "$title" | sed 's/./=/g')
