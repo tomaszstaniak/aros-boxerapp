@@ -54,12 +54,29 @@ sysopt=(); [ "$BOXER_ABI" = mainline-v1 ] && sysopt=(--sysroot="$AROS_SDK")
 
 # 1. Repeat the link and list what it opens.
 link_in=(); while IFS= read -r l; do link_in+=("$l"); done < "$inputs"
-"$gxx" "${sysopt[@]+"${sysopt[@]}"}" -Wl,-t -o "$tmp/BoxerUI" "${link_in[@]}" > "$tmp/trace.txt" 2>&1 \
+"$gxx" "${sysopt[@]+"${sysopt[@]}"}" -Wl,-t -Wl,-Map,"$tmp/BoxerUI.map" -o "$tmp/BoxerUI" "${link_in[@]}" > "$tmp/trace.txt" 2>&1 \
   || { cat "$tmp/trace.txt" >&2; die "the link could not be repeated"; }
 [ "$(shasum -a 256 "$tmp/BoxerUI" | cut -d' ' -f1)" = "$want" ] \
   || die "the repeated link does not give the BoxerUI of $info"
 opened=$(grep -E '^/' "$tmp/trace.txt" | sed -E 's/\(.*\)$//' | awk '!seen[$0]++')
 
+# The build's own archives go into the kit with the members the link takes
+# from them (the link map's "Archive member included" list), in their
+# order: the others are not part of BoxerUI, and a compile of an unused
+# member can carry a build path (an assertion's file name).
+own_archive() {  # <archive> <kit copy>
+  local a=$1 dst=$2 d m keep=()
+  d="$tmp/ar-$(basename "$a")"; mkdir -p "$d"
+  (cd "$d" && "$AROS_AR" x "$a") || die "cannot unpack $a"
+  [ "$("$AROS_AR" t "$a" | sort | uniq -d)" = "" ] || die "duplicate member names in $a"
+  while IFS= read -r m; do
+    grep -q -F -x "$a($m)" "$tmp/members.txt" && keep+=("$d/$m")
+  done < <("$AROS_AR" t "$a")
+  [ ${#keep[@]} -gt 0 ] || die "no member of $a is linked"
+  "$AROS_AR" rcs "$dst" "${keep[@]}" || die "cannot write $dst"
+  echo "$(basename "$a"): ${#keep[@]} of $("$AROS_AR" t "$a" | wc -l | tr -d ' ') members" >> "$tmp/own-archives.txt"
+}
+grep -E '^/[^ ]+\.a\([^)]+\)$' "$tmp/BoxerUI.map" | sort -u > "$tmp/members.txt"
 kit="$out/$name"; [ -d "$out" ] && chmod -R u+w "$out"; rm -rf "$out"
 mkdir -p "$kit/relink/obj" "$kit/relink/lib" "$kit/relink/sysroot/lib" "$kit/libiconv" "$kit/LICENSES"
 : > "$kit/relink/objects.txt"; toolchain_libs=""; iconv_sha=""
@@ -72,7 +89,7 @@ for f in $opened; do
     case "$b" in
       *.o) [ ! -e "$kit/relink/obj/$b" ] || die "two objects named $b"
            cp "$f" "$kit/relink/obj/$b"; echo "obj/$b" >> "$kit/relink/objects.txt" ;;
-      libboxer-dosbox.a|libSDL3_ctl.a) cp "$f" "$kit/relink/lib/$b" ;;
+      libboxer-dosbox.a|libSDL3_ctl.a) own_archive "$f" "$kit/relink/lib/$b" ;;
       *) die "unexpected file on the link line: $f" ;;
     esac
     continue
@@ -167,8 +184,8 @@ $aros_diff
 
 relink/
   obj/                    BoxerUI's own object files, in link order (objects.txt)
-  lib/libboxer-dosbox.a   the DOSBox core of this build
-  lib/libSDL3_ctl.a       the reduced SDL3 of this build
+  lib/libboxer-dosbox.a   the DOSBox core of this build \  the members
+  lib/libSDL3_ctl.a       the reduced SDL3 of this build /  BoxerUI links
   lib/libiconv.a          the SDK's GNU libiconv, as linked
                           (sha256 $iconv_sha)
   sysroot/lib/            the AROS start-up code and link libraries the link
@@ -220,7 +237,10 @@ outside=$(grep -E '^/' "$tmp/test.txt" | sed -E 's/\(.*\)$//' | sort -u | outsid
 # No path of this machine in the kit's text files.
 leak=$(grep -r -l -I -F -e "$P" -e "$HOME" -e "$AROS_TOOLCHAIN" -e "$AROS_SDK" "$kit" || true)
 [ -z "$leak" ] || die "host paths in: $leak"
+leak=$(grep -r -l -a -F -e "$P" -e "$HOME" "$kit" || true)
+[ -z "$leak" ] || die "paths of this project or home directory in: $leak"
 
 (cd "$out" && rm -f "$name.zip" && zip -qrX "$name.zip" "$name")
 unzip -tq "$out/$name.zip" >/dev/null || die "zip test failed"
+sed 's/^/make-lgpl-kit: /' "$tmp/own-archives.txt"
 echo "make-lgpl-kit: ok -> $out/$name.zip ($(shasum -a 256 "$out/$name.zip" | cut -d' ' -f1)); relink test: BoxerUI $got"
