@@ -149,7 +149,7 @@ cat > "$kit/README.txt" <<EOF
 $title
 $rule
 
-The BoxerUI program of the package Boxer-$ver-$target links GNU libiconv
+The BoxerUI program of Boxer for AROS $ver ($target) links GNU libiconv
 $iv statically (SDL3's character-set conversion uses it). GNU libiconv is
 free software under the GNU Lesser General Public License, version 2.1 or
 later (LICENSES/LGPL-2.1.txt). This kit lets you change libiconv and link
