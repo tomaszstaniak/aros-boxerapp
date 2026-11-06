@@ -1,5 +1,7 @@
 # Project documentation
 
+- [Screenshot gallery: Boxer on AROS](screenshots.md)
+
 - [Development: targets, source pins, build and tests](development.md)
 - [Pinned sources and patch workflow](patching.md)
 - [Licences and authors](licenses.md)

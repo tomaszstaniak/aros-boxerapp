@@ -1,11 +1,17 @@
 # Boxer for AROS
 
+<img src="assets/runtime/boxer/boxer-128.png" alt="Boxer logo" width="96" height="96" align="right">
+
 An AROS port of [Boxer](https://github.com/alinebee/Boxer), the DOS game
 emulator front end by Alun Bestor, with Boxer's own DOSBox 0.74 core.
 
 It brings Boxer's gamebox workflow and interface to AROS using Zune.
 **This is an experimental preview.** It provides the foundation for the
 port; it is not yet the complete Boxer experience.
+
+[![Boxer running Tyrian on AROS One](documentation/images/inspector-cpu.png)](documentation/screenshots.md)
+
+[See the screenshot gallery](documentation/screenshots.md): Welcome, import, covers, games folder, recent games, gameplay, DOS prompt, program launcher and Inspector. Captured with Boxer 0.2.0-preview1 on AROS One (x86_64 ABIv11).
 
 ## What this preview can do
 
