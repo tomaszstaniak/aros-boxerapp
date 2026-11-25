@@ -15,7 +15,9 @@ Opened later by BoxerUI or the SDL code linked into it:
 Not needed: SDL is linked statically (SDL 3, built without OpenGL), so
   no SDL library and no gl.library is required. Such names can appear in
   the binary as text; this build does not use them.
-Built against mainline AROS 87266168 (2026-10-26).
+Built against the SDK of the mainline AROS nightly build of 2026-11-24.
+  It needs a nightly build of 2026-11-24 or later; on an earlier one use
+  Boxer 0.2.0 preview 1.
 Fonts: Fonts:TrueType/VeraSans.ttf and VeraSansBold.ttf (the system's
   Bitstream Vera Sans; Boxer's Fonts/*.otag refer to them). Without them
   BoxerUI falls back to topaz.font.
